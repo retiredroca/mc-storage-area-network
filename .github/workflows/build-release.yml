@@ -23,6 +23,9 @@ jobs:
       RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.run_number) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history + tags so the changelog can diff against the previous release.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -51,13 +54,28 @@ jobs:
           cp crafting-network/build/libs/*-universal.jar dist/
           ls -la dist
 
+      # Commit-derived changelog used for CurseForge and Modrinth.
+      - name: Generate changelog
+        run: |
+          prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          if [ -n "$prev" ]; then range="$prev..HEAD"; else range="HEAD"; fi
+          {
+            echo "Changes since ${prev:-the beginning}:"
+            echo
+            git log "$range" --no-merges --pretty=format:'- %s (`%h`)'
+            echo
+          } > dist/changelog.md
+          echo "----- changelog.md -----"
+          cat dist/changelog.md
+
       - uses: actions/upload-artifact@v4
         with:
           name: universal-jars
           path: dist/*.jar
 
-      # Publishes a GitHub release and the same files to CurseForge.
-      - name: Publish release (GitHub + CurseForge)
+      # Publishes a GitHub release (auto-generated notes) and the same files + changelog
+      # to CurseForge and Modrinth.
+      - name: Publish release (GitHub + CurseForge + Modrinth)
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -67,10 +85,12 @@ jobs:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-version-type: release
+          curseforge-changelog-file: dist/changelog.md
 
           modrinth-id: mc-storage-area-network
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-version-type: release
+          modrinth-changelog-file: dist/changelog.md
 
           files: |
             dist/*.jar
