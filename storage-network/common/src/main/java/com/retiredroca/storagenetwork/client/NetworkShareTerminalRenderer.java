@@ -19,8 +19,9 @@ import net.minecraft.resources.ResourceLocation;
 public class NetworkShareTerminalRenderer<T extends AbstractNetworkShareTerminalBlockEntity>
         implements BlockEntityRenderer<T> {
     private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("storage_network", "textures/entity/chest/share_terminal.png");
-    public static final int TINT = 0xFFFFFF;
+            ResourceLocation.withDefaultNamespace("textures/entity/chest/ender.png");
+    // Obsidian purple (#281D3D) brightened so the multiply on the dark ender-chest texture reads purple.
+    public static final int TINT = 0x9B6CFF;
 
     private final ModelPart root;
     private final ModelPart lid;
