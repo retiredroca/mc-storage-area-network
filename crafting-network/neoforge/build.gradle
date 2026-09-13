@@ -29,7 +29,7 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache") // datagen cache files
 }
 
-// See the storage-central Fabric build for why the shared sources are relocated into a
+// See the storage-network Fabric build for why the shared sources are relocated into a
 // loader-specific package: it lets a single merged jar contain both mapping variants.
 def commonPrefix = 'com.retiredroca.craftingnetwork'
 def relocatedPrefix = 'com.retiredroca.craftingnetwork.neoforge.common'

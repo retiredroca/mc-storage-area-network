@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 /**
  * Loader-independent helpers for navigating and mutating shulker boxes that are stored inside
  * vanilla {@link Container} slots. Uses only vanilla types so the same code works on Fabric
- * and NeoForge and can be shared between Storage Central, Crafting Central and any shulker add-on.
+ * and NeoForge and can be shared between Storage Network, Crafting Network and any shulker add-on.
  */
 public final class ShulkerBoxHelper {
     public static final int BOX_CAPACITY = 27;

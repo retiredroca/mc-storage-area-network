@@ -17,3 +17,6 @@ bin/
 # OS
 .DS_Store
 Thumbs.db
+
+# local dev session script (untracked)
+oc.sh

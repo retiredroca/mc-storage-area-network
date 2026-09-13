@@ -1,7 +1,7 @@
 # MC Storage Area Network API
 
 A small, standalone, multi-loader API for exposing **item sources** to mc-storage-area-network hosts
-(Storage Central, Crafting Central, and anything else that queries a shared network).
+(Storage Network, Crafting Network, and anything else that queries a shared network).
 
 It provides:
 
@@ -30,7 +30,7 @@ nested copy. Drop it in `mods/` on either loader (no separate per-loader downloa
 - **Fabric:** requires Fabric Loader + Fabric API.
 - **NeoForge:** requires NeoForge `21.1.235+` for Minecraft `1.21.1`.
 
-Hosts such as Storage Central / Crafting Central declare `mc_storage_area_network` as a dependency, so
+Hosts such as Storage Network / Crafting Network declare `mc_storage_area_network` as a dependency, so
 install this jar alongside them.
 
 ---
