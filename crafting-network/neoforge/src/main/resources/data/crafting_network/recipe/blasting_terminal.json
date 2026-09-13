@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "ICI",
+    "III"
+  ],
+  "key": {
+    "I": { "item": "minecraft:copper_ingot" },
+    "C": { "item": "minecraft:blast_furnace" }
+  },
+  "result": {
+    "id": "crafting_network:blasting_terminal",
+    "count": 1
+  }
+}

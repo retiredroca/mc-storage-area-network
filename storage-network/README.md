@@ -1,102 +1,101 @@
 # Storage Network
 
-![Storage Network demo](storage-network.gif)
+**One searchable interface for every chest, barrel and container near you.**
 
-A Minecraft 1.21.1 mod for **NeoForge** and **Fabric** that adds a **Storage Terminal** — a block that scans nearby chunks for any storage container and lets you access, search, and manage all of your items from a single, fast interface.
+Tired of running between chests? Place a **Storage Terminal** and it scans the chunks around it,
+gathering every inventory-bearing block — vanilla or modded — into a single, searchable index.
+Browse, search, sort, take and deposit from one screen.
 
-> Currently in development. Tested in single-player and on LAN/dedicated servers.
+![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/storage-network/storage-network.gif)
+
+---
 
 ## Features
 
-- **Storage Terminal block** — place it down and open a searchable interface that aggregates the contents of every inventory-bearing block in range (chests, barrels, furnaces, hoppers, and more).
-- **Click-to-extract & deposit** — click an item in the terminal to pull it into your inventory (shift-click for a full stack), or shift-click items in your inventory to push them into the network.
-- **Live search** — type to filter items by name or ID.
-- **Same feel as a double chest** — the terminal renders with the familiar double-chest window and works like a normal container.
-- **Range upgrades** — six tiers that expand the scan radius:
-  - Tier 0 → 1×1 chunks (base) - no upgrade needed
-  - Tier 1 → 3×3 chunks
-  - Tier 2 → 5×5 chunks
-  - Tier 3 → 7×7 chunks
-  - Tier 4 → 9×9 chunks
-  - Tier 5 → 11×11 chunks (max)
-- **Server-aware range limits** — tiers are automatically capped so the scan radius never exceeds the server's `view-distance`/`simulation-distance` from `server.properties`, and can be further limited in a config file.
-- **Fast scanning** — the terminal only scans actual inventory-bearing block entities, so it stays responsive even with many containers nearby.
-- **Server-authoritative** — works in single-player, LAN, and dedicated servers; no client-side hacks.
-- **Aggregate reads** — the terminal shows the total count of each item across the whole network.
+- **Storage Terminal** — aggregates chests, barrels, hoppers, shulker boxes and any modded container within range into one searchable grid.
+- **Search & sort** — search by name or id; sort by name, type, tag, mod or equipment slot.
+- **Virtual item grid** — stacks are merged and counted, with draggable search and source panels.
+- **Range tiers** — upgrade the terminal to scan a larger area (1×1 up to 11×11 chunks).
+- **Network Share Terminal** — a collection-only sink for crafted outputs (see below).
+- **Shulker flattening** — shulker-box contents (and boxes inside boxes) appear as ordinary items.
+- **Ownership & privacy** — a terminal only shows global (worldgen) storage plus storage placed by the terminal's owner.
 
-## Requirements
+## The Storage Terminal
 
-- **Minecraft**: 1.21.1
-- **NeoForge** edition: NeoForge 21.1.235 or later
-- **Fabric** edition: Fabric Loader 0.16.14 or later + [Fabric API](https://modrinth.com/mod/fabric-api)
+- Aggregates all discovered containers into one searchable list.
+- Left-click an entry to take a stack; holds shift to take more.
+- Shift-click items in your inventory to deposit them into the network.
+- The **source dropdown** lets you scope the view to *All Storage*, your *Inventory*, or a single container.
 
-## Installation
+## The Network Share Terminal
 
-**NeoForge edition**
+A companion block that **receives crafted output** from Crafting Network terminals and holds it for you.
 
-1. Install [NeoForge](https://neoforged.net/) for Minecraft 1.21.1.
-2. Place `neoforge-storage_network-1.YY.MM.DD.HH.jar` from the [Releases](https://github.com/RetiredRoca/storage-network/releases) page (NeoForge edition) into your `mods/` folder.
-3. Launch the game.
+- Collection-only: its contents are hidden from normal terminal listings.
+- Anyone can open it and deposit items; only the owner can break it.
+- Rendered as a tinted ender chest.
 
-**Fabric edition**
+## Ownership & privacy
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.1, plus Fabric API.
-2. Place the Fabric `fabric-storage_network-1.YY.MM.DD.HH.jar` from the [Releases](https://github.com/RetiredRoca/storage-network/releases) page into your `mods/` folder.
-3. Launch the game.
+Storage Network records who places each container:
 
-## Building from source
+- **Global/worldgen containers** (dungeon chests, etc.) are visible to everyone.
+- **Player-placed storage** is visible only to the terminal's owner (and, optionally, their scoreboard team).
+- Terminals are **openable by anyone** but **breakable only by their owner**.
 
-Requires **Java 21** (auto-provisioned by the Gradle toolchain).
+All of this is configurable on the server (see below).
 
-**NeoForge edition** (from the `neoforge/` folder):
+## Getting started
 
-```bash
-cd neoforge
-./gradlew build
-```
-
-The built mod JAR will be at `neoforge/build/libs/neoforge-storage_network-1.YY.MM.DD.HH.jar`.
-
-**Fabric edition** (from the `fabric/` folder):
-
-```bash
-cd fabric
-./gradlew build
-```
-
-The built mod JAR will be at `fabric/build/libs/fabric-storage_network-1.YY.MM.DD.HH.jar`.
-
-> Note: run `build` only. Do **not** run `runClient`/`runServer` during development if you prefer to test via a launcher (e.g. Prism Launcher) pointing at an existing installation.
-
-## Usage
-
-1. Craft the **Storage Terminal** and place it somewhere with your storage nearby.
-2. **Right-click** the terminal to open the interface.
-3. Browse/search the aggregated contents.
-4. **Click** an item to take one, **shift-click** to take a full stack.
-5. **Shift-click** items from your own inventory to deposit them into the network.
-6. Craft and apply a **Range Upgrade** (right-click it on the terminal) to increase scan range.
+1. Craft a **Storage Terminal**: 8 copper ingots around a chest.
+2. Place it near your storage and right-click to open.
+3. Upgrade it with range tiers (see recipes below) to expand the scan radius.
 
 ## Recipes
 
-Recipes for the terminal and the five range upgrades are included in `neoforge/src/main/resources/data/storage_network/recipe/` (NeoForge) and `fabric/src/main/resources/data/storage_network/recipe/` (Fabric).
+| Result | Recipe |
+|--------|--------|
+| **Storage Terminal** | 3×3: 8× Copper Ingot + 1× Chest (center) |
+| **Network Share Terminal** | 3×3: 4× Chest around a Storage Terminal |
+| **Iron (tier 1) upgrade** | Terminal (center) + 4× Iron Ingot |
+| **Gold (tier 2) upgrade** | Iron Terminal (center) + 4× Gold Ingot |
+| **Emerald (tier 3) upgrade** | Gold Terminal (center) + 4× Emerald |
+| **Diamond (tier 4) upgrade** | Emerald Terminal (center) + 4× Diamond |
+| **Netherite (tier 5) upgrade** | Diamond Terminal (center) + 4× Netherite Ingot |
+
+**Scan radius by tier:** Copper 1×1 → Iron 3×3 → Gold 5×5 → Emerald 7×7 → Diamond 9×9 → Netherite 11×11 chunks
+(automatically capped by the server's view/simulation distance).
+
+## Requirements
+
+| | |
+|---|---|
+| Minecraft | 1.21.1 |
+| Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
+| Java | 21 |
+| Side | Client & Server |
+| Dependency | MC Storage Area Network (`mc_storage_area_network`) — bundled in this jar |
 
 ## Configuration
 
-The max tier can be limited per server. The effective tier is also capped automatically by the smaller of the server's `view-distance` and `simulation-distance` from `server.properties`, so upgrades never scan further than chunks are actually generated/loaded.
+- Fabric: `config/storage_network.json`
+- NeoForge: `config/storage_network-server.toml`
 
-- **NeoForge**: `config/storage_network-server.toml` (generated on first run) — `maxTier` hard caps the highest tier that may be applied (default `5`).
-- **Fabric**: `config/storage_network.json` (generated on first run) — `maxTier` behaves the same (default `5`).
+| Key | Default | Description |
+|-----|---------|-------------|
+| `maxTier` | `5` | Highest upgrade tier allowed on the server (0–5). |
 
-## Configuration / Credits
+The API's ownership options (`ownershipEnabled`, `teamSharing`) live in the `mc_storage_area_network` config.
 
-- **Mod ID**: `storage_network`
-- **Package**: `com.retiredroca.storagenetwork`
-- **Server config (NeoForge)**: `config/storage_network-server.toml`
-- **Server config (Fabric)**: `config/storage_network.json`
+## Compatibility
+
+- Works with any container that exposes a standard inventory (vanilla and most modded storage).
+- JEI/REI are not required.
 
 ## License
 
-Released under the [Apache License 2.0](LICENSE).
+[Apache-2.0](LICENSE)
 
-*NeoForge edition built with the [MDK](https://github.com/neoforged/MDK); Fabric edition built with the [Fabric Example Mod](https://github.com/FabricMC/fabric-example-mod). Minecraft, NeoForge and Fabric are property of their respective owners.*
+## Author
+
+Retired Roca

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "ICI",
+    "III"
+  ],
+  "key": {
+    "I": { "item": "minecraft:copper_ingot" },
+    "C": { "item": "minecraft:smoker" }
+  },
+  "result": {
+    "id": "crafting_network:smoking_terminal",
+    "count": 1
+  }
+}

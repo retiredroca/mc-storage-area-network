@@ -1,110 +1,114 @@
 # Crafting Network
 
-![Crafting Network demo](crafting-network.gif)
+**Craft using every chest near you — no more running back and forth for materials.**
 
-A Minecraft 1.21.1 mod for **NeoForge** and **Fabric** that adds a **Crafting Station** — an upgradable crafting table that scans nearby chunks for storage containers and lets you craft using items pulled from those containers and your own inventory.
+Crafting Network turns nearby storage into a shared item network and adds a family of upgradable
+**Terminals** that craft, smelt, blast, smoke and brew directly from it. Pull ingredients from your
+chests, process them, and send the results back — automatically.
 
-> Currently in development. Tested in single-player and on LAN/dedicated servers.
+![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/crafting-network/crafting-network.gif)
+
+---
 
 ## Features
 
-- **Crafting Station block** — an upgradable crafting table that opens the familiar vanilla crafting window.
-- **Vanilla recipe book** — fully supported; craftable/uncraftable highlights reflect what the station can make from the scanned network plus your inventory.
-- **Network-aware craftable detection** — the station keeps a synchronized catalog of the largest stacks across the network, so recipes you currently can't craft show up greyed-out and clickable recipes are highlighted.
-- **Blueprint crafting** — place a copy of each ingredient in the 3×3 grid as a template; the station crafts using items from the nearest containers **and** your inventory, without taking from the grid.
-- **Click to craft** — click the result slot to craft one (or shift-click for a full stack); keep clicking to keep crafting as long as ingredients hold out.
-- **Shift-click deposit** — shift-click items in your inventory to push them into the scanned containers.
-- **Source dropdown** — a floating dropdown beside the GUI selects **All Storage** or a single container; crafting, the recipe-book catalog and the storage panel all respect the selection. Drag it to reposition, scroll through the list, and its position is remembered between sessions (`config/crafting_network-client.json`).
-- **Remote storage panel** — the **Storage** button above the grid toggles a 9×7 panel showing the top 63 items available in the selected source.
-- **Count-accurate scanning** — duplicate handlers (e.g. both halves of a double chest or stacked backpack inventories) are deduplicated, so counts match what the storage terminal shows.
-- **Range upgrades** — six tiers that expand the scan radius:
-  - Tier 0 → 1×1 chunks (base) - no upgrade needed
-  - Tier 1 → 3×3 chunks
-  - Tier 2 → 5×5 chunks
-  - Tier 3 → 7×7 chunks
-  - Tier 4 → 9×9 chunks
-  - Tier 5 → 11×11 chunks (max)
-- **Server-aware range limits** — tiers are automatically capped so the scan radius never exceeds the server's `view-distance`/`simulation-distance` from `server.properties`, and can be further limited in a config file.
-- **Fast scanning** — the station only scans actual inventory-bearing block entities, so it stays responsive even with many containers nearby.
-- **Server-authoritative** — works in single-player, LAN, and dedicated servers; no client-side hacks.
+- **Crafting Terminal** — an upgradable crafting table with a recipe book that crafts using items drawn from the network plus your inventory.
+- **Processor Terminals** — **Smelting**, **Blasting**, **Smoking** and **Brewing** terminals that pull inputs and fuel from the network, process them, and push results back.
+- **Recipe-book selector** — pick a recipe from the book; the terminal gathers the ingredients for you.
+- **Sources dropdown** — scope ingredients to *All Storage*, your *Inventory*, or a single container.
+- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then your inventory, then the nearest container.
+- **Range tiers** — upgrade terminals to scan a larger area (1×1 up to 11×11 chunks).
+- **Ownership & privacy** — terminals only use global (worldgen) storage plus storage placed by the terminal's owner.
 
-## Requirements
+## The Crafting Terminal
 
-- **Minecraft**: 1.21.1
-- **NeoForge** edition: NeoForge 21.1.235 or later
-- **Fabric** edition: Fabric Loader 0.16.14 or later + [Fabric API](https://modrinth.com/mod/fabric-api)
+- Open it to see the vanilla 3×3 grid and recipe book.
+- Select a recipe; the terminal reports whether you have the materials and, on click, crafts it.
+- **Click** the result to craft one; **shift-click** to craft as many as your materials allow.
+- Shift-click items in your inventory to deposit them into the network.
 
-## Installation
+## Processor Terminals
 
-**NeoForge edition**
+Each processor terminal runs automatically once it has a recipe to work on:
 
-1. Install [NeoForge](https://neoforged.net/) for Minecraft 1.21.1.
-2. Place `neoforge-crafting_network-1.YY.MM.DD.HH.jar` from the [Releases](https://github.com/RetiredRoca/crafting-network/releases) page (NeoForge edition) into your `mods/` folder.
-3. Launch the game.
+| Terminal | Processes | Notes |
+|----------|-----------|-------|
+| **Smelting Terminal** | Furnace recipes | Needs fuel from the network |
+| **Blasting Terminal** | Blast-furnace recipes | Faster than smelting |
+| **Smoking Terminal** | Smoker recipes | Fast food cooking |
+| **Brewing Terminal** | Potions | Select a target potion from the brew book; pulls water, blaze powder and ingredients |
 
-**Fabric edition**
+Higher tiers process **faster** (tier speed multiplier) and scan more chunks.
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.1, plus Fabric API.
-2. Place the Fabric `fabric-crafting_network-1.YY.MM.DD.HH.jar` from the [Releases](https://github.com/RetiredRoca/crafting-network/releases) page into your `mods/` folder.
-3. Launch the game.
+## Ownership & privacy
 
-## Building from source
+- Terminals are **openable by anyone** but **breakable only by their owner**.
+- A terminal only sees **global (worldgen) storage** and **storage placed by the terminal's owner** (plus scoreboard-team members, if enabled).
+- Configurable on the server via the bundled MC Storage Area Network API.
 
-Requires **Java 21** (auto-provisioned by the Gradle toolchain).
+## Getting started
 
-**NeoForge edition** (from the `neoforge/` folder):
-
-```bash
-cd neoforge
-./gradlew build
-```
-
-The built mod JAR will be at `neoforge/build/libs/neoforge-crafting_network-1.YY.MM.DD.HH.jar`.
-
-**Fabric edition** (from the `fabric/` folder):
-
-```bash
-cd fabric
-./gradlew build
-```
-
-The built mod JAR will be at `fabric/build/libs/fabric-crafting_network-1.YY.MM.DD.HH.jar`.
-
-> Note: run `build` only. Do **not** run `runClient`/`runServer` during development if you prefer to test via a launcher (e.g. Prism Launcher) pointing at an existing installation.
-
-## Usage
-
-1. Craft the **Crafting Station** and place it somewhere with your storage nearby.
-2. **Right-click** the station to open the crafting window.
-3. Click items from your inventory into the 3×3 grid to set up the recipe template (your items stay in your inventory).
-4. Use the **source dropdown** beside the window to craft from **All Storage** or a single container; drag it to move it around the screen.
-5. **Click the result slot** to craft one, holding items in your cursor; **shift-click** the result to craft a full stack.
-6. Open the **recipe book** to browse recipes — craftable ones are highlighted based on the storage network.
-7. Click the **Storage** button to toggle a panel showing the top items in the selected source, and **shift-click** items from your own inventory to deposit them into the network.
-8. Craft and apply a **Range Upgrade** (right-click it on the station) to increase scan range.
-
-> Crafting always prefers items from the scanned containers first, then uses the player's inventory if the network runs short.
+1. Craft a **Crafting Terminal** and place it near your storage.
+2. Right-click to open; pick a recipe from the recipe book.
+3. Craft the processor terminals you need and let them run.
+4. Add a **Network Share Terminal** (from Storage Network) so outputs are collected automatically.
 
 ## Recipes
 
-Recipes: `crafting_terminal` (crafting table surrounded by copper ingots) and five `crafting_upgrade_tierN` recipes (craft the station surrounded by iron/gold/emerald/diamond/netherite ingots — it must match the station's current tier). Recipe JSONs are in `neoforge/src/main/resources/data/crafting_network/recipe/` (NeoForge) and `fabric/src/main/resources/data/crafting_network/recipe/` (Fabric).
+All terminals are shaped 3×3: **8× Copper Ingot** around a core block.
+
+| Result | Core block |
+|--------|-----------|
+| **Crafting Terminal** | Crafting Table |
+| **Smelting Terminal** | Furnace |
+| **Blasting Terminal** | Blast Furnace |
+| **Smoking Terminal** | Smoker |
+| **Brewing Terminal** | Brewing Stand |
+
+**Tier upgrades** place the previous terminal in the center of a 3×3 and surround it with 4 ingots/gems:
+
+| Tier | Material |
+|------|----------|
+| Iron (1) | 4× Iron Ingot |
+| Gold (2) | 4× Gold Ingot |
+| Emerald (3) | 4× Emerald |
+| Diamond (4) | 4× Diamond |
+| Netherite (5) | 4× Netherite Ingot |
+
+**Scan radius by tier:** Copper 1×1 → Iron 3×3 → Gold 5×5 → Emerald 7×7 → Diamond 9×9 → Netherite 11×11 chunks.
+
+> Pair with **Storage Network** for the Storage Terminal and the Network Share Terminal used for output collection.
+
+## Requirements
+
+| | |
+|---|---|
+| Minecraft | 1.21.1 |
+| Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
+| Java | 21 |
+| Side | Client & Server |
+| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — bundled; Storage Network recommended for the share terminal |
 
 ## Configuration
 
-The max tier can be limited per server. The effective tier is also capped automatically by the smaller of the server's `view-distance` and `simulation-distance` from `server.properties`, so upgrades never scan further than chunks are actually generated/loaded.
+- Fabric: `config/crafting_network.json`
+- NeoForge: `config/crafting_network-server.toml`
 
-- **NeoForge**: `config/crafting_network-server.toml` (generated on first run) — `maxTier` hard caps the highest tier that may be applied (default `5`).
-- **Fabric**: `config/crafting_network.json` (generated on first run) — `maxTier` behaves the same (default `5`).
+| Key | Default | Description |
+|-----|---------|-------------|
+| `maxTier` | `5` | Highest upgrade tier allowed on the server (0–5). |
 
-Client-side, `config/crafting_network-client.json` stores the last position of the source dropdown.
+The API's ownership options (`ownershipEnabled`, `teamSharing`) live in the `mc_storage_area_network` config.
 
-## Credits
+## Compatibility
 
-- **Mod ID**: `crafting_network`
-- **Package**: `com.retiredroca.craftingnetwork`
+- Works with any container that exposes a standard inventory (vanilla and most modded storage).
+- JEI/REI are not required; the terminal uses the vanilla recipe book.
 
 ## License
 
-Released under the [Apache License 2.0](LICENSE).
+[Apache-2.0](LICENSE)
 
-*NeoForge edition built with the [MDK](https://github.com/neoforged/MDK); Fabric edition built with the [Fabric Example Mod](https://github.com/FabricMC/fabric-example-mod). Minecraft, NeoForge and Fabric are property of their respective owners.*
+## Author
+
+Retired Roca
