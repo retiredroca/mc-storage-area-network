@@ -120,7 +120,8 @@ jobs:
             fabric
             neoforge
           java: 21
-          retry-attempts: 3
+          retry-attempts: 5
+          retry-delay: 15000
           fail-mode: warn
 
       - name: Publish Storage Network
@@ -140,7 +141,8 @@ jobs:
             fabric
             neoforge
           java: 21
-          retry-attempts: 3
+          retry-attempts: 5
+          retry-delay: 15000
           fail-mode: warn
 
       - name: Publish Crafting Network
@@ -160,5 +162,6 @@ jobs:
             fabric
             neoforge
           java: 21
-          retry-attempts: 3
+          retry-attempts: 5
+          retry-delay: 15000
           fail-mode: warn
