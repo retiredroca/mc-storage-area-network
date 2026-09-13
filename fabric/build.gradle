@@ -87,6 +87,10 @@ publishing {
         }
     }
     repositories {
+        maven {
+            name = 'repo'
+            url = uri("${projectDir}/../repo")
+        }
         mavenLocal()
     }
 }

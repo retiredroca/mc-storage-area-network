@@ -1,13 +1,13 @@
 plugins {
     id 'base'
+    id 'maven-publish'
 }
-
 
 // Fixed API version (no build-date suffix).
 version = '1.0.0'
 group = 'com.retiredroca.itemnetwork'
 
-// Newest non-sources / non-dev jar in a directory (loader builds are date-versioned).
+// Newest non-sources / non-dev jar in a directory.
 def newestJar = { String dir ->
     def d = file(dir)
     def jars = (d.listFiles() ?: new File[0]).findAll {
@@ -20,10 +20,16 @@ def newestJar = { String dir ->
     return jars.last()
 }
 
+def bundleTokens = [
+        '@@VERSION@@': version.toString(),
+        '@@AUTHORS@@': 'Retired Roca',
+        '@@LICENSE@@': 'Apache-2.0',
+]
+
 /**
- * Universal jar: contains common + fabric classes + fabric.mod.json from the Fabric build, and the
- * NeoForge-only classes + neoforge.mods.toml from the NeoForge build. Each loader reads only its own
- * metadata and entrypoint, so the same jar loads on both.
+ * Universal bundle: a thin container mod holding the loader-specific API jars as nested mods.
+ * The container carries no top-level classes, so each loader loads only its own nested copy of the
+ * public com.retiredroca.itemnetwork.api package (Fabric intermediary vs NeoForge Mojang).
  */
 tasks.register('universalJar', Jar) {
     dependsOn gradle.includedBuild('fabric').task(':build')
@@ -34,16 +40,21 @@ tasks.register('universalJar', Jar) {
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    from({
-        def jar = newestJar('fabric/build/libs')
-        jar == null ? [] : zipTree(jar)
-    })
-    from({
-        def jar = newestJar('neoforge/build/libs')
-        jar == null ? [] : zipTree(jar)
-    }) {
-        include 'com/retiredroca/itemnetwork/neoforge/**'
-        include 'META-INF/neoforge.mods.toml'
+    // Container metadata only (fabric.mod.json + META-INF/neoforge.mods.toml + jarjar metadata).
+    from('bundle') {
+        filter { String line ->
+            def out = line
+            bundleTokens.each { token, value -> out = out.replace(token, value) }
+            out
+        }
+    }
+    from({ newestJar('fabric/build/libs') }) {
+        into 'META-INF/jars'
+        rename { 'item_network_api-fabric.jar' }
+    }
+    from({ newestJar('neoforge/build/libs') }) {
+        into 'META-INF/jarjar'
+        rename { 'item_network_api-neoforge.jar' }
     }
 }
 
@@ -51,11 +62,35 @@ tasks.named('build') {
     dependsOn 'universalJar'
 }
 
-// Host mods (storage-central, crafting-central) resolve the API from mavenLocal, so run this
-// before building them (or after any API change): ./gradlew publishApi
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact(tasks.named('universalJar'))
+            artifactId = 'item-network-api'
+        }
+    }
+    repositories {
+        maven {
+            name = 'repo'
+            url = uri("${projectDir}/repo")
+        }
+        mavenLocal()
+    }
+}
+
+// Publishes the per-loader API jars to mavenLocal (for local host builds).
 tasks.register('publishApi') {
     group = 'publishing'
     description = 'Publishes the Fabric and NeoForge API jars to mavenLocal for host mods to consume.'
     dependsOn gradle.includedBuild('fabric').task(':publishToMavenLocal')
     dependsOn gradle.includedBuild('neoforge').task(':publishToMavenLocal')
+}
+
+// Publishes everything (per-loader jars + universal bundle) into the in-repo maven (repo/).
+tasks.register('publishRepo') {
+    group = 'publishing'
+    description = 'Publishes the API (per-loader jars + universal bundle) into ./repo for hosts and modders.'
+    dependsOn gradle.includedBuild('fabric').task(':publishMavenJavaPublicationToRepoRepository')
+    dependsOn gradle.includedBuild('neoforge').task(':publishMavenJavaPublicationToRepoRepository')
+    dependsOn 'publishMavenJavaPublicationToRepoRepository'
 }
