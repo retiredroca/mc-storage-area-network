@@ -22,20 +22,22 @@ jobs:
       # v<tag> for tag pushes, otherwise v<run number> (manual dispatch / /release comment).
       RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.run_number) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history + tags so the changelog can diff against the previous release.
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
       # The committed gradle.properties point at a local Windows JDK; drop that on CI
-      # and let the toolchain / JAVA_HOME take over.
-      - name: Drop local java home
-        run: find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
+      # and let the toolchain / JAVA_HOME take over. Also make sure gradlew is executable.
+      - name: Prepare build
+        run: |
+          find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
+          chmod +x ./gradlew
 
       - name: Build API + in-repo maven
         run: ./gradlew --no-daemon clean build publishRepo
