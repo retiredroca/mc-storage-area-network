@@ -1,0 +1,145 @@
+# MC Storage Area Network
+
+**Turn every chest, barrel and container around you into one shared, searchable item network — then craft with it.**
+
+Have you ever filled a chunk with chests? Now you can — and access, search, sort, and craft with
+everything inside them from a single block. MC Storage Area Network is a suite of three mods for
+**Minecraft 1.21.1** on **Fabric** and **NeoForge**:
+
+| Mod | What it adds |
+|-----|--------------|
+| **Storage Network** | **Storage Terminal** — browse, search, take and deposit from every nearby container from one interface. Plus the **Network Share Terminal** for collecting crafted output. |
+| **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
+| **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. Bundled automatically; other mods can hook into it. |
+
+![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/storage-network/storage-network.gif)
+![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/crafting-network/crafting-network.gif)
+
+---
+
+## Features
+
+- **One network for all your storage** — chests, barrels, hoppers, shulker boxes, and any modded inventory-bearing block within range.
+- **Storage Terminal** — a searchable, sortable grid of every item in the network, with draggable search and source panels. Search by name or id; sort by name, type, tag, mod or equipment.
+- **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. Click to craft one, shift-click to craft all available.
+- **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back.
+- **Sources dropdown** — scope any terminal to *All Storage*, your *Inventory*, or a single container.
+- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then your inventory, then the nearest container.
+- **Range tiers** — upgrade terminals to scan from **1×1 up to 11×11 chunks** (capped by the server's view/simulation distance).
+- **Shulker flattening** — shulker-box contents (and boxes inside boxes) appear as ordinary items, ready to craft with.
+- **Ownership & privacy** — a terminal only shows global (worldgen) storage plus storage placed by the terminal's owner.
+
+## Storage Terminal
+
+Place it near your storage and it scans the surrounding chunks, gathering every inventory block into
+one searchable index.
+
+- Left-click an entry to take a stack; shift to take more.
+- Shift-click items in your inventory to deposit them back into the network.
+- Use the source dropdown to view everything, just your inventory, or one container.
+
+## Network Share Terminal
+
+A collection-only sink that **receives crafted output** and holds it for you.
+
+- Its contents are hidden from normal terminal listings.
+- Anyone can open and deposit into it; only the owner can break it.
+- Rendered as a tinted ender chest.
+
+> Requires **Storage Network** (it's part of that mod).
+
+## Crafting Terminal & Processor Terminals
+
+- The **Crafting Terminal** shows the vanilla 3×3 grid and recipe book. Select a recipe and the terminal reports whether the network has the materials; click to craft one, shift-click to craft as many as possible.
+- The **Smelting / Blasting / Smoking Terminals** run automatically once they have a recipe to work on, drawing inputs and fuel from the network.
+- The **Brewing Terminal** lets you pick a target potion from a brew book; it pulls water bottles, blaze powder and ingredients and brews them for you.
+- Higher tiers process **faster** as well as scanning further.
+
+## Ownership & privacy
+
+Storage Network records who places each container:
+
+- **Global / worldgen containers** (dungeon chests, etc.) are visible to everyone.
+- **Player-placed storage** is visible only to the terminal's owner — and, optionally, to their scoreboard team.
+- Terminals are **openable by anyone** but **breakable only by their owner**.
+
+All of this is configurable on the server.
+
+## Getting started
+
+1. Craft a **Storage Terminal** (8 copper ingots around a chest) and place it near your storage.
+2. Craft a **Crafting Terminal** (8 copper ingots around a crafting table) to craft from the network.
+3. Craft the processor terminals you need (8 copper ingots around a Furnace / Blast Furnace / Smoker / Brewing Stand).
+4. Add a **Network Share Terminal** (4 chests around a Storage Terminal) to collect crafted output automatically.
+5. Upgrade any terminal with range tiers to cover more chunks.
+
+## Recipes
+
+| Result | Recipe |
+|--------|--------|
+| **Storage Terminal** | 3×3: 8× Copper Ingot around a Chest |
+| **Network Share Terminal** | 3×3: 4× Chest around a Storage Terminal |
+| **Crafting Terminal** | 3×3: 8× Copper Ingot around a Crafting Table |
+| **Smelting Terminal** | 3×3: 8× Copper Ingot around a Furnace |
+| **Blasting Terminal** | 3×3: 8× Copper Ingot around a Blast Furnace |
+| **Smoking Terminal** | 3×3: 8× Copper Ingot around a Smoker |
+| **Brewing Terminal** | 3×3: 8× Copper Ingot around a Brewing Stand |
+
+**Tier upgrades** — place the previous terminal in the center of a 3×3 crafting grid and surround it with four of the tier material:
+
+| Tier | Name | Material | Scan radius |
+|------|------|----------|-------------|
+| 0 | Copper | — (base terminal) | 1×1 chunks |
+| 1 | Iron | 4× Iron Ingot | 3×3 chunks |
+| 2 | Gold | 4× Gold Ingot | 5×5 chunks |
+| 3 | Emerald | 4× Emerald | 7×7 chunks |
+| 4 | Diamond | 4× Diamond | 9×9 chunks |
+| 5 | Netherite | 4× Netherite Ingot | 11×11 chunks |
+
+Higher tiers also make processor terminals work faster.
+
+## Requirements
+
+| | |
+|---|---|
+| Minecraft | 1.21.1 |
+| Loaders | **Fabric** (Loaders + Fabric API) **or** **NeoForge 21.1.235+** |
+| Java | 21 |
+| Side | Client & Server |
+
+MC Storage Area Network (`mc_storage_area_network`) is **bundled inside** the Storage Network and
+Crafting Network jars — you only install this separately if another mod needs the API.
+
+## Installation
+
+1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for Minecraft 1.21.1.
+2. Drop the universal jar(s) into your `mods/` folder. The same jar works on both loaders.
+3. Do **not** rename or mix loader-specific files.
+
+## Configuration
+
+- Fabric: `config/<mod>.json` — NeoForge: `config/<mod>-server.toml`
+
+| Mod | Key | Default | Description |
+|-----|-----|---------|-------------|
+| `mc_storage_area_network` | `flattenDepth` | `1` | How many shulker-box levels to flatten (1 = boxes in containers, 2 = boxes in boxes). |
+| `mc_storage_area_network` | `boxRowHidden` | `false` | Hide raw shulker-box stacks so only their contents show. |
+| `mc_storage_area_network` | `sameTypeFirst` | `true` | Prefer inserting into boxes that already hold the same item. |
+| `mc_storage_area_network` | `ownershipEnabled` | `true` | Terminals show only global + owner-placed storage. |
+| `mc_storage_area_network` | `teamSharing` | `true` | Scoreboard-team members share their placed storage. |
+| `storage_network` | `maxTier` | `5` | Highest upgrade tier allowed (0–5). |
+| `crafting_network` | `maxTier` | `5` | Highest upgrade tier allowed (0–5). |
+
+## Compatibility
+
+- Works with any container that exposes a standard inventory — vanilla and most modded storage.
+- No JEI/REI required; crafting uses the vanilla recipe book.
+- Client & server: install on both for full functionality.
+
+## License
+
+[Apache-2.0](https://github.com/retiredroca/mc-storage-area-network/blob/main/LICENSE)
+
+## Author
+
+Retired Roca
