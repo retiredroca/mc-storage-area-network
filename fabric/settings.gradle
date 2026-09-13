@@ -9,4 +9,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'item-network-api-fabric'
+rootProject.name = 'mc-storage-area-network-fabric'

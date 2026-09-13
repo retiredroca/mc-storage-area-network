@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.retiredroca.craftingnetwork.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "RecipeBookComponentAccessor",
+    "RecipeBookTabButtonAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "An upgradable Crafting Station for Minecraft. Like the Storage Terminal, it scans nearby chunks for storage containers; place a crafting blueprint in its 3x3 grid and it crafts using items drawn from those containers and your inventory. Upgrade the station to increase its scan radius.",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "mixins": [
+    "crafting_network.mixins.json"
+  ],
+  "entrypoints": {
+    "main": [
+      "com.retiredroca.craftingnetwork.fabric.CraftingNetwork"
+    ],
+    "client": [
+      "com.retiredroca.craftingnetwork.fabric.CraftingNetworkClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "mc_storage_area_network": ">=1.0.2",
+    "java": ">=21"
+  }
+}

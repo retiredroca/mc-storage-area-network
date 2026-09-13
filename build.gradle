@@ -4,8 +4,8 @@ plugins {
 }
 
 // Fixed API version (no build-date suffix).
-version = '1.0.1'
-group = 'com.retiredroca.itemnetwork'
+version = '1.0.2'
+group = 'com.retiredroca.mcstorageareanetwork'
 
 // Newest non-sources / non-dev jar in a directory.
 def newestJar = { String dir ->
@@ -29,13 +29,13 @@ def bundleTokens = [
 /**
  * Universal bundle: a thin container mod holding the loader-specific API jars as nested mods.
  * The container carries no top-level classes, so each loader loads only its own nested copy of the
- * public com.retiredroca.itemnetwork.api package (Fabric intermediary vs NeoForge Mojang).
+ * public com.retiredroca.mcstorageareanetwork.api package (Fabric intermediary vs NeoForge Mojang).
  */
 tasks.register('universalJar', Jar) {
     dependsOn gradle.includedBuild('fabric').task(':build')
     dependsOn gradle.includedBuild('neoforge').task(':build')
 
-    archiveBaseName = 'item-network-api'
+    archiveBaseName = 'mc-storage-area-network'
     archiveClassifier = 'universal'
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -50,11 +50,11 @@ tasks.register('universalJar', Jar) {
     }
     from({ newestJar('fabric/build/libs') }) {
         into 'META-INF/jars'
-        rename { 'item_network_api-fabric.jar' }
+        rename { 'mc_storage_area_network-fabric.jar' }
     }
     from({ newestJar('neoforge/build/libs') }) {
         into 'META-INF/jarjar'
-        rename { 'item_network_api-neoforge.jar' }
+        rename { 'mc_storage_area_network-neoforge.jar' }
     }
 }
 
@@ -66,7 +66,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             artifact(tasks.named('universalJar'))
-            artifactId = 'item-network-api'
+            artifactId = 'mc-storage-area-network'
         }
     }
     repositories {

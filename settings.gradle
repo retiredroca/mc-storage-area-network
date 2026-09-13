@@ -12,10 +12,14 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'item-network-api'
+rootProject.name = 'mc-storage-area-network'
 
 // The loader builds are separate (included) builds because Fabric Loom and NeoGradle
 // cannot share a single Gradle project. The root project merges their outputs into one
 // universal jar that both loaders accept.
 includeBuild('fabric')
 includeBuild('neoforge')
+
+// The gameplay mods live in this monorepo as child builds and depend on the API.
+includeBuild('storage-network')
+includeBuild('crafting-network')

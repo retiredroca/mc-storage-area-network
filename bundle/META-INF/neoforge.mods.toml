@@ -3,10 +3,10 @@ loaderVersion="[1,)"
 license="@@LICENSE@@"
 
 [[mods]]
-modId="item_network_api_bundle"
+modId="mc_storage_area_network_bundle"
 version="@@VERSION@@"
-displayName="Item Network API (Universal)"
+displayName="MC Storage Area Network API (Universal)"
 description='''
-Universal distribution of the Item Network API. Bundles the Fabric and NeoForge builds; each loader
-loads only its own nested copy, so the public com.retiredroca.itemnetwork.api package stays intact.
+Universal distribution of the MC Storage Area Network API. Bundles the Fabric and NeoForge builds; each loader
+loads only its own nested copy, so the public com.retiredroca.mcstorageareanetwork.api package stays intact.
 '''

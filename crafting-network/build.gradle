@@ -1,0 +1,55 @@
+plugins {
+    id 'base'
+}
+
+import java.time.LocalDateTime
+
+// Version is derived from the build date: 1.YY.MM.DD.HH.
+def dateVersion = "1.0.0." + String.format("%02d%02d%02d%02d", LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(), LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
+version = dateVersion
+group = 'com.retiredroca.craftingnetwork'
+
+// Newest non-sources / non-dev jar in a directory (loader builds are date-versioned).
+def newestJar = { String dir ->
+    def d = file(dir)
+    def jars = (d.listFiles() ?: new File[0]).findAll {
+        it.name.endsWith('.jar') && !it.name.contains('sources') && !it.name.contains('dev')
+    }
+    if (jars.isEmpty()) {
+        return null
+    }
+    jars.sort { it.lastModified() }
+    return jars.last()
+}
+
+/**
+ * Universal jar: contains common + fabric classes + fabric.mod.json from the Fabric build, and the
+ * NeoForge-only classes + neoforge.mods.toml from the NeoForge build. Each loader reads only its own
+ * metadata and entrypoint, so the same jar loads on both.
+ */
+tasks.register('universalJar', Jar) {
+    dependsOn gradle.includedBuild('fabric').task(':build')
+    dependsOn gradle.includedBuild('neoforge').task(':build')
+
+    archiveBaseName = 'crafting-network'
+    archiveClassifier = 'universal'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from({
+        def jar = newestJar('fabric/build/libs')
+        jar == null ? [] : zipTree(jar)
+    })
+    from({
+        def jar = newestJar('neoforge/build/libs')
+        jar == null ? [] : zipTree(jar)
+    }) {
+        include 'com/retiredroca/craftingnetwork/neoforge/**'
+        include 'META-INF/neoforge.mods.toml'
+        include 'META-INF/accesstransformer.cfg'
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'universalJar'
+}

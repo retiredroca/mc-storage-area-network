@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "id": "item_network_api_bundle",
+  "id": "mc_storage_area_network_bundle",
   "version": "@@VERSION@@",
-  "name": "Item Network API (Universal)",
-  "description": "Universal distribution of the Item Network API. Bundles the Fabric and NeoForge builds; each loader loads only its own nested copy, so the public com.retiredroca.itemnetwork.api package stays intact.",
+  "name": "MC Storage Area Network API (Universal)",
+  "description": "Universal distribution of the MC Storage Area Network API. Bundles the Fabric and NeoForge builds; each loader loads only its own nested copy, so the public com.retiredroca.mcstorageareanetwork.api package stays intact.",
   "authors": ["@@AUTHORS@@"],
   "license": "@@LICENSE@@",
   "environment": "*",
   "jars": [
     {
-      "file": "META-INF/jars/item_network_api-fabric.jar"
+      "file": "META-INF/jars/mc_storage_area_network-fabric.jar"
     }
   ]
 }

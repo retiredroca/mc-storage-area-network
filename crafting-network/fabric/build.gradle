@@ -1,0 +1,122 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+import java.time.LocalDateTime
+
+// Version is derived from the build date: 1.YY.MM.DD.HH (e.g. 1.26.09.10.14 for Sept 10, 2026 @ 14:00).
+def dateVersion = "1.0.0." + String.format("%02d%02d%02d%02d", LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(), LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
+version = dateVersion
+group = mod_group_id
+
+base {
+    archivesName = 'fabric-' + mod_id
+}
+
+repositories {
+    maven {
+        name = 'itemNetworkRepo'
+        url = uri("${projectDir}/../../repo")
+    }
+    mavenLocal()
+    maven {
+        name = 'itemNetwork'
+        url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo'
+    }
+}
+
+// See the storage-central Fabric build for why the shared sources are relocated into a
+// loader-specific package: it lets a single merged jar contain both mapping variants.
+def commonPrefix = 'com.retiredroca.craftingnetwork'
+def relocatedPrefix = 'com.retiredroca.craftingnetwork.fabric.common'
+
+tasks.register('relocateCommonSources', Copy) {
+    from(rootProject.file('../common/src/main/java'))
+    into(layout.buildDirectory.dir('generated/common'))
+    filter { String line ->
+        line.replace(commonPrefix, relocatedPrefix)
+    }
+}
+
+tasks.register('relocateLoaderSources', Copy) {
+    from('src/main/java')
+    into(layout.buildDirectory.dir('generated/loader'))
+    filter { String line ->
+        def matcher = line =~ /import com\.retiredroca\.craftingnetwork\.(?!fabric\b|neoforge\b|mixin\b)([A-Za-z0-9_.]+);/
+        if (matcher.find()) {
+            return "import com.retiredroca.craftingnetwork.fabric.common.${matcher.group(1)};"
+        }
+        return line
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = []
+            srcDir(tasks.named('relocateCommonSources'))
+            srcDir(tasks.named('relocateLoaderSources'))
+        }
+    }
+}
+
+loom {
+    // Use Mojang mappings so the source matches the NeoForge build 1:1.
+    officialMojangMappings()
+}
+
+dependencies {
+    // Minecraft + Fabric loader + Fabric API
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
+    modImplementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:${api_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", minecraft_version
+    inputs.property "loader_version", loader_version
+    inputs.property "mod_id", mod_id
+    inputs.property "mod_name", mod_name
+    inputs.property "mod_license", mod_license
+    inputs.property "mod_authors", mod_authors
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+                "minecraft_version": minecraft_version,
+                "loader_version": loader_version,
+                "mod_id": mod_id,
+                "mod_name": mod_name,
+                "mod_license": mod_license,
+                "mod_authors": mod_authors
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${mod_id}" }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}

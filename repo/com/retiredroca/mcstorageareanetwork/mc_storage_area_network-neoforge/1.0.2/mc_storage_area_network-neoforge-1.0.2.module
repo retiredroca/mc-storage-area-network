@@ -1,0 +1,60 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.retiredroca.mcstorageareanetwork",
+    "module": "mc_storage_area_network-neoforge",
+    "version": "1.0.2",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "mc_storage_area_network-neoforge-1.0.2.jar",
+          "url": "mc_storage_area_network-neoforge-1.0.2.jar",
+          "size": 33786,
+          "sha512": "83a5f2d96b5d647508f0bfc07bc24d94c571f655036deb6f99bd614cf580f1954129fb136969d1dbc35234f3263f352f6f394a6e5285f7d49766a692ccb2ccba",
+          "sha256": "1e065e4812423e82473df4529dfed1bdcf60b0c05a7b1eb21d6f6650e44549ff",
+          "sha1": "391ecbab41bee269eade0332e09581068ddbc7b5",
+          "md5": "2fbb5c8a3dabd9e46d06c9e438c87bf7"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "mc_storage_area_network-neoforge-1.0.2.jar",
+          "url": "mc_storage_area_network-neoforge-1.0.2.jar",
+          "size": 33786,
+          "sha512": "83a5f2d96b5d647508f0bfc07bc24d94c571f655036deb6f99bd614cf580f1954129fb136969d1dbc35234f3263f352f6f394a6e5285f7d49766a692ccb2ccba",
+          "sha256": "1e065e4812423e82473df4529dfed1bdcf60b0c05a7b1eb21d6f6650e44549ff",
+          "sha1": "391ecbab41bee269eade0332e09581068ddbc7b5",
+          "md5": "2fbb5c8a3dabd9e46d06c9e438c87bf7"
+        }
+      ]
+    }
+  ]
+}

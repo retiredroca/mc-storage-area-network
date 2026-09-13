@@ -1,0 +1,19 @@
+{
+  "itemGroup.storage_network": "Storage Network",
+  "block.storage_network.storage_terminal": "Storage Terminal",
+  "container.storage_network.storage_terminal": "Storage Terminal",
+  "block.storage_network.terminal_locked": "This terminal belongs to another player",
+  "gui.storage_network.search": "Search...",
+  "gui.storage_network.chest_all": "All chests",
+  "gui.storage_network.chest_count": "%s chests",
+  "gui.storage_network.chest_none": "No chests found",
+  "gui.storage_network.nested_items": "%s items",
+  "gui.storage_network.tier": "Tier %s",
+  "gui.storage_network.count": "x%s",
+  "gui.storage_network.page": "%s/%s",
+  "sort.storage_network.name": "Name",
+  "sort.storage_network.type": "Type",
+  "sort.storage_network.tag": "Tag",
+  "sort.storage_network.mod": "Mod",
+  "sort.storage_network.equipment": "Equip"
+}

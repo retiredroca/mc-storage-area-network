@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Centralized storage solution for Minecraft. A Storage Terminal scans nearby chunks for any storage container and lets you access, search, sort, and manage all of it from a single interface. Upgrade the terminal to increase its scan range.",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.retiredroca.storagenetwork.fabric.StorageNetwork"
+    ],
+    "client": [
+      "com.retiredroca.storagenetwork.fabric.StorageNetworkClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "mc_storage_area_network": ">=1.0.2",
+    "java": ">=21"
+  }
+}

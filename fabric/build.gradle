@@ -5,7 +5,7 @@ plugins {
 
 
 // Fixed API version (no build-date suffix).
-version = '1.0.1'
+version = '1.0.2'
 group = mod_group_id
 
 base {

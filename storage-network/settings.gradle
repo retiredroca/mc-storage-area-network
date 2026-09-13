@@ -1,0 +1,21 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+        maven {
+            url = 'https://maven.neoforged.net/releases'
+        }
+    }
+}
+
+rootProject.name = 'storage-network'
+
+// The loader builds are separate (included) builds because Fabric Loom and NeoGradle
+// cannot share a single Gradle project. The root project merges their outputs into one
+// universal jar that both loaders accept.
+includeBuild('fabric')
+includeBuild('neoforge')

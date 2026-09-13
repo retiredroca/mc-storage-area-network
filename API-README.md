@@ -1,6 +1,6 @@
-# Item Network API
+# MC Storage Area Network API
 
-A small, standalone, multi-loader API for exposing **item sources** to item-network hosts
+A small, standalone, multi-loader API for exposing **item sources** to mc-storage-area-network hosts
 (Storage Central, Crafting Central, and anything else that queries a shared network).
 
 It provides:
@@ -12,7 +12,7 @@ It provides:
 - **Hidden-item filters** — hide "container" items that are represented by their contents instead.
 - **Shulker-box helpers** — read/write shulker box contents as a normal item list.
 
-The mod id is `item_network_api`. Package: `com.retiredroca.itemnetwork.api`.
+The mod id is `mc_storage_area_network`. Package: `com.retiredroca.mcstorageareanetwork.api`.
 
 ---
 
@@ -21,7 +21,7 @@ The mod id is `item_network_api`. Package: `com.retiredroca.itemnetwork.api`.
 Download the **universal** jar:
 
 ```
-item-network-api-1.0.1-universal.jar
+mc-storage-area-network-1.0.2-universal.jar
 ```
 
 It is a thin container that bundles the Fabric and NeoForge builds; each loader loads only its own
@@ -30,7 +30,7 @@ nested copy. Drop it in `mods/` on either loader (no separate per-loader downloa
 - **Fabric:** requires Fabric Loader + Fabric API.
 - **NeoForge:** requires NeoForge `21.1.235+` for Minecraft `1.21.1`.
 
-Hosts such as Storage Central / Crafting Central declare `item_network_api` as a dependency, so
+Hosts such as Storage Central / Crafting Central declare `mc_storage_area_network` as a dependency, so
 install this jar alongside them.
 
 ---
@@ -43,7 +43,7 @@ install this jar alongside them.
 repositories {
     maven {
         name = 'itemNetwork'
-        url = 'https://raw.githubusercontent.com/retiredroca/item-network/main/repo'
+        url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo'
     }
 }
 ```
@@ -52,25 +52,25 @@ repositories {
 
 ```groovy
 // Fabric
-modImplementation 'com.retiredroca.itemnetwork:item_network_api-fabric:1.0.1'
+modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.2'
 
 // NeoForge
-implementation 'com.retiredroca.itemnetwork:item_network_api-neoforge:1.0.1'
+implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.2'
 ```
 
 Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
 
 ```
-com.retiredroca.itemnetwork:item-network-api:1.0.1:universal
+com.retiredroca.mcstorageareanetwork:mc-storage-area-network:1.0.2:universal
 ```
 
-> Compile against the **per-loader** artifact for your mod. The `com.retiredroca.itemnetwork.api`
+> Compile against the **per-loader** artifact for your mod. The `com.retiredroca.mcstorageareanetwork.api`
 > package is mapping-specific (Fabric intermediary / NeoForge Mojang), which is why the API ships
 > per-loader artifacts and a bundled universal install jar rather than a single class-merged jar.
 
 ### Registering an item source
 
-Implement `com.retiredroca.itemnetwork.api.ItemSource`:
+Implement `com.retiredroca.mcstorageareanetwork.api.ItemSource`:
 
 ```java
 public final class MySource implements ItemSource {
@@ -102,7 +102,7 @@ Then register it:
 ```json
 {
   "entrypoints": {
-    "item_network_api": [
+    "mc_storage_area_network": [
       "com.example.mymod.MySource"
     ]
   }
@@ -114,7 +114,7 @@ Each entrypoint value is instantiated and registered as an `ItemSource`.
 **NeoForge** — send an InterModComms message during construction:
 
 ```java
-InterModComms.sendTo("item_network_api", "register_item_source", () -> new MySource());
+InterModComms.sendTo("mc_storage_area_network", "register_item_source", () -> new MySource());
 ```
 
 You can also register directly at mod init via `ItemSourceRegistry.register(source)` on either
@@ -176,7 +176,7 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 ## Building / publishing
 
 ```bash
-./gradlew build           # universal bundle -> build/libs/item-network-api-1.0.1-universal.jar
+./gradlew build           # universal bundle -> build/libs/mc-storage-area-network-1.0.2-universal.jar
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
 ./gradlew publishRepo     # per-loader jars + bundle -> ./repo (committed maven for distribution)
 ```
@@ -192,4 +192,4 @@ modders. Commit it after `publishRepo`.
 | Fabric | Loader 0.16.14+ / Fabric API |
 | NeoForge | 21.1.235+ |
 | Java | 21 |
-| API version | 1.0.1 |
+| API version | 1.0.2 |

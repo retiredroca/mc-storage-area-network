@@ -7,9 +7,12 @@
   "authors": ["${mod_authors}"],
   "license": "${mod_license}",
   "environment": "*",
+  "mixins": [
+    "mc_storage_area_network.mixins.json"
+  ],
   "entrypoints": {
     "main": [
-      "com.retiredroca.itemnetwork.fabric.ItemNetworkApi"
+      "com.retiredroca.mcstorageareanetwork.fabric.McStorageAreaNetwork"
     ]
   },
   "depends": {
