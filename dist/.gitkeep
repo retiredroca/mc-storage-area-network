@@ -1,0 +1,2 @@
+# Release artifacts (universal jars) are copied here by CI before publishing.
+# This folder is generated at build time; the .gitkeep keeps it in the repo.
