@@ -28,10 +28,7 @@ public class NetworkShareTerminalRenderer<T extends AbstractNetworkShareTerminal
     @Override
     public void render(T entity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource,
             int light, int overlay) {
-        poseStack.pushPose();
-        poseStack.translate(0.5, 0.5, 0.5);
         VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutout(TEXTURE));
         this.root.render(poseStack, consumer, light, overlay, 0xFF000000 | TINT);
-        poseStack.popPose();
     }
 }
