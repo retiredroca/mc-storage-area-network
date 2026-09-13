@@ -68,6 +68,10 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-version-type: release
 
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-version-type: release
+
           files: |
             dist/*.jar
           name: MC Storage Area Network ${{ env.RELEASE_TAG }}
