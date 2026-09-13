@@ -86,7 +86,20 @@ See **[API-README.md](API-README.md)** for the full API reference.
 
 ## License
 
-[Apache-2.0](LICENSE)
+This project's own source code is licensed under [Apache-2.0](LICENSE).
+
+## Credits & third-party notices
+
+- **Minecraft** is a trademark of Mojang Synergies AB. This is an unofficial, fan-made
+  modification and is **not affiliated with, endorsed by, or sponsored by** Mojang Studios or
+  Microsoft Corporation.
+- Developed against the **official Mojang mappings**. The mappings are used only for development
+  and are **not redistributed** by this project. The mappings are (c) 2020 Microsoft Corporation,
+  provided "as-is"; use and modification of Minecraft: Java Edition is governed by the
+  [Minecraft EULA](https://account.mojang.com/documents/minecraft_eula).
+- Built on **Fabric Loader/API** (Apache-2.0) and **NeoForge** (LGPL-2.1).
+
+See [NOTICE](NOTICE) for full attribution.
 
 ## Author
 

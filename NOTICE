@@ -1,0 +1,51 @@
+MC Storage Area Network
+Copyright 2026 Retired Roca
+
+This product is licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+--------------------------------------------------------------------------
+Third-party notices and attributions
+--------------------------------------------------------------------------
+
+Minecraft
+  "Minecraft" and "Mojang" are trademarks of Mojang Synergies AB. This
+  project is an unofficial, fan-made modification and is not affiliated
+  with, endorsed by, or sponsored by Mojang Studios or Microsoft
+  Corporation.
+
+Official Mojang mappings
+  This project is developed against the official Mojang mappings. The
+  mappings are used solely for development purposes and are NOT
+  redistributed by this project, in whole or in part. They are provided
+  subject to the following notice:
+
+  (c) 2020 Microsoft Corporation. These mappings are provided "as-is" and
+  you bear the risk of using them. You may copy and use the mappings for
+  development purposes, but you may not redistribute the mappings complete
+  and unmodified. Microsoft makes no warranties, express or implied, with
+  respect to the mappings provided here. Use and modification of this
+  document or the source code (in any form) of Minecraft: Java Edition is
+  governed by the Minecraft End User License Agreement available at
+  https://account.mojang.com/documents/minecraft_eula.
+
+  Minecraft: Java Edition and its source code are the property of Mojang
+  Studios / Microsoft Corporation and are governed by the Minecraft End
+  User License Agreement.
+
+Fabric
+  Fabric Loader and Fabric API are developed by the FabricMC project and
+  are licensed under the Apache License, Version 2.0.
+
+NeoForge
+  NeoForge is developed by the NeoForged project and is licensed under the
+  GNU Lesser General Public License, version 2.1.
