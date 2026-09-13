@@ -18,6 +18,9 @@ jobs:
       github.event_name != 'issue_comment' ||
       contains(github.event.comment.body, '/release')
     runs-on: ubuntu-latest
+    env:
+      # v<tag> for tag pushes, otherwise v<run number> (manual dispatch / /release comment).
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.run_number) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,14 +56,28 @@ jobs:
           name: universal-jars
           path: dist/*.jar
 
-      - name: Create release
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') ||
-          github.event_name == 'workflow_dispatch' ||
-          github.event_name == 'issue_comment'
-        uses: softprops/action-gh-release@v2
+      # Publishes a GitHub release and the same files to CurseForge.
+      - name: Publish release (GitHub + CurseForge)
+        uses: Kir-Antipov/mc-publish@v3.3
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('Build {0}', github.run_number) }}
-          files: dist/*.jar
-          generate_release_notes: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-tag: ${{ env.RELEASE_TAG }}
+          github-generate-changelog: true
+
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          curseforge-version-type: release
+
+          files: |
+            dist/*.jar
+          name: MC Storage Area Network ${{ env.RELEASE_TAG }}
+          version: ${{ env.RELEASE_TAG }}
+          version-type: release
+          game-versions: |
+            1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: |
+            21
+          retry-attempts: 3
