@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "item_network_api_bundle",
+  "version": "@@VERSION@@",
+  "name": "Item Network API (Universal)",
+  "description": "Universal distribution of the Item Network API. Bundles the Fabric and NeoForge builds; each loader loads only its own nested copy, so the public com.retiredroca.itemnetwork.api package stays intact.",
+  "authors": ["@@AUTHORS@@"],
+  "license": "@@LICENSE@@",
+  "environment": "*",
+  "jars": [
+    {
+      "file": "META-INF/jars/item_network_api-fabric.jar"
+    }
+  ]
+}

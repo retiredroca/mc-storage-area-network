@@ -1,0 +1,12 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="@@LICENSE@@"
+
+[[mods]]
+modId="item_network_api_bundle"
+version="@@VERSION@@"
+displayName="Item Network API (Universal)"
+description='''
+Universal distribution of the Item Network API. Bundles the Fabric and NeoForge builds; each loader
+loads only its own nested copy, so the public com.retiredroca.itemnetwork.api package stays intact.
+'''

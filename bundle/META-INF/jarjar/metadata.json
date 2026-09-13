@@ -1,0 +1,16 @@
+{
+  "jars": [
+    {
+      "identifier": {
+        "group": "com.retiredroca.itemnetwork",
+        "artifact": "item_network_api-neoforge"
+      },
+      "version": {
+        "range": "[@@VERSION@@,)",
+        "artifactVersion": "@@VERSION@@"
+      },
+      "path": "META-INF/jarjar/item_network_api-neoforge.jar",
+      "isObfuscated": false
+    }
+  ]
+}
