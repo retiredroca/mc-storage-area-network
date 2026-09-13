@@ -75,35 +75,90 @@ jobs:
           name: universal-jars
           path: dist/*.jar
 
-      # Publishes a GitHub release (auto-generated notes) and the same files + changelog
-      # to CurseForge and Modrinth.
-      - name: Publish release (GitHub + CurseForge + Modrinth)
+      # Read each mod's own version from its built jar so every published version
+      # gets a distinct number (required by Modrinth within a single project).
+      - name: Resolve mod versions
+        run: |
+          api_ver=$(basename dist/mc-storage-area-network-*-universal.jar | sed -E 's/^mc-storage-area-network-(.*)-universal\.jar$/\1/')
+          storage_ver=$(basename dist/storage-network-*-universal.jar | sed -E 's/^storage-network-(.*)-universal\.jar$/\1/')
+          crafting_ver=$(basename dist/crafting-network-*-universal.jar | sed -E 's/^crafting-network-(.*)-universal\.jar$/\1/')
+          {
+            echo "API_VER=$api_ver"
+            echo "STORAGE_VER=$storage_ver"
+            echo "CRAFTING_VER=$crafting_ver"
+          } >> "$GITHUB_ENV"
+          echo "API=$api_ver Storage=$storage_ver Crafting=$crafting_ver"
+
+      # One GitHub release containing all three jars.
+      - name: Publish GitHub release
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: ${{ env.RELEASE_TAG }}
           github-generate-changelog: true
-
-          curseforge-id: 1690770
-          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-version-type: release
-          curseforge-changelog-file: dist/changelog.md
-
-          modrinth-id: mc-storage-area-network
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-version-type: release
-          modrinth-changelog-file: dist/changelog.md
-
-          files: |
-            dist/*.jar
+          files: dist/*.jar
           name: MC Storage Area Network ${{ env.RELEASE_TAG }}
           version: ${{ env.RELEASE_TAG }}
           version-type: release
-          game-versions: |
-            1.21.1
+
+      # CurseForge + Modrinth, one version per mod so each keeps its own name/subtitle
+      # on the shared MC Storage Area Network project.
+      - name: Publish MC Storage Area Network API
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/mc-storage-area-network-*.jar
+          name: MC Storage Area Network ${{ env.RELEASE_TAG }}
+          version: mc-storage-area-network-${{ env.API_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
           loaders: |
             fabric
             neoforge
-          java: |
-            21
+          java: 21
           retry-attempts: 3
+          fail-mode: warn
+
+      - name: Publish Storage Network
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/storage-network-*.jar
+          name: Storage Network ${{ env.RELEASE_TAG }}
+          version: storage-network-${{ env.STORAGE_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 3
+          fail-mode: warn
+
+      - name: Publish Crafting Network
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/crafting-network-*.jar
+          name: Crafting Network ${{ env.RELEASE_TAG }}
+          version: crafting-network-${{ env.CRAFTING_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 3
+          fail-mode: warn
