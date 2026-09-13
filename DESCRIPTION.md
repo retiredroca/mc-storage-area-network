@@ -4,7 +4,8 @@
 
 Have you ever filled a chunk with chests? Now you can — and access, search, sort, and craft with
 everything inside them from a single block. MC Storage Area Network is a suite of three mods for
-**Minecraft 1.21.1** on **Fabric** and **NeoForge**:
+**Minecraft 1.21.1** on **Fabric** and **NeoForge** — install them all from one **all-in-one jar**,
+or pick only the mods you want:
 
 | Mod | What it adds |
 |-----|--------------|
@@ -107,15 +108,23 @@ Higher tiers also make processor terminals work faster.
 | Java | 21 |
 | Side | Client & Server |
 
-> **MC Storage Area Network (`mc_storage_area_network`) is a required dependency.** Install its jar
-> alongside the Storage Network and Crafting Network jars — it is **not** bundled inside them.
+> **MC Storage Area Network (`mc_storage_area_network`) is required by both gameplay mods.** It is
+> bundled in the all-in-one jar; when installing the mods individually, install the API jar too.
 
 ## Installation
 
+The same jar works on both Fabric and NeoForge.
+
+**All-in-one (recommended):** drop `mc-storage-area-network-<version>-all.jar` into your `mods/`
+folder — it bundles the API, Storage Network and Crafting Network in a single file.
+
+**Or install the mods individually:**
+
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for Minecraft 1.21.1.
-2. Install the **MC Storage Area Network API** jar — Storage Network and Crafting Network require it.
-3. Drop the mod's universal jar into your `mods/` folder. The same jar works on both loaders.
-4. Do **not** rename or mix loader-specific files.
+2. Install the **MC Storage Area Network API** jar (required by both gameplay mods).
+3. Drop the **Storage Network** and/or **Crafting Network** jar into `mods/`.
+
+> Never use the all-in-one jar together with the individual jars — the same mods would load twice.
 
 ## Configuration
 
