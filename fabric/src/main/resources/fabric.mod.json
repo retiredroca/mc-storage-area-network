@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Shared item-source API for Storage Central, Crafting Central and shulker-box add-ons. Provides chunk storage scanning, item-source registration and shulker-box helpers so other mods can integrate without depending on either gameplay mod.",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.retiredroca.itemnetwork.fabric.ItemNetworkApi"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21"
+  }
+}

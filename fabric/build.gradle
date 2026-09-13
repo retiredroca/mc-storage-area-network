@@ -1,0 +1,92 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+
+// Fixed API version (no build-date suffix).
+version = '1.0.0'
+group = mod_group_id
+
+base {
+    archivesName = 'fabric-' + mod_id
+}
+
+repositories {
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir('../common/src/main/java')
+        }
+    }
+}
+
+loom {
+    // Use Mojang mappings so the source matches the NeoForge build 1:1.
+    officialMojangMappings()
+}
+
+dependencies {
+    // Minecraft + Fabric loader + Fabric API
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", minecraft_version
+    inputs.property "loader_version", loader_version
+    inputs.property "mod_id", mod_id
+    inputs.property "mod_name", mod_name
+    inputs.property "mod_license", mod_license
+    inputs.property "mod_authors", mod_authors
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+                "minecraft_version": minecraft_version,
+                "loader_version": loader_version,
+                "mod_id": mod_id,
+                "mod_name": mod_name,
+                "mod_license": mod_license,
+                "mod_authors": mod_authors
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${mod_id}" }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact(remapJar) {
+                builtBy remapJar
+            }
+            artifact(sourcesJar) {
+                builtBy sourcesJar
+                classifier = 'sources'
+            }
+            artifactId = "${mod_id}-fabric"
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}
