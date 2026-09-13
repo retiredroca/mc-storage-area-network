@@ -74,7 +74,7 @@ All of this is configurable on the server (see below).
 | Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
 | Java | 21 |
 | Side | Client & Server |
-| Dependency | MC Storage Area Network (`mc_storage_area_network`) — bundled in this jar |
+| Dependency | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately |
 
 ## Configuration
 

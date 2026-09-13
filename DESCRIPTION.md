@@ -10,7 +10,7 @@ everything inside them from a single block. MC Storage Area Network is a suite o
 |-----|--------------|
 | **Storage Network** | **Storage Terminal** — browse, search, take and deposit from every nearby container from one interface. Plus the **Network Share Terminal** for collecting crafted output. |
 | **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
-| **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. Bundled automatically; other mods can hook into it. |
+| **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. **Required by both**; other mods can hook into it. |
 
 ![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/storage-network/storage-network.gif)
 ![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/crafting-network/crafting-network.gif)
@@ -107,14 +107,15 @@ Higher tiers also make processor terminals work faster.
 | Java | 21 |
 | Side | Client & Server |
 
-MC Storage Area Network (`mc_storage_area_network`) is **bundled inside** the Storage Network and
-Crafting Network jars — you only install this separately if another mod needs the API.
+> **MC Storage Area Network (`mc_storage_area_network`) is a required dependency.** Install its jar
+> alongside the Storage Network and Crafting Network jars — it is **not** bundled inside them.
 
 ## Installation
 
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for Minecraft 1.21.1.
-2. Drop the universal jar(s) into your `mods/` folder. The same jar works on both loaders.
-3. Do **not** rename or mix loader-specific files.
+2. Install the **MC Storage Area Network API** jar — Storage Network and Crafting Network require it.
+3. Drop the mod's universal jar into your `mods/` folder. The same jar works on both loaders.
+4. Do **not** rename or mix loader-specific files.
 
 ## Configuration
 

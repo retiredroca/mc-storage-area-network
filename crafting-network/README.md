@@ -44,7 +44,7 @@ Higher tiers process **faster** (tier speed multiplier) and scan more chunks.
 
 - Terminals are **openable by anyone** but **breakable only by their owner**.
 - A terminal only sees **global (worldgen) storage** and **storage placed by the terminal's owner** (plus scoreboard-team members, if enabled).
-- Configurable on the server via the bundled MC Storage Area Network API.
+- Configurable on the server via the required MC Storage Area Network API.
 
 ## Getting started
 
@@ -87,7 +87,7 @@ All terminals are shaped 3×3: **8× Copper Ingot** around a core block.
 | Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
 | Java | 21 |
 | Side | Client & Server |
-| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — bundled; Storage Network recommended for the share terminal |
+| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately; Storage Network recommended for the share terminal |
 
 ## Configuration
 

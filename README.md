@@ -32,8 +32,8 @@ A single jar works on **Fabric** and **NeoForge**.
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for **Minecraft 1.21.1**.
 2. Drop `mc-storage-area-network-<version>-universal.jar` into your `mods/` folder.
 
-> You usually **don't install this by itself** — Storage Network and Crafting Network bundle it
-> automatically. Install it standalone if another mod depends on the API.
+> This API is a **required dependency** of Storage Network and Crafting Network — install it
+> alongside them (and with any other mod that hooks into the API).
 
 ## Requirements
 
