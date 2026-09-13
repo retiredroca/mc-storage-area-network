@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:builtin/entity",
   "textures": {
-    "particle": "minecraft:block/ender_chest"
+    "particle": "minecraft:block/obsidian"
   },
   "display": {
     "gui": {

@@ -94,4 +94,12 @@ public class NetworkShareTerminalMenu extends AbstractContainerMenu {
     public boolean stillValid(Player player) {
         return container.stillValid(player);
     }
+
+    @Override
+    public void removed(Player player) {
+        if (container instanceof AbstractNetworkShareTerminalBlockEntity be) {
+            be.stopOpen(player);
+        }
+        super.removed(player);
+    }
 }

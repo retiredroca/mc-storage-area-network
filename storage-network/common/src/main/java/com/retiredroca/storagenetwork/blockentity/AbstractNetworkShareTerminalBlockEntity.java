@@ -11,6 +11,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -31,8 +34,54 @@ public abstract class AbstractNetworkShareTerminalBlockEntity extends BlockEntit
 
     private final NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);
 
+    private boolean lidOpen = false;
+    private long lidChangeTime = 0;
+
     protected AbstractNetworkShareTerminalBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+    }
+
+    public void startOpen(Player player) {
+        if (level == null || level.isClientSide || lidOpen) {
+            return;
+        }
+        lidOpen = true;
+        lidChangeTime = level.getGameTime();
+        level.playSound(null, worldPosition, SoundEvents.ENDER_CHEST_OPEN, SoundSource.BLOCKS, 0.5F,
+                level.random.nextFloat() * 0.1F + 0.9F);
+        level.blockEvent(worldPosition, getBlockState().getBlock(), 1, 1);
+    }
+
+    public void stopOpen(Player player) {
+        if (level == null || level.isClientSide || !lidOpen) {
+            return;
+        }
+        lidOpen = false;
+        lidChangeTime = level.getGameTime();
+        level.playSound(null, worldPosition, SoundEvents.ENDER_CHEST_CLOSE, SoundSource.BLOCKS, 0.5F,
+                level.random.nextFloat() * 0.1F + 0.9F);
+        level.blockEvent(worldPosition, getBlockState().getBlock(), 1, 0);
+    }
+
+    @Override
+    public boolean triggerEvent(int id, int data) {
+        if (id == 1) {
+            lidOpen = data != 0;
+            if (level != null) {
+                lidChangeTime = level.getGameTime();
+            }
+            return true;
+        }
+        return super.triggerEvent(id, data);
+    }
+
+    public float getOpenNess(float partialTick) {
+        if (level == null || lidChangeTime == 0) {
+            return 0.0F;
+        }
+        float elapsed = (float) (level.getGameTime() - lidChangeTime) + partialTick;
+        float t = Mth.clamp(elapsed / 7.0F, 0.0F, 1.0F);
+        return lidOpen ? t : 1.0F - t;
     }
 
     /** Best-fit insert used for crafted output routing. Returns the remainder. */
