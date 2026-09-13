@@ -103,6 +103,11 @@ jobs:
 
       # CurseForge + Modrinth, one version per mod so each keeps its own name/subtitle
       # on the shared MC Storage Area Network project.
+      #
+      # IMPORTANT: keep exactly ONE file per mc-publish invocation for CurseForge.
+      # mc-publish passes the 2nd+ files of a single invocation as `parentFileID`, so
+      # CurseForge lists them as "additional files" nested under the first and hides them
+      # from the main download page. One invocation per jar keeps all three standalone.
       - name: Publish MC Storage Area Network API
         uses: Kir-Antipov/mc-publish@v3.3
         with:
