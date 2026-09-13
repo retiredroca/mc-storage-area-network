@@ -101,18 +101,80 @@ jobs:
           version: ${{ env.RELEASE_TAG }}
           version-type: release
 
-      # CurseForge + Modrinth, one version per mod so each keeps its own name/subtitle
-      # on the shared MC Storage Area Network project.
+      # CurseForge and Modrinth are published in separate steps so each platform can be
+      # configured and verified independently.
       #
-      # NOTE: mc-publish turns the 2nd+ files of a single invocation into "additional"
-      # files (CurseForge `parentFileID`; Modrinth non-primary), so keep ONE file per
-      # invocation. The same universal jars go to both platforms.
-      - name: Publish MC Storage Area Network API
+      # NOTE: mc-publish turns the 2nd+ files of a single invocation into "additional" files
+      # (CurseForge `parentFileID`; Modrinth non-primary), so keep exactly ONE file per step.
+      #
+      # Modrinth `modrinth-id` must be the base62 project ID (e.g. "AANobbMI"), NOT the slug:
+      # `mc-storage-area-network` contains hyphens, which Modrinth rejects while parsing that
+      # field as base62. Set the repository variable `MODRINTH_ID` to the ID, or grant the
+      # token the "Read projects" scope so mc-publish can resolve the slug itself.
+
+      # --- CurseForge ---------------------------------------------------------------
+      - name: Publish MC Storage Area Network API - CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          modrinth-id: mc-storage-area-network
+          files: dist/mc-storage-area-network-*-universal.jar
+          name: MC Storage Area Network ${{ env.RELEASE_TAG }}
+          version: mc-storage-area-network-${{ env.API_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      - name: Publish Storage Network - CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/storage-network-*.jar
+          name: Storage Network ${{ env.RELEASE_TAG }}
+          version: storage-network-${{ env.STORAGE_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      - name: Publish Crafting Network - CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/crafting-network-*.jar
+          name: Crafting Network ${{ env.RELEASE_TAG }}
+          version: crafting-network-${{ env.CRAFTING_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      # --- Modrinth -----------------------------------------------------------------
+      - name: Publish MC Storage Area Network API - Modrinth
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: dist/mc-storage-area-network-*-universal.jar
           name: MC Storage Area Network ${{ env.RELEASE_TAG }}
@@ -128,12 +190,10 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Storage Network
+      - name: Publish Storage Network - Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
-          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          modrinth-id: mc-storage-area-network
+          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: dist/storage-network-*.jar
           name: Storage Network ${{ env.RELEASE_TAG }}
@@ -149,12 +209,10 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Crafting Network
+      - name: Publish Crafting Network - Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
-          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          modrinth-id: mc-storage-area-network
+          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: dist/crafting-network-*.jar
           name: Crafting Network ${{ env.RELEASE_TAG }}
