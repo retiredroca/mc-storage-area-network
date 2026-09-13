@@ -114,20 +114,16 @@ jobs:
       # mc-publish passes the 2nd+ files of a single invocation as `parentFileID`, so
       # CurseForge lists them as "additional files" nested under the first and hides them
       # from the main download page. One invocation per jar keeps all three standalone.
-      - name: Publish MC Storage Area Network API
+      # One file per mc-publish invocation per platform. mc-publish marks the 2nd+ files of a
+      # single invocation as "additional" (CurseForge `parentFileID`; Modrinth non-primary),
+      # so splitting keeps every jar a standalone top-level file.
+      - name: Publish API to CurseForge (universal)
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           # CurseForge does no mod-id matching, so the single universal jar is fine here.
           curseforge-files: dist/mc-storage-area-network-*-universal.jar
-          modrinth-id: mc-storage-area-network
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          # Modrinth resolves a file to a project via the mod id inside it. The universal
-          # `_bundle` container matches no project, so publish the per-loader jars instead.
-          modrinth-files: |
-            dist/api/fabric-mc_storage_area_network-*.jar
-            dist/api/neoforge-mc_storage_area_network-*.jar
           name: MC Storage Area Network ${{ env.RELEASE_TAG }}
           version: mc-storage-area-network-${{ env.API_VER }}
           changelog-file: dist/changelog.md
@@ -136,6 +132,43 @@ jobs:
           loaders: |
             fabric
             neoforge
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      # Modrinth resolves a file to a project via the mod id inside it, and the universal
+      # `_bundle` container matches nothing, so Modrinth gets the per-loader jars. Each is
+      # published in its own version so neither becomes a non-primary "additional" file.
+      - name: Publish API to Modrinth (Fabric)
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-files: dist/api/fabric-mc_storage_area_network-*.jar
+          name: MC Storage Area Network (Fabric) ${{ env.RELEASE_TAG }}
+          version: mc-storage-area-network-fabric-${{ env.API_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: fabric
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      - name: Publish API to Modrinth (NeoForge)
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: mc-storage-area-network
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-files: dist/api/neoforge-mc_storage_area_network-*.jar
+          name: MC Storage Area Network (NeoForge) ${{ env.RELEASE_TAG }}
+          version: mc-storage-area-network-neoforge-${{ env.API_VER }}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: neoforge
           java: 21
           retry-attempts: 5
           retry-delay: 15000
