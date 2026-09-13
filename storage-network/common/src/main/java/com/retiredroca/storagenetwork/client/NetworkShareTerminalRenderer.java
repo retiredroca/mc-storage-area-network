@@ -19,7 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 public class NetworkShareTerminalRenderer<T extends AbstractNetworkShareTerminalBlockEntity>
         implements BlockEntityRenderer<T> {
     private static final ResourceLocation TEXTURE =
-            ResourceLocation.withDefaultNamespace("textures/entity/chest/ender.png");
+            ResourceLocation.fromNamespaceAndPath("storage_network", "textures/entity/chest/share_terminal.png");
     public static final int TINT = 0xFFFFFF;
 
     private final ModelPart root;
