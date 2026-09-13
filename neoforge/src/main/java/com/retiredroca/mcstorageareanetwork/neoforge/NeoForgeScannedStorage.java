@@ -15,11 +15,22 @@ public final class NeoForgeScannedStorage implements ScannedStorage {
     private final BlockPos pos;
     private final String label;
     private final IItemHandler handler;
+    private final boolean collectionOnly;
 
     public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler) {
+        this(pos, label, handler, false);
+    }
+
+    public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler, boolean collectionOnly) {
         this.pos = pos;
         this.label = label;
         this.handler = handler;
+        this.collectionOnly = collectionOnly;
+    }
+
+    @Override
+    public boolean collectionOnly() {
+        return collectionOnly;
     }
 
     @Override

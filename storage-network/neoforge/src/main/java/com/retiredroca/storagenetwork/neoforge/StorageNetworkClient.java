@@ -1,6 +1,8 @@
 package com.retiredroca.storagenetwork.neoforge;
 
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.client.NetworkShareTerminalRenderer;
+import com.retiredroca.storagenetwork.client.NetworkShareTerminalScreen;
 import com.retiredroca.storagenetwork.client.StorageTerminalBEWLR;
 import com.retiredroca.storagenetwork.client.StorageTerminalRenderer;
 import com.retiredroca.storagenetwork.client.StorageTerminalScreen;
@@ -31,10 +33,13 @@ public class StorageNetworkClient {
 
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(Registration.STORAGE_TERMINAL_MENU.get(), StorageTerminalScreen::new);
+        event.register(Registration.SHARE_TERMINAL_MENU.get(), NetworkShareTerminalScreen::new);
     }
 
     private static void registerRenderers(RegisterRenderers event) {
         event.registerBlockEntityRenderer(Registration.STORAGE_TERMINAL_BE.get(), StorageTerminalRenderer::new);
+        event.registerBlockEntityRenderer(Registration.SHARE_TERMINAL_BE.get(),
+                context -> new NetworkShareTerminalRenderer<>(context));
     }
 
     private static void registerItemExtensions(RegisterClientExtensionsEvent event) {
@@ -45,5 +50,12 @@ public class StorageNetworkClient {
                 return new NeoForgeStorageTerminalBEWLR(mc.getBlockEntityRenderDispatcher(), mc.getEntityModels());
             }
         }, Registration.STORAGE_TERMINAL_ITEM.get());
+        event.registerItem(new IClientItemExtensions() {
+            @Override
+            public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                Minecraft mc = Minecraft.getInstance();
+                return new NeoForgeNetworkShareTerminalBEWLR(mc.getBlockEntityRenderDispatcher(), mc.getEntityModels());
+            }
+        }, Registration.SHARE_TERMINAL_ITEM.get());
     }
 }

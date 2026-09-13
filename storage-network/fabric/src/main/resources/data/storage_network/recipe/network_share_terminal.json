@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "CTC",
+    " C "
+  ],
+  "key": {
+    "C": { "item": "minecraft:chest" },
+    "T": { "item": "storage_network:storage_terminal" }
+  },
+  "result": {
+    "id": "storage_network:network_share_terminal",
+    "count": 1
+  }
+}

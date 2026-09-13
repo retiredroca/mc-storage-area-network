@@ -17,11 +17,22 @@ public final class FabricScannedStorage implements ScannedStorage {
     private final BlockPos pos;
     private final String label;
     private final Storage<ItemVariant> storage;
+    private final boolean collectionOnly;
 
     public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage) {
+        this(pos, label, storage, false);
+    }
+
+    public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage, boolean collectionOnly) {
         this.pos = pos;
         this.label = label;
         this.storage = storage;
+        this.collectionOnly = collectionOnly;
+    }
+
+    @Override
+    public boolean collectionOnly() {
+        return collectionOnly;
     }
 
     @Override

@@ -2,6 +2,7 @@
   "itemGroup.storage_network": "Storage Network",
   "block.storage_network.storage_terminal": "Storage Terminal",
   "container.storage_network.storage_terminal": "Storage Terminal",
+  "block.storage_network.network_share_terminal": "Network Share Terminal",
   "block.storage_network.terminal_locked": "This terminal belongs to another player",
   "gui.storage_network.search": "Search...",
   "gui.storage_network.chest_all": "All chests",

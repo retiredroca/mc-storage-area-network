@@ -2,7 +2,9 @@ package com.retiredroca.storagenetwork;
 
 import java.nio.file.Path;
 
+import com.retiredroca.storagenetwork.block.NetworkShareTerminalBlock;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
+import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBlockEntity;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSyncPayload;
 
@@ -27,6 +29,14 @@ public interface StorageNetworkPlatform {
     AbstractStorageTerminalBlockEntity createTerminalBlockEntity(BlockPos pos, BlockState state);
 
     void openTerminal(ServerPlayer player, AbstractStorageTerminalBlockEntity terminal);
+
+    MenuType<?> shareTerminalMenuType();
+
+    NetworkShareTerminalBlock shareTerminalBlock();
+
+    AbstractNetworkShareTerminalBlockEntity createShareTerminalBlockEntity(BlockPos pos, BlockState state);
+
+    void openShareTerminal(ServerPlayer player, AbstractNetworkShareTerminalBlockEntity share);
 
     /** Send the terminal contents snapshot to a player. */
     void sendTerminalSync(ServerPlayer player, TerminalSyncPayload payload);

@@ -1,7 +1,9 @@
 package com.retiredroca.storagenetwork.neoforge;
 
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.block.NetworkShareTerminalBlock;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
+import com.retiredroca.storagenetwork.menu.NetworkShareTerminalMenu;
 import com.retiredroca.storagenetwork.menu.StorageTerminalMenu;
 import com.retiredroca.storagenetwork.recipe.TerminalUpgradeRecipe;
 
@@ -20,7 +22,10 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -57,6 +62,22 @@ public final class Registration {
             MENUS.register("storage_terminal",
                     () -> IMenuTypeExtension.create(StorageTerminalMenu::fromNetwork));
 
+    public static final DeferredBlock<NetworkShareTerminalBlock> SHARE_TERMINAL_BLOCK =
+            BLOCKS.register("network_share_terminal", () -> new NetworkShareTerminalBlock(
+                    BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(2.5f).noOcclusion()));
+
+    public static final DeferredItem<BlockItem> SHARE_TERMINAL_ITEM =
+            ITEMS.registerSimpleBlockItem("network_share_terminal", SHARE_TERMINAL_BLOCK);
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkShareTerminalBlockEntity>> SHARE_TERMINAL_BE =
+            BLOCK_ENTITIES.register("network_share_terminal",
+                    () -> BlockEntityType.Builder.of(NetworkShareTerminalBlockEntity::new, SHARE_TERMINAL_BLOCK.get())
+                            .build(null));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<NetworkShareTerminalMenu>> SHARE_TERMINAL_MENU =
+            MENUS.register("network_share_terminal",
+                    () -> IMenuTypeExtension.create(NetworkShareTerminalMenu::fromNetwork));
+
     private static final String[] TIER_NAMES = {
         "Copper", "Iron", "Gold", "Emerald", "Diamond", "Netherite"
     };
@@ -82,6 +103,7 @@ public final class Registration {
                         for (int i = 0; i < TIER_NAMES.length; i++) {
                             output.accept(terminalWithTier(i));
                         }
+                        output.accept(SHARE_TERMINAL_ITEM.get());
                     })
                     .build());
 
@@ -102,5 +124,11 @@ public final class Registration {
         MENUS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         RECIPE_SERIALIZERS.register(modEventBus);
+        modEventBus.addListener(Registration::registerCapabilities);
+    }
+
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, SHARE_TERMINAL_BE.get(),
+                (blockEntity, side) -> new InvWrapper(blockEntity));
     }
 }

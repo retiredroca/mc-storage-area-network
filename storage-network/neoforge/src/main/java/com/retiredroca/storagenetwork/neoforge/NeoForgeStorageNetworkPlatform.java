@@ -3,7 +3,9 @@ package com.retiredroca.storagenetwork.neoforge;
 import java.nio.file.Path;
 
 import com.retiredroca.storagenetwork.StorageNetworkPlatform;
+import com.retiredroca.storagenetwork.block.NetworkShareTerminalBlock;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
+import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBlockEntity;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalExtractPayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSelectPayload;
@@ -56,6 +58,28 @@ public final class NeoForgeStorageNetworkPlatform implements StorageNetworkPlatf
     @Override
     public void sendTerminalSync(ServerPlayer player, TerminalSyncPayload payload) {
         PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    @Override
+    public MenuType<?> shareTerminalMenuType() {
+        return Registration.SHARE_TERMINAL_MENU.get();
+    }
+
+    @Override
+    public NetworkShareTerminalBlock shareTerminalBlock() {
+        return Registration.SHARE_TERMINAL_BLOCK.get();
+    }
+
+    @Override
+    public AbstractNetworkShareTerminalBlockEntity createShareTerminalBlockEntity(BlockPos pos, BlockState state) {
+        return new NetworkShareTerminalBlockEntity(pos, state);
+    }
+
+    @Override
+    public void openShareTerminal(ServerPlayer player, AbstractNetworkShareTerminalBlockEntity share) {
+        if (share instanceof NetworkShareTerminalBlockEntity be) {
+            player.openMenu(be, buf -> buf.writeBlockPos(be.getBlockPos()));
+        }
     }
 
     @Override

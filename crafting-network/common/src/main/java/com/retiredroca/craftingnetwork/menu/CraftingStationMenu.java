@@ -572,6 +572,18 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             return;
         }
         ItemStack remaining = stack;
+        // Collection-only sinks (Network Share Terminal) receive crafted output first.
+        for (ScannedStorage storage : station.getScannedStorages()) {
+            if (remaining.isEmpty()) {
+                return;
+            }
+            if (storage.collectionOnly()) {
+                remaining = storage.insert(remaining);
+            }
+        }
+        if (remaining.isEmpty()) {
+            return;
+        }
         for (ScannedStorage storage : station.getScannedStorages()) {
             if (remaining.isEmpty()) {
                 return;

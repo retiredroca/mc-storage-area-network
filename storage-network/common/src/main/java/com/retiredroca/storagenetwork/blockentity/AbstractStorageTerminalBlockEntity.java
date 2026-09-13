@@ -126,7 +126,12 @@ public abstract class AbstractStorageTerminalBlockEntity extends BlockEntity imp
             }
             lastScan = now;
             int radius = getChunkRadius();
-            storages = new ArrayList<>(ItemNetworkServices.scanner().scan(serverLevel, worldPosition, radius));
+            storages = new ArrayList<>();
+            for (ScannedStorage storage : ItemNetworkServices.scanner().scan(serverLevel, worldPosition, radius)) {
+                if (!storage.collectionOnly()) {
+                    storages.add(storage);
+                }
+            }
             ItemSourceRegistry.refreshAll(serverLevel, worldPosition, radius);
         }
     }

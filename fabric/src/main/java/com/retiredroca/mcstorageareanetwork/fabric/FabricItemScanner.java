@@ -3,6 +3,7 @@ package com.retiredroca.mcstorageareanetwork.fabric;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.ItemScanner;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
@@ -41,7 +42,8 @@ public final class FabricItemScanner implements ItemScanner {
                     Storage<ItemVariant> storage = ItemStorage.SIDED.find(level, pos, null);
                     if (storage != null
                             && ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
-                        out.add(new FabricScannedStorage(pos, labelOf(blockEntity), storage));
+                        boolean collectionOnly = level.getBlockState(pos).getBlock() instanceof CollectionOnlyStorage;
+                        out.add(new FabricScannedStorage(pos, labelOf(blockEntity), storage, collectionOnly));
                     }
                 }
             }

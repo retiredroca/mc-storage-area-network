@@ -19,6 +19,11 @@ public interface ScannedStorage {
         return true;
     }
 
+    /** Collection-only storages (output sinks) are hidden from listings but receive crafted output. */
+    default boolean collectionOnly() {
+        return false;
+    }
+
     /** All non-empty stacks in this storage, as stack entries (count = amount). */
     List<ItemStack> enumerate();
 

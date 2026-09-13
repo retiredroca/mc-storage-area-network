@@ -3,6 +3,7 @@ package com.retiredroca.mcstorageareanetwork.neoforge;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.ItemScanner;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
@@ -42,7 +43,8 @@ public final class NeoForgeItemScanner implements ItemScanner {
                         IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
                         if (handler != null) {
                             if (ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
-                                out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler));
+                                boolean collectionOnly = level.getBlockState(pos).getBlock() instanceof CollectionOnlyStorage;
+                                out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler, collectionOnly));
                             }
                             break;
                         }

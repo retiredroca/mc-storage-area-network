@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "storage_network:block/network_share_terminal" }
+  }
+}

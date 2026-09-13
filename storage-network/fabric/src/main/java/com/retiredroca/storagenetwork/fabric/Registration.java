@@ -1,13 +1,17 @@
 package com.retiredroca.storagenetwork.fabric;
 
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.block.NetworkShareTerminalBlock;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
+import com.retiredroca.storagenetwork.menu.NetworkShareTerminalMenu;
 import com.retiredroca.storagenetwork.menu.StorageTerminalMenu;
 import com.retiredroca.storagenetwork.recipe.TerminalUpgradeRecipe;
 
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
+import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
@@ -39,6 +43,17 @@ public final class Registration {
     public static final ExtendedScreenHandlerType<StorageTerminalMenu, BlockPos> STORAGE_TERMINAL_MENU =
             new ExtendedScreenHandlerType<>(StorageTerminalMenu::fromNetwork, BlockPos.STREAM_CODEC);
 
+    public static final NetworkShareTerminalBlock SHARE_TERMINAL_BLOCK = new NetworkShareTerminalBlock(
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(2.5f).noOcclusion());
+
+    public static final BlockItem SHARE_TERMINAL_ITEM = new BlockItem(SHARE_TERMINAL_BLOCK, new Item.Properties());
+
+    public static final BlockEntityType<NetworkShareTerminalBlockEntity> SHARE_TERMINAL_BE =
+            BlockEntityType.Builder.of(NetworkShareTerminalBlockEntity::new, SHARE_TERMINAL_BLOCK).build(null);
+
+    public static final ExtendedScreenHandlerType<NetworkShareTerminalMenu, BlockPos> SHARE_TERMINAL_MENU =
+            new ExtendedScreenHandlerType<>(NetworkShareTerminalMenu::fromNetwork, BlockPos.STREAM_CODEC);
+
     public static final ResourceKey<CreativeModeTab> STORAGE_CENTRAL_TAB_KEY =
             ResourceKey.create(Registries.CREATIVE_MODE_TAB,
                     ResourceLocation.fromNamespaceAndPath(StorageNetworkCommon.MODID, "storage_network"));
@@ -66,6 +81,12 @@ public final class Registration {
         Registry.register(BuiltInRegistries.MENU, rl("storage_terminal"), STORAGE_TERMINAL_MENU);
         Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, rl("terminal_upgrade"),
                 TerminalUpgradeRecipe.Serializer.INSTANCE);
+        Registry.register(BuiltInRegistries.BLOCK, rl("network_share_terminal"), SHARE_TERMINAL_BLOCK);
+        Registry.register(BuiltInRegistries.ITEM, rl("network_share_terminal"), SHARE_TERMINAL_ITEM);
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, rl("network_share_terminal"), SHARE_TERMINAL_BE);
+        Registry.register(BuiltInRegistries.MENU, rl("network_share_terminal"), SHARE_TERMINAL_MENU);
+        ItemStorage.SIDED.registerForBlockEntity((be, direction) -> InventoryStorage.of(be, direction),
+                SHARE_TERMINAL_BE);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, STORAGE_CENTRAL_TAB_KEY,
                 FabricItemGroup.builder()
                         .title(Component.translatable("itemGroup.storage_network"))
@@ -78,6 +99,7 @@ public final class Registration {
             for (int i = 0; i < TIER_NAMES.length; i++) {
                 output.accept(terminalWithTier(i));
             }
+            output.accept(SHARE_TERMINAL_ITEM);
         });
     }
 
