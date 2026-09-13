@@ -48,13 +48,19 @@ jobs:
       - name: Build crafting-network
         run: ./gradlew --no-daemon -p crafting-network clean build
 
-      - name: Collect universal jars
+      - name: Collect release jars
         run: |
-          mkdir -p dist
+          mkdir -p dist/api
           cp build/libs/*-universal.jar dist/
           cp storage-network/build/libs/*-universal.jar dist/
           cp crafting-network/build/libs/*-universal.jar dist/
-          ls -la dist
+          # Per-loader API jars (mod id `mc_storage_area_network`). Modrinth keys files by the
+          # mod id inside them, so these are what we publish there; the universal `_bundle`
+          # container jar stays for GitHub/CurseForge.
+          cp fabric/build/libs/fabric-mc_storage_area_network-*.jar dist/api/ 2>/dev/null || true
+          cp neoforge/build/libs/neoforge-mc_storage_area_network-*.jar dist/api/ 2>/dev/null || true
+          rm -f dist/api/*-sources.jar
+          ls -la dist dist/api
 
       # Commit-derived changelog used for CurseForge and Modrinth.
       - name: Generate changelog
@@ -113,9 +119,15 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          # CurseForge does no mod-id matching, so the single universal jar is fine here.
+          curseforge-files: dist/mc-storage-area-network-*-universal.jar
           modrinth-id: mc-storage-area-network
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/mc-storage-area-network-*.jar
+          # Modrinth resolves a file to a project via the mod id inside it. The universal
+          # `_bundle` container matches no project, so publish the per-loader jars instead.
+          modrinth-files: |
+            dist/api/fabric-mc_storage_area_network-*.jar
+            dist/api/neoforge-mc_storage_area_network-*.jar
           name: MC Storage Area Network ${{ env.RELEASE_TAG }}
           version: mc-storage-area-network-${{ env.API_VER }}
           changelog-file: dist/changelog.md
