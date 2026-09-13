@@ -1,0 +1,11 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="@@LICENSE@@"
+
+[[mods]]
+modId="mc_storage_area_network_all"
+version="@@VERSION@@"
+displayName="MC Storage Area Network (All-in-One)"
+description='''
+All-in-one install of MC Storage Area Network: the shared API plus the Storage Network and Crafting Network gameplay mods.
+'''

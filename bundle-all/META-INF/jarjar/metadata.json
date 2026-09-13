@@ -1,0 +1,40 @@
+{
+  "jars": [
+    {
+      "identifier": {
+        "group": "com.retiredroca.mcstorageareanetwork",
+        "artifact": "mc_storage_area_network-neoforge"
+      },
+      "version": {
+        "range": "[1,)",
+        "artifactVersion": "@@API_VERSION@@"
+      },
+      "path": "META-INF/jarjar/mc_storage_area_network-neoforge.jar",
+      "isObfuscated": false
+    },
+    {
+      "identifier": {
+        "group": "com.retiredroca.storagenetwork",
+        "artifact": "storage-network-neoforge"
+      },
+      "version": {
+        "range": "[1,)",
+        "artifactVersion": "@@STORAGE_VERSION@@"
+      },
+      "path": "META-INF/jarjar/storage-network-neoforge.jar",
+      "isObfuscated": false
+    },
+    {
+      "identifier": {
+        "group": "com.retiredroca.craftingnetwork",
+        "artifact": "crafting-network-neoforge"
+      },
+      "version": {
+        "range": "[1,)",
+        "artifactVersion": "@@CRAFTING_VERSION@@"
+      },
+      "path": "META-INF/jarjar/crafting-network-neoforge.jar",
+      "isObfuscated": false
+    }
+  ]
+}

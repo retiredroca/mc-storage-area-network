@@ -48,10 +48,14 @@ jobs:
       - name: Build crafting-network
         run: ./gradlew --no-daemon -p crafting-network clean build
 
+      - name: Build all-in-one jar
+        run: ./gradlew --no-daemon combinedJar
+
       - name: Collect release jars
         run: |
           mkdir -p dist
           cp build/libs/*-universal.jar dist/
+          cp build/libs/*-all.jar dist/
           cp storage-network/build/libs/*-universal.jar dist/
           cp crafting-network/build/libs/*-universal.jar dist/
           ls -la dist

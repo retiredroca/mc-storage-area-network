@@ -3,6 +3,8 @@ plugins {
     id 'maven-publish'
 }
 
+import java.time.LocalDateTime
+
 // Fixed API version (no build-date suffix).
 version = '1.0.2'
 group = 'com.retiredroca.mcstorageareanetwork'
@@ -60,6 +62,105 @@ tasks.register('universalJar', Jar) {
 
 tasks.named('build') {
     dependsOn 'universalJar'
+}
+
+// Date-based version for the all-in-one release artifact (matches the gameplay mods).
+def combinedVersion = '1.0.0.' + String.format('%02d%02d%02d%02d',
+        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
+        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
+
+// Newest non-sources / non-dev jar in a directory whose name starts with the given prefix.
+def newestArtifact = { String dir, String prefix ->
+    def d = file(dir)
+    def jars = (d.listFiles() ?: new File[0]).findAll {
+        it.name.startsWith(prefix) && it.name.endsWith('.jar') &&
+                !it.name.contains('sources') && !it.name.contains('dev')
+    }
+    if (jars.isEmpty()) {
+        return null
+    }
+    jars.sort { it.lastModified() }
+    return jars.last()
+}
+
+def versionFromJar = { File jar, String prefix ->
+    def name = jar.name
+    if (name.startsWith(prefix)) {
+        name = name.substring(prefix.length())
+    }
+    name.endsWith('.jar') ? name.substring(0, name.length() - 4) : name
+}
+
+/**
+ * All-in-one jar: a thin container that nests each mod's loader-specific jar. A single jar can only
+ * carry one mod per loader, so Fabric reads the `*-fabric` jars from META-INF/jars while NeoForge
+ * reads the `*-neoforge` jars from META-INF/jarjar.
+ */
+tasks.register('combinedJar', Jar) {
+    dependsOn gradle.includedBuild('fabric').task(':build')
+    dependsOn gradle.includedBuild('neoforge').task(':build')
+    dependsOn gradle.includedBuild('storage-network').task(':build')
+    dependsOn gradle.includedBuild('crafting-network').task(':build')
+
+    archiveBaseName = 'mc-storage-area-network'
+    archiveClassifier = 'all'
+    version = combinedVersion
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    def tokensCache = null
+    def tokens = {
+        if (tokensCache == null) {
+            def apiF = newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-')
+            def stF = newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-')
+            def crF = newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-')
+            tokensCache = [
+                    '@@VERSION@@'         : combinedVersion,
+                    '@@AUTHORS@@'         : 'Retired Roca',
+                    '@@LICENSE@@'         : 'Apache-2.0',
+                    '@@API_VERSION@@'     : apiF ? versionFromJar(apiF, 'fabric-mc_storage_area_network-') : combinedVersion,
+                    '@@STORAGE_VERSION@@' : stF ? versionFromJar(stF, 'fabric-storage_network-') : combinedVersion,
+                    '@@CRAFTING_VERSION@@': crF ? versionFromJar(crF, 'fabric-crafting_network-') : combinedVersion,
+            ]
+        }
+        tokensCache
+    }
+
+    from('bundle-all') {
+        filter { String line ->
+            def out = line
+            tokens().each { token, value -> out = out.replace(token, value) }
+            out
+        }
+    }
+
+    // Fabric side: per-loader jars, loaded from META-INF/jars.
+    from({ def f = newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-'); f == null ? [] : f }) {
+        into 'META-INF/jars'
+        rename { 'mc_storage_area_network-fabric.jar' }
+    }
+    from({ def f = newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-'); f == null ? [] : f }) {
+        into 'META-INF/jars'
+        rename { 'storage-network-fabric.jar' }
+    }
+    from({ def f = newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-'); f == null ? [] : f }) {
+        into 'META-INF/jars'
+        rename { 'crafting-network-fabric.jar' }
+    }
+
+    // NeoForge side: per-loader jars, loaded from META-INF/jarjar.
+    from({ def f = newestArtifact('neoforge/build/libs', 'neoforge-mc_storage_area_network-'); f == null ? [] : f }) {
+        into 'META-INF/jarjar'
+        rename { 'mc_storage_area_network-neoforge.jar' }
+    }
+    from({ def f = newestArtifact('storage-network/neoforge/build/libs', 'neoforge-storage_network-'); f == null ? [] : f }) {
+        into 'META-INF/jarjar'
+        rename { 'storage-network-neoforge.jar' }
+    }
+    from({ def f = newestArtifact('crafting-network/neoforge/build/libs', 'neoforge-crafting_network-'); f == null ? [] : f }) {
+        into 'META-INF/jarjar'
+        rename { 'crafting-network-neoforge.jar' }
+    }
 }
 
 publishing {
