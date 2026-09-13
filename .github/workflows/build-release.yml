@@ -171,7 +171,11 @@ jobs:
           fail-mode: warn
 
       # --- Modrinth -----------------------------------------------------------------
+      # Disabled until the project is approved (it has no project ID yet). Enable by setting
+      # the repository variable `PUBLISH_MODRINTH` to `true` (and `MODRINTH_ID` to the base62
+      # project ID, or grant the token "Read projects").
       - name: Publish MC Storage Area Network API - Modrinth
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
@@ -191,6 +195,7 @@ jobs:
           fail-mode: warn
 
       - name: Publish Storage Network - Modrinth
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
@@ -210,6 +215,7 @@ jobs:
           fail-mode: warn
 
       - name: Publish Crafting Network - Modrinth
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
