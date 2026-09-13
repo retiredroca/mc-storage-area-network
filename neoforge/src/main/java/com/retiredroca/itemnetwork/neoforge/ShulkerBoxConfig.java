@@ -57,8 +57,14 @@ public final class ShulkerBoxConfig {
     }
 
     public static void onConfigLoad(ModConfigEvent event) {
+        // The Unloading event fires on server stop; reading values then throws.
+        if (event instanceof ModConfigEvent.Unloading) {
+            return;
+        }
         if (event.getConfig().getSpec() == SERVER_SPEC) {
-            migrateLegacyConfig(event);
+            if (event instanceof ModConfigEvent.Loading) {
+                migrateLegacyConfig(event);
+            }
             bake();
         }
     }

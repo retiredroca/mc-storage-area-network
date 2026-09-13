@@ -21,7 +21,7 @@ The mod id is `item_network_api`. Package: `com.retiredroca.itemnetwork.api`.
 Download the **universal** jar:
 
 ```
-item-network-api-1.0.0-universal.jar
+item-network-api-1.0.1-universal.jar
 ```
 
 It is a thin container that bundles the Fabric and NeoForge builds; each loader loads only its own
@@ -52,16 +52,16 @@ repositories {
 
 ```groovy
 // Fabric
-modImplementation 'com.retiredroca.itemnetwork:item_network_api-fabric:1.0.0'
+modImplementation 'com.retiredroca.itemnetwork:item_network_api-fabric:1.0.1'
 
 // NeoForge
-implementation 'com.retiredroca.itemnetwork:item_network_api-neoforge:1.0.0'
+implementation 'com.retiredroca.itemnetwork:item_network_api-neoforge:1.0.1'
 ```
 
 Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
 
 ```
-com.retiredroca.itemnetwork:item-network-api:1.0.0:universal
+com.retiredroca.itemnetwork:item-network-api:1.0.1:universal
 ```
 
 > Compile against the **per-loader** artifact for your mod. The `com.retiredroca.itemnetwork.api`
@@ -176,7 +176,7 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 ## Building / publishing
 
 ```bash
-./gradlew build           # universal bundle -> build/libs/item-network-api-1.0.0-universal.jar
+./gradlew build           # universal bundle -> build/libs/item-network-api-1.0.1-universal.jar
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
 ./gradlew publishRepo     # per-loader jars + bundle -> ./repo (committed maven for distribution)
 ```
@@ -192,4 +192,4 @@ modders. Commit it after `publishRepo`.
 | Fabric | Loader 0.16.14+ / Fabric API |
 | NeoForge | 21.1.235+ |
 | Java | 21 |
-| API version | 1.0.0 |
+| API version | 1.0.1 |

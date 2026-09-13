@@ -4,7 +4,7 @@ plugins {
 }
 
 // Fixed API version (no build-date suffix).
-version = '1.0.0'
+version = '1.0.1'
 group = 'com.retiredroca.itemnetwork'
 
 // Newest non-sources / non-dev jar in a directory.
