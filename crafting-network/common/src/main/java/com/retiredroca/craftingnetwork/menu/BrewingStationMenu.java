@@ -106,7 +106,7 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
             return station.getState();
         }
         return lastSentState != null ? lastSentState
-                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false);
+                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false, false);
     }
 
     @Override
@@ -195,6 +195,12 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
         if (id == 1000) {
             if (station != null) {
                 station.setShulkersFirst(!station.isShulkersFirst());
+            }
+            return true;
+        }
+        if (id == 1001) {
+            if (station != null) {
+                station.setInventoryFirst(!station.isInventoryFirst());
             }
             return true;
         }

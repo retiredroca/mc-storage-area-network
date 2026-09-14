@@ -121,7 +121,7 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
             return station.getState();
         }
         return lastSentState != null ? lastSentState
-                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false);
+                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false, false);
     }
 
     @Override
@@ -207,6 +207,12 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
         if (id == 1000) {
             if (station != null) {
                 station.setShulkersFirst(!station.isShulkersFirst());
+            }
+            return true;
+        }
+        if (id == 1001) {
+            if (station != null) {
+                station.setInventoryFirst(!station.isInventoryFirst());
             }
             return true;
         }

@@ -62,7 +62,9 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     private int dataVersion;
     private int selectedSource = SOURCE_ALL;
     private boolean clientShulkersFirst;
+    private boolean clientInventoryFirst;
     private static final int SHULKERS_FIRST_BUTTON = 1000;
+    private static final int INVENTORY_FIRST_BUTTON = 1001;
     private ItemStack resultOutput = ItemStack.EMPTY;
     private int resultPerCraft = 1;
 
@@ -96,7 +98,7 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     public static CraftingStationMenu fromNetwork(int containerId, Inventory playerInventory,
             CraftingStationOpenData data) {
         return new CraftingStationMenu(containerId, playerInventory, data.pos(), data.sources(),
-                data.shulkersFirst());
+                data.shulkersFirst(), data.inventoryFirst());
     }
 
     public static CraftingStationMenu fromNetwork(int containerId, Inventory playerInventory,
@@ -104,7 +106,8 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         BlockPos pos = buffer.readBlockPos();
         List<CraftingSourceInfo> sources = readSources(buffer);
         boolean shulkersFirst = buffer.readBoolean();
-        return new CraftingStationMenu(containerId, playerInventory, pos, sources, shulkersFirst);
+        boolean inventoryFirst = buffer.readBoolean();
+        return new CraftingStationMenu(containerId, playerInventory, pos, sources, shulkersFirst, inventoryFirst);
     }
 
     public static void writeSources(RegistryFriendlyByteBuf buffer, List<CraftingSourceInfo> sources) {
@@ -124,12 +127,13 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     }
 
     private CraftingStationMenu(int containerId, Inventory playerInventory, BlockPos pos,
-            List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+            List<CraftingSourceInfo> sources, boolean shulkersFirst, boolean inventoryFirst) {
         super(CraftingNetworkCommon.platform().craftingStationMenuType(), containerId);
         this.station = null;
         this.pos = pos;
         this.playerInventory = playerInventory;
         this.clientShulkersFirst = shulkersFirst;
+        this.clientInventoryFirst = inventoryFirst;
         this.craftSlots = new TransientCraftingContainer(this, 3, 3);
         this.resultSlots = new ResultContainer();
         this.menuStorages = new ArrayList<>();
@@ -239,8 +243,9 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         return dataVersion;
     }
 
-    public void setServerSources(List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+    public void setServerSources(List<CraftingSourceInfo> sources, boolean shulkersFirst, boolean inventoryFirst) {
         this.clientShulkersFirst = shulkersFirst;
+        this.clientInventoryFirst = inventoryFirst;
         if (!this.sources.equals(sources)) {
             this.sources = new ArrayList<>(sources);
             rebuildFlatTargets();
@@ -251,6 +256,11 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     /** Whether the "shulkers first" output option is enabled for this station. */
     public boolean isShulkersFirst() {
         return station != null ? station.isShulkersFirst() : clientShulkersFirst;
+    }
+
+    /** Whether crafted output should go to the player's inventory first. */
+    public boolean isInventoryFirst() {
+        return station != null ? station.isInventoryFirst() : clientInventoryFirst;
     }
 
     public int getSelectedSource() {
@@ -280,7 +290,17 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             if (station != null) {
                 station.setShulkersFirst(!station.isShulkersFirst());
                 if (owner != null) {
-                    CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst());
+                    CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst(), station.isInventoryFirst());
+                }
+            }
+            return true;
+        }
+        if (id == INVENTORY_FIRST_BUTTON) {
+            if (station != null) {
+                station.setInventoryFirst(!station.isInventoryFirst());
+                if (owner != null) {
+                    CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst(),
+                            station.isInventoryFirst());
                 }
             }
             return true;
@@ -373,7 +393,7 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         rebuildFlatTargets();
         this.dataVersion++;
         if (owner != null) {
-            CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst());
+            CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst(), station.isInventoryFirst());
         }
     }
 
@@ -643,6 +663,13 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             return;
         }
         ItemStack remaining = stack;
+        // "Inventory first": send crafted output to the player's inventory before anything else.
+        if (station.isInventoryFirst()) {
+            player.getInventory().add(remaining);
+            if (remaining.isEmpty()) {
+                return;
+            }
+        }
         // "Shulkers first": fill shulker-box contents before anything else.
         if (station.isShulkersFirst()) {
             remaining = station.insertIntoShulkers(remaining);

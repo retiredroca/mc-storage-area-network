@@ -16,7 +16,10 @@ chests, process them, and send the results back — automatically.
 - **Processor Terminals** — **Smelting**, **Blasting**, **Smoking** and **Brewing** terminals that pull inputs and fuel from the network, process them, and push results back.
 - **Recipe-book selector** — pick a recipe from the book; it only starts if the materials (and, for processors, fuel) are available.
 - **Batch crafting** — the result slot shows how many you can craft; **click** to craft one, **shift-click** to craft a stack (or as many as the network allows).
+- **No redstone, no item filters** — say goodbye to hopper chains, sorters and filter systems; a Terminal replaces your whole automated storage setup.
+- **Craft even when your inventory is full** — output is routed into the network, or straight back to your inventory with the *Inventory first* option.
 - **"Shulkers first" toggle** — a per-machine checkbox that makes output fill shulker boxes in the network before other containers.
+- **"Inventory first" toggle** — a per-machine checkbox that sends crafted output to your inventory first.
 - **XP collection** — Smelting/Blasting/Smoking terminals build up experience; **crouch + right-click** to collect it (owner and scoreboard team).
 - **Sources dropdown** — scope ingredients to *All Storage*, your *Inventory*, or a single container.
 - **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
@@ -29,7 +32,7 @@ chests, process them, and send the results back — automatically.
 - Select a recipe; it only places if the network (or your inventory) has the materials.
 - The result slot shows **how many** you can make. **Click** to craft one; **shift-click** to craft a stack, or as many as your materials allow.
 - Shift-click items in your inventory to deposit them into the network.
-- The **Shulkers first** checkbox next to the result fills shulker boxes in the network before other containers.
+- The **Shulkers first** checkbox next to the result fills shulker boxes in the network before other containers; the **Inventory first** checkbox below it sends crafted output to your inventory first.
 
 ## Processor Terminals
 

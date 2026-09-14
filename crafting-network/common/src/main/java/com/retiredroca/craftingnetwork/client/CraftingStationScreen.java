@@ -65,6 +65,7 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
     private Button storageToggle;
     private Button recipeBookToggle;
     private CheckboxWidget shulkerToggle;
+    private CheckboxWidget inventoryToggle;
     private EditBox searchBox;
     private boolean widthTooNarrow;
     private boolean storagePanelVisible;
@@ -103,6 +104,9 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         this.shulkerToggle = new CheckboxWidget(0, 0, this.menu.isShulkersFirst(),
                 Component.translatable("gui.crafting_network.shulkers_first.tooltip"),
                 value -> sendShulkerToggle());
+        this.inventoryToggle = new CheckboxWidget(0, 0, this.menu.isInventoryFirst(),
+                Component.translatable("gui.crafting_network.inventory_first.tooltip"),
+                value -> sendInventoryToggle());
         this.searchBox = new EditBox(this.font, 0, 0, SEARCH_W, 14, Component.translatable("gui.recipebook.search_hint"));
         this.searchBox.setMaxLength(50);
         this.searchBox.setBordered(false);
@@ -110,6 +114,7 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         this.searchBox.setHint(Component.translatable("gui.recipebook.search_hint"));
         this.addRenderableWidget(this.recipeBookToggle);
         this.addRenderableWidget(this.shulkerToggle);
+        this.addRenderableWidget(this.inventoryToggle);
         this.addWidget(this.storageToggle);
         this.addWidget(this.recipeBookComponent);
         this.addWidget(this.searchBox);
@@ -138,6 +143,14 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         }
     }
 
+    private void sendInventoryToggle() {
+        if (this.minecraft != null && this.minecraft.getConnection() != null) {
+            this.minecraft.getConnection().send(
+                    new net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket(
+                            this.menu.containerId, 1001));
+        }
+    }
+
     private void recomputeLeftPos() {
         int bookShift = this.recipeBookComponent.updateScreenPosition(this.width, this.imageWidth);
         boolean bookOpen = this.recipeBookComponent.isVisible();
@@ -162,6 +175,10 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
             // Right of the output slot, centered over the last inventory column and the output slot.
             this.shulkerToggle.setPosition(this.leftPos + 156, this.topPos + 39);
         }
+        if (this.inventoryToggle != null) {
+            // Directly below the shulkers checkbox, with a little buffer.
+            this.inventoryToggle.setPosition(this.leftPos + 156, this.topPos + 52);
+        }
         if (this.searchBox != null) {
             int panelX = this.leftPos - 10 - PANEL_W;
             if (panelX >= 4) {
@@ -178,6 +195,9 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         layoutHud();
         if (this.shulkerToggle != null) {
             this.shulkerToggle.setSelected(this.menu.isShulkersFirst());
+        }
+        if (this.inventoryToggle != null) {
+            this.inventoryToggle.setSelected(this.menu.isInventoryFirst());
         }
         if (!this.recipeBookComponent.isVisible()) {
             this.bookSourcesOpen = false;

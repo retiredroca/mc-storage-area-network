@@ -43,6 +43,7 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
     private static final String TAG_TIER = "tier";
     private static final String TAG_PINNED = "pinnedSource";
     private static final String TAG_SHULKERS_FIRST = "shulkersFirst";
+    private static final String TAG_INVENTORY_FIRST = "inventoryFirst";
     private static final long[] CHUNK_RADII = { 0, 1, 2, 3, 4, 5 };
 
     private static final record BoxLeaf(String label, int[] slots) {}
@@ -57,6 +58,7 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
 
     private BlockPos pinnedSource = null;
     private boolean shulkersFirst = false;
+    private boolean inventoryFirst = false;
 
     protected AbstractCraftingStationBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -196,6 +198,21 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
         }
     }
 
+    public boolean isInventoryFirst() {
+        return inventoryFirst;
+    }
+
+    public void setInventoryFirst(boolean inventoryFirst) {
+        if (this.inventoryFirst == inventoryFirst) {
+            return;
+        }
+        this.inventoryFirst = inventoryFirst;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void tickServer() {
         if (level == null || level.isClientSide) {
             return;
@@ -311,6 +328,7 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
             pinnedSource = null;
         }
         shulkersFirst = tag.getBoolean(TAG_SHULKERS_FIRST);
+        inventoryFirst = tag.getBoolean(TAG_INVENTORY_FIRST);
     }
 
     @Override
@@ -318,6 +336,7 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
         super.saveAdditional(tag, registries);
         tag.putInt(TAG_TIER, tier);
         tag.putBoolean(TAG_SHULKERS_FIRST, shulkersFirst);
+        tag.putBoolean(TAG_INVENTORY_FIRST, inventoryFirst);
         if (pinnedSource != null) {
             tag.putIntArray(TAG_PINNED, new int[] {
                     pinnedSource.getX() - worldPosition.getX(),

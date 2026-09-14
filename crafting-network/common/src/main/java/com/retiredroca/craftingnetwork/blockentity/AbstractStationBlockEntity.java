@@ -75,6 +75,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private static final String TAG_BOTTLES = "bottles";
     private static final String TAG_INGREDIENT = "ingredient";
     private static final String TAG_SHULKERS_FIRST = "shulkersFirst";
+    private static final String TAG_INVENTORY_FIRST = "inventoryFirst";
     private static final String TAG_STORED_XP = "storedXp";
     private static final long[] CHUNK_RADII = { 0, 1, 2, 3, 4, 5 };
 
@@ -92,6 +93,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private String brewTarget = "";
     private ItemStack recipeFilter = ItemStack.EMPTY;
     private boolean shulkersFirst = false;
+    private boolean inventoryFirst = false;
     private float storedExperience = 0f;
 
     private int fuelCharge = 0;
@@ -256,6 +258,21 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             return;
         }
         this.shulkersFirst = shulkersFirst;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public boolean isInventoryFirst() {
+        return inventoryFirst;
+    }
+
+    public void setInventoryFirst(boolean inventoryFirst) {
+        if (this.inventoryFirst == inventoryFirst) {
+            return;
+        }
+        this.inventoryFirst = inventoryFirst;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -839,14 +856,14 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
                     "gui.crafting_network.slot_fuel", fuelCharge > 0 ? new ItemStack(Items.BLAZE_POWDER) : ItemStack.EMPTY));
             StationStatus status = getStatus();
-            return new StationState(status, slots, progressPct, brewTarget, craftablePotions, shulkersFirst);
+            return new StationState(status, slots, progressPct, brewTarget, craftablePotions, shulkersFirst, inventoryFirst);
         }
         List<com.retiredroca.craftingnetwork.station.StationSlot> slots = List.of(
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_input", input),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_fuel", fuel),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_result", result));
         StationStatus status = getStatus();
-        return new StationState(status, slots, progressPct, "", List.of(), shulkersFirst);
+        return new StationState(status, slots, progressPct, "", List.of(), shulkersFirst, inventoryFirst);
     }
 
     public boolean stillValid(Player player) {
@@ -910,6 +927,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             recipeFilter = ItemStack.parseOptional(registries, tag.getCompound(TAG_RECIPE_FILTER));
         }
         shulkersFirst = tag.getBoolean(TAG_SHULKERS_FIRST);
+        inventoryFirst = tag.getBoolean(TAG_INVENTORY_FIRST);
         storedExperience = tag.getFloat(TAG_STORED_XP);
     }
 
@@ -942,6 +960,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         tag.put(TAG_BOTTLES, bottleList);
         tag.put(TAG_INGREDIENT, ingredient.saveOptional(registries));
         tag.putBoolean(TAG_SHULKERS_FIRST, shulkersFirst);
+        tag.putBoolean(TAG_INVENTORY_FIRST, inventoryFirst);
         tag.putFloat(TAG_STORED_XP, storedExperience);
     }
 

@@ -16,6 +16,6 @@ public class CraftingStationBlockEntity extends AbstractCraftingStationBlockEnti
 
     @Override
     public CraftingStationOpenData getScreenOpeningData(ServerPlayer player) {
-        return new CraftingStationOpenData(getBlockPos(), getSourceInfos(), isShulkersFirst());
+        return new CraftingStationOpenData(getBlockPos(), getSourceInfos(), isShulkersFirst(), isInventoryFirst());
     }
 }

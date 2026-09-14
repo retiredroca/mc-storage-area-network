@@ -21,6 +21,8 @@ or pick only the mods you want:
 ## Features
 
 - **One network for all your storage** — chests, barrels, hoppers, shulker boxes, and any modded inventory-bearing block within range.
+- **No redstone, no item filters** — say goodbye to hopper chains, sorters and filter systems; one Terminal replaces your whole automated storage setup.
+- **Craft even when your inventory is full** — crafted output is routed into the network, or straight back to your inventory with the *Inventory first* option.
 - **Storage Terminal** — a searchable, sortable grid of every item in the network, with draggable search and source panels. Search by name or id; sort by name, type, tag, mod or equipment.
 - **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. The result shows how many you can make; **click** to craft one, **shift-click** to craft a stack.
 - **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back. Smelting/Blasting/Smoking earn experience you can collect with **crouch + right-click**.
@@ -55,7 +57,7 @@ A collection-only sink that **receives crafted output** and holds it for you.
 - The **Crafting Terminal** shows the vanilla 3×3 grid and recipe book. Selecting a recipe only places it if the network (or your inventory) has the materials; the result slot shows **how many** you can make. **Click** to craft one, **shift-click** to craft a stack (or as many as you can).
 - The **Smelting / Blasting / Smoking Terminals** run automatically once they have a recipe and fuel, drawing inputs and fuel from the network. **Crouch + right-click** to collect the experience they earn (owner and scoreboard team).
 - The **Brewing Terminal** lets you pick a target potion; it pulls water bottles, blaze powder and ingredients and brews **one batch (3 potions)**, then waits until you re-select the target.
-- Every machine has a **"Shulkers first"** checkbox that fills shulker boxes before other containers.
+- Every machine has a **"Shulkers first"** checkbox that fills shulker boxes before other containers, and an **"Inventory first"** checkbox that sends crafted output straight to your inventory.
 - Higher tiers process **faster** as well as scanning further.
 
 ## Ownership & privacy

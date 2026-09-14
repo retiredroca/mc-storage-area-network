@@ -31,5 +31,7 @@
   "gui.crafting_network.slot_ingredient": "Ingredient",
   "gui.crafting_network.shulkers_first": "Shulkers first",
   "gui.crafting_network.shulkers_first.tooltip": "Fill shulker boxes in the network before other storage",
+  "gui.crafting_network.inventory_first": "Inventory first",
+  "gui.crafting_network.inventory_first.tooltip": "Send crafted output to your inventory before the network",
   "disconnect.crafting_network.server_requires.reason": "This server requires Crafting Network. Please install it and reconnect."
 }

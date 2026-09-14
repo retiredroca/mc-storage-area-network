@@ -83,6 +83,7 @@ public final class NeoForgeCraftingNetworkPlatform implements CraftingNetworkPla
             buffer.writeBlockPos(station.getBlockPos());
             CraftingStationMenu.writeSources(buffer, station.getSourceInfos());
             buffer.writeBoolean(station.isShulkersFirst());
+            buffer.writeBoolean(station.isInventoryFirst());
         });
     }
 
@@ -93,8 +94,9 @@ public final class NeoForgeCraftingNetworkPlatform implements CraftingNetworkPla
     }
 
     @Override
-    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst) {
-        Networking.sendSources(player, sources, shulkersFirst);
+    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst,
+            boolean inventoryFirst) {
+        Networking.sendSources(player, sources, shulkersFirst, inventoryFirst);
     }
 
     @Override

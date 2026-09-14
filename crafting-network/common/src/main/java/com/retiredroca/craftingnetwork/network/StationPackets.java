@@ -38,8 +38,8 @@ public final class StationPackets {
         }
     }
 
-    public record CraftingSourcesPayload(List<CraftingSourceInfo> sources, boolean shulkersFirst)
-            implements CustomPacketPayload {
+    public record CraftingSourcesPayload(List<CraftingSourceInfo> sources, boolean shulkersFirst,
+            boolean inventoryFirst) implements CustomPacketPayload {
         public static final Type<CraftingSourcesPayload> TYPE = new Type<>(CRAFTING_SOURCES);
         public static final StreamCodec<RegistryFriendlyByteBuf, CraftingSourcesPayload> STREAM_CODEC = StreamCodec.of(
                 CraftingSourcesPayload::encode,
@@ -49,12 +49,15 @@ public final class StationPackets {
             CraftingSourceInfo.STREAM_CODEC.<RegistryFriendlyByteBuf>cast().apply(ByteBufCodecs.list())
                     .encode(buf, payload.sources());
             buf.writeBoolean(payload.shulkersFirst());
+            buf.writeBoolean(payload.inventoryFirst());
         }
 
         private static CraftingSourcesPayload decode(RegistryFriendlyByteBuf buf) {
             List<CraftingSourceInfo> sources = CraftingSourceInfo.STREAM_CODEC.<RegistryFriendlyByteBuf>cast()
                     .apply(ByteBufCodecs.list()).decode(buf);
-            return new CraftingSourcesPayload(sources, buf.readBoolean());
+            boolean shulkersFirst = buf.readBoolean();
+            boolean inventoryFirst = buf.readBoolean();
+            return new CraftingSourcesPayload(sources, shulkersFirst, inventoryFirst);
         }
 
         @Override

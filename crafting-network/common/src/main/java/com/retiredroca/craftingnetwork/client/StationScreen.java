@@ -89,6 +89,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
     private RecipeBookComponent recipeBookComponent;
     private Button recipeBookToggle;
     private CheckboxWidget shulkerToggle;
+    private CheckboxWidget inventoryToggle;
     private EditBox searchBox;
     private boolean widthTooNarrow;
     private long lastCatalogSig = -1;
@@ -129,6 +130,9 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         this.shulkerToggle = new CheckboxWidget(0, 0, shulkersFirst(),
                 Component.translatable("gui.crafting_network.shulkers_first.tooltip"),
                 value -> sendShulkerToggle());
+        this.inventoryToggle = new CheckboxWidget(0, 0, inventoryFirst(),
+                Component.translatable("gui.crafting_network.inventory_first.tooltip"),
+                value -> sendInventoryToggle());
         this.searchBox = new EditBox(this.font, 0, 0, SEARCH_W, 14,
                 Component.translatable("gui.recipebook.search_hint"));
         this.searchBox.setMaxLength(50);
@@ -143,6 +147,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
             this.addWidget(this.recipeBookComponent);
         }
         this.addRenderableWidget(this.shulkerToggle);
+        this.addRenderableWidget(this.inventoryToggle);
         recomputeLeftPos();
     }
 
@@ -157,6 +162,19 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
     private boolean shulkersFirst() {
         StationState state = getStationMenu().getState();
         return state != null && state.shulkersFirst();
+    }
+
+    private void sendInventoryToggle() {
+        if (this.minecraft != null && this.minecraft.getConnection() != null) {
+            this.minecraft.getConnection().send(
+                    new net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket(
+                            this.menu.containerId, 1001));
+        }
+    }
+
+    private boolean inventoryFirst() {
+        StationState state = getStationMenu().getState();
+        return state != null && state.inventoryFirst();
     }
 
     private void toggleBook() {
@@ -301,6 +319,10 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
             // Right of the output, centered over the last inventory column (brewing: over the bottles).
             this.shulkerToggle.setPosition(this.leftPos + 156, this.topPos + (isBrewing() ? 55 : 39));
         }
+        if (this.inventoryToggle != null) {
+            // Directly below the shulkers checkbox, with a little buffer.
+            this.inventoryToggle.setPosition(this.leftPos + 156, this.topPos + (isBrewing() ? 68 : 52));
+        }
         if (this.searchBox != null) {
             int panelX = machineTabPanelX();
             if (panelX >= 4 && isBookVisible()) {
@@ -368,6 +390,9 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         layoutHud();
         if (this.shulkerToggle != null) {
             this.shulkerToggle.setSelected(shulkersFirst());
+        }
+        if (this.inventoryToggle != null) {
+            this.inventoryToggle.setSelected(inventoryFirst());
         }
         if (!isBookVisible()) {
             this.sourcesOpen = false;

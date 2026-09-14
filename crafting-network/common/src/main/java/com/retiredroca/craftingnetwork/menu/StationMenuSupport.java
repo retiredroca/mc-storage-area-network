@@ -153,7 +153,7 @@ public class StationMenuSupport {
         rebuildFlatTargets();
         dataVersion++;
         if (owner != null) {
-            CraftingNetworkCommon.platform().sendSources(owner, sources, false);
+            CraftingNetworkCommon.platform().sendSources(owner, sources, false, false);
         }
         return true;
     }
