@@ -14,7 +14,10 @@ chests, process them, and send the results back — automatically.
 
 - **Crafting Terminal** — an upgradable crafting table with a recipe book that crafts using items drawn from the network plus your inventory.
 - **Processor Terminals** — **Smelting**, **Blasting**, **Smoking** and **Brewing** terminals that pull inputs and fuel from the network, process them, and push results back.
-- **Recipe-book selector** — pick a recipe from the book; the terminal gathers the ingredients for you.
+- **Recipe-book selector** — pick a recipe from the book; it only starts if the materials (and, for processors, fuel) are available.
+- **Batch crafting** — the result slot shows how many you can craft; **click** to craft one, **shift-click** to craft a stack (or as many as the network allows).
+- **"Shulkers first" toggle** — a per-machine checkbox that makes output fill shulker boxes in the network before other containers.
+- **XP collection** — Smelting/Blasting/Smoking terminals build up experience; **crouch + right-click** to collect it (owner and scoreboard team).
 - **Sources dropdown** — scope ingredients to *All Storage*, your *Inventory*, or a single container.
 - **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan a larger area (1×1 up to 11×11 chunks).
@@ -23,22 +26,25 @@ chests, process them, and send the results back — automatically.
 ## The Crafting Terminal
 
 - Open it to see the vanilla 3×3 grid and recipe book.
-- Select a recipe; the terminal reports whether you have the materials and, on click, crafts it.
-- **Click** the result to craft one; **shift-click** to craft as many as your materials allow.
+- Select a recipe; it only places if the network (or your inventory) has the materials.
+- The result slot shows **how many** you can make. **Click** to craft one; **shift-click** to craft a stack, or as many as your materials allow.
 - Shift-click items in your inventory to deposit them into the network.
+- The **Shulkers first** checkbox next to the result fills shulker boxes in the network before other containers.
 
 ## Processor Terminals
 
-Each processor terminal runs automatically once it has a recipe to work on:
+Each processor terminal runs automatically once it has a recipe to work on; clicking a recipe only starts it if the input and fuel are available:
 
 | Terminal | Processes | Notes |
 |----------|-----------|-------|
-| **Smelting Terminal** | Furnace recipes | Needs fuel from the network |
-| **Blasting Terminal** | Blast-furnace recipes | Faster than smelting |
-| **Smoking Terminal** | Smoker recipes | Fast food cooking |
-| **Brewing Terminal** | Potions | Select a target potion from the brew book; pulls water, blaze powder and ingredients |
+| **Smelting Terminal** | Furnace recipes | Needs fuel from the network; earns XP |
+| **Blasting Terminal** | Blast-furnace recipes | Faster than smelting; earns XP |
+| **Smoking Terminal** | Smoker recipes | Fast food cooking; earns XP |
+| **Brewing Terminal** | Potions | Select a target potion; pulls water, blaze powder and ingredients and brews **one batch (3 potions)**, then waits until you re-select the target |
 
-Higher tiers process **faster** (tier speed multiplier) and scan more chunks.
+- **Collect XP:** crouch + right-click a Smelting/Blasting/Smoking terminal to collect the experience it has earned.
+- **Shulkers first:** the checkbox makes output fill shulker boxes before other containers.
+- Higher tiers process **faster** (tier speed multiplier) and scan more chunks.
 
 ## Ownership & privacy
 

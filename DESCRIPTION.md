@@ -22,8 +22,9 @@ or pick only the mods you want:
 
 - **One network for all your storage** — chests, barrels, hoppers, shulker boxes, and any modded inventory-bearing block within range.
 - **Storage Terminal** — a searchable, sortable grid of every item in the network, with draggable search and source panels. Search by name or id; sort by name, type, tag, mod or equipment.
-- **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. Click to craft one, shift-click to craft all available.
-- **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back.
+- **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. The result shows how many you can make; **click** to craft one, **shift-click** to craft a stack.
+- **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back. Smelting/Blasting/Smoking earn experience you can collect with **crouch + right-click**.
+- **"Shulkers first" toggle** — a per-machine checkbox that fills shulker boxes in the network before other containers.
 - **Sources dropdown** — scope any terminal to *All Storage*, your *Inventory*, or a single container.
 - **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan from **1×1 up to 11×11 chunks** (capped by the server's view/simulation distance).
@@ -51,9 +52,10 @@ A collection-only sink that **receives crafted output** and holds it for you.
 
 ## Crafting Terminal & Processor Terminals
 
-- The **Crafting Terminal** shows the vanilla 3×3 grid and recipe book. Select a recipe and the terminal reports whether the network has the materials; click to craft one, shift-click to craft as many as possible.
-- The **Smelting / Blasting / Smoking Terminals** run automatically once they have a recipe to work on, drawing inputs and fuel from the network.
-- The **Brewing Terminal** lets you pick a target potion from a brew book; it pulls water bottles, blaze powder and ingredients and brews them for you.
+- The **Crafting Terminal** shows the vanilla 3×3 grid and recipe book. Selecting a recipe only places it if the network (or your inventory) has the materials; the result slot shows **how many** you can make. **Click** to craft one, **shift-click** to craft a stack (or as many as you can).
+- The **Smelting / Blasting / Smoking Terminals** run automatically once they have a recipe and fuel, drawing inputs and fuel from the network. **Crouch + right-click** to collect the experience they earn (owner and scoreboard team).
+- The **Brewing Terminal** lets you pick a target potion; it pulls water bottles, blaze powder and ingredients and brews **one batch (3 potions)**, then waits until you re-select the target.
+- Every machine has a **"Shulkers first"** checkbox that fills shulker boxes before other containers.
 - Higher tiers process **faster** as well as scanning further.
 
 ## Ownership & privacy
