@@ -27,6 +27,6 @@ An upgradable Crafting Station for Minecraft. Like the Storage Terminal, it scan
 [[dependencies.${mod_id}]]
     modId="mc_storage_area_network"
     type="required"
-    versionRange="[1.0.2,)"
+    versionRange="[1.0,1.1)"
     ordering="AFTER"
     side="BOTH"

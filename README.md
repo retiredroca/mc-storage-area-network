@@ -30,11 +30,33 @@ A single jar works on **Fabric** and **NeoForge**.
 ## Installation
 
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for **Minecraft 1.21.1**.
-2. Drop `mc-storage-area-network-<version>-universal.jar` into your `mods/` folder.
+2. Drop the **universal** API jar into your `mods/` folder:
 
-> This API is a **required dependency** of Storage Network and Crafting Network. If you're installing
-> those, either use the **all-in-one** `mc-storage-area-network-<version>-all.jar` (bundles the API
-> plus both gameplay mods) or install this API jar alongside them.
+   ```
+   universal_mc_san_api.<version>.jar
+   ```
+
+   One jar for both loaders — a thin container holding the Fabric and NeoForge builds, where each
+   loader loads only its own nested copy.
+
+> This API is a **required dependency** of Storage Network and Crafting Network. For the whole suite,
+> use a **bundle**: `universal-bundle-all.<version>.jar` (API + both gameplay mods), or
+> `universal-bundle-storage` / `universal-bundle-crafting` for one gameplay mod each.
+
+### Downloads
+
+| File | Loader | Contents |
+|------|--------|----------|
+| `universal_mc_san_api.<version>.jar` | Fabric + NeoForge | This API |
+| `universal-storage-network.<version>.jar` | Fabric + NeoForge | Storage Network (needs the API) |
+| `universal-crafting-network.<version>.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
+| `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network |
+| `universal-bundle-storage` / `universal-bundle-crafting` | Fabric + NeoForge | API + one gameplay mod |
+| `fabric-*` / `neoforge-*` | single loader | any of the above, loader-specific |
+
+Universal jars are published to **CurseForge / Modrinth**; the loader-specific (`fabric-*` /
+`neoforge-*`) builds are on
+**[GitHub Releases](https://github.com/retiredroca/mc-storage-area-network/releases)**.
 
 ## Requirements
 
@@ -54,10 +76,14 @@ repositories {
     maven { url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo' }
 }
 dependencies {
-    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.2' // Fabric
-    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.2' // NeoForge
+    // Compile against the per-loader artifact for your mod. (1.0.+ tracks the 1.0.x series.)
+    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.+' // Fabric
+    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.+' // NeoForge
 }
 ```
+
+The API version is `1.0.<yymmddhh>` (a date-based patch), so depending on `1.0.x` picks up the latest
+build without chasing an exact number.
 
 Register an item source:
 

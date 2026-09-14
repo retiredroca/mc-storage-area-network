@@ -4,8 +4,12 @@ plugins {
 }
 
 
-// Fixed API version (no build-date suffix).
-version = '1.0.2'
+import java.time.LocalDateTime
+
+// API version: 1.0.YYMMDDHH (date as the patch).
+version = '1.0.' + String.format('%02d%02d%02d%02d',
+        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
+        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
 group = mod_group_id
 
 base {

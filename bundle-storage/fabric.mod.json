@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "mc_storage_area_network_bundle_storage",
+  "version": "@@VERSION@@",
+  "name": "MC Storage Area Network (Storage)",
+  "description": "One-file install: the MC Storage Area Network API plus Storage Network. Works on Fabric; each loader loads only its own nested jars.",
+  "authors": ["@@AUTHORS@@"],
+  "license": "@@LICENSE@@",
+  "environment": "*",
+  "jars": [
+    { "file": "META-INF/jars/mc_storage_area_network-fabric.jar" },
+    { "file": "META-INF/jars/storage-network-fabric.jar" }
+  ]
+}

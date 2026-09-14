@@ -98,8 +98,9 @@ All terminals are shaped 3×3: **8× Copper Ingot** around a core block.
 | Side | Client & Server |
 | Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately; Storage Network recommended for the share terminal |
 
-> Easiest install: the **all-in-one** `mc-storage-area-network-<version>-all.jar` bundles this mod,
-> Storage Network and the API. To install just this mod instead, also drop in the API jar.
+> Easiest install: the **bundle** `universal-bundle-all.<version>.jar` (or `universal-bundle-crafting`
+> for just this one) bundles this mod, Storage Network and the API. To install this mod on its own,
+> also drop in the universal API jar (`universal_mc_san_api.<version>.jar`).
 
 ## Configuration
 

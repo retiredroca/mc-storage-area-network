@@ -5,8 +5,15 @@ plugins {
 
 import java.time.LocalDateTime
 
-// Fixed API version (no build-date suffix).
-version = '1.0.2'
+// Build stamp: YYMMDDHH. The API uses it as the patch (1.0.<stamp>); the bundles use the
+// gameplay-mod scheme (1.0.0.<stamp>).
+def buildStamp = String.format('%02d%02d%02d%02d',
+        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
+        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
+def apiVersion = '1.0.' + buildStamp
+def bundleVersion = '1.0.0.' + buildStamp
+
+version = apiVersion
 group = 'com.retiredroca.mcstorageareanetwork'
 
 // Newest non-sources / non-dev jar in a directory.
@@ -22,54 +29,7 @@ def newestJar = { String dir ->
     return jars.last()
 }
 
-def bundleTokens = [
-        '@@VERSION@@': version.toString(),
-        '@@AUTHORS@@': 'Retired Roca',
-        '@@LICENSE@@': 'Apache-2.0',
-]
-
-/**
- * Universal bundle: a thin container mod holding the loader-specific API jars as nested mods.
- * The container carries no top-level classes, so each loader loads only its own nested copy of the
- * public com.retiredroca.mcstorageareanetwork.api package (Fabric intermediary vs NeoForge Mojang).
- */
-tasks.register('universalJar', Jar) {
-    dependsOn gradle.includedBuild('fabric').task(':build')
-    dependsOn gradle.includedBuild('neoforge').task(':build')
-
-    archiveBaseName = 'mc-storage-area-network'
-    archiveClassifier = 'universal'
-    destinationDirectory = layout.buildDirectory.dir('libs')
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    // Container metadata only (fabric.mod.json + META-INF/neoforge.mods.toml + jarjar metadata).
-    from('bundle') {
-        filter { String line ->
-            def out = line
-            bundleTokens.each { token, value -> out = out.replace(token, value) }
-            out
-        }
-    }
-    from({ newestJar('fabric/build/libs') }) {
-        into 'META-INF/jars'
-        rename { 'mc_storage_area_network-fabric.jar' }
-    }
-    from({ newestJar('neoforge/build/libs') }) {
-        into 'META-INF/jarjar'
-        rename { 'mc_storage_area_network-neoforge.jar' }
-    }
-}
-
-tasks.named('build') {
-    dependsOn 'universalJar'
-}
-
-// Date-based version for the all-in-one release artifact (matches the gameplay mods).
-def combinedVersion = '1.0.0.' + String.format('%02d%02d%02d%02d',
-        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
-        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
-
-// Newest non-sources / non-dev jar in a directory whose name starts with the given prefix.
+// Newest non-sources / non-dev jar whose name starts with the given prefix.
 def newestArtifact = { String dir, String prefix ->
     def d = file(dir)
     def jars = (d.listFiles() ?: new File[0]).findAll {
@@ -91,82 +51,228 @@ def versionFromJar = { File jar, String prefix ->
     name.endsWith('.jar') ? name.substring(0, name.length() - 4) : name
 }
 
-/**
- * All-in-one jar: a thin container that nests each mod's loader-specific jar. A single jar can only
- * carry one mod per loader, so Fabric reads the `*-fabric` jars from META-INF/jars while NeoForge
- * reads the `*-neoforge` jars from META-INF/jarjar.
- */
-tasks.register('combinedJar', Jar) {
-    dependsOn gradle.includedBuild('fabric').task(':build')
-    dependsOn gradle.includedBuild('neoforge').task(':build')
-    dependsOn gradle.includedBuild('storage-network').task(':build')
-    dependsOn gradle.includedBuild('crafting-network').task(':build')
+// Per-mod, per-loader source jars (lazy so they resolve after the child builds run).
+def apiFab = { newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-') }
+def apiNeo = { newestArtifact('neoforge/build/libs', 'neoforge-mc_storage_area_network-') }
+def stFab = { newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-') }
+def stNeo = { newestArtifact('storage-network/neoforge/build/libs', 'neoforge-storage_network-') }
+def crFab = { newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-') }
+def crNeo = { newestArtifact('crafting-network/neoforge/build/libs', 'neoforge-crafting_network-') }
+def stUni = { newestJar('storage-network/build/libs') }
+def crUni = { newestJar('crafting-network/build/libs') }
 
-    archiveBaseName = 'mc-storage-area-network'
-    archiveClassifier = 'all'
-    version = combinedVersion
+def fabJar = [api: apiFab, storage: stFab, crafting: crFab]
+def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo]
+def fabName = [api: 'mc_storage_area_network-fabric.jar',
+               storage: 'storage-network-fabric.jar',
+               crafting: 'crafting-network-fabric.jar']
+def neoName = [api: 'mc_storage_area_network-neoforge.jar',
+               storage: 'storage-network-neoforge.jar',
+               crafting: 'crafting-network-neoforge.jar']
+
+def baseTokens = [
+        '@@VERSION@@': bundleVersion,
+        '@@AUTHORS@@': 'Retired Roca',
+        '@@LICENSE@@': 'Apache-2.0',
+]
+def apiTokens = [
+        '@@VERSION@@': apiVersion,
+        '@@AUTHORS@@': 'Retired Roca',
+        '@@LICENSE@@': 'Apache-2.0',
+]
+def versionTokens = {
+    def a = apiFab()
+    def s = stFab()
+    def c = crFab()
+    [
+            '@@API_VERSION@@'     : a ? versionFromJar(a, 'fabric-mc_storage_area_network-') : apiVersion,
+            '@@STORAGE_VERSION@@' : s ? versionFromJar(s, 'fabric-storage_network-') : bundleVersion,
+            '@@CRAFTING_VERSION@@': c ? versionFromJar(c, 'fabric-crafting_network-') : bundleVersion,
+    ]
+}
+
+// --- repo/ maven housekeeping -------------------------------------------------------
+def versionKey = { String v -> v.tokenize('.').collect { it.isInteger() ? it.toInteger() : 0 } }
+def compareVersions = { String a, String b ->
+    def ka = versionKey(a)
+    def kb = versionKey(b)
+    for (int i = 0; i < Math.max(ka.size(), kb.size()); i++) {
+        def x = i < ka.size() ? ka[i] : 0
+        def y = i < kb.size() ? kb[i] : 0
+        if (x != y) {
+            return x <=> y
+        }
+    }
+    0
+}
+def writeChecksums = { File f ->
+    def bytes = f.bytes
+    ['md5': 'MD5', 'sha1': 'SHA-1', 'sha256': 'SHA-256', 'sha512': 'SHA-512'].each { ext, algo ->
+        def digest = java.security.MessageDigest.getInstance(algo).digest(bytes)
+        new File(f.parentFile, "${f.name}.${ext}").text =
+                digest.collect { String.format('%02x', it & 0xff) }.join()
+    }
+}
+def writeMetadata = { File artifactDir, String groupId, String artifactId, List<String> versions ->
+    def sorted = versions.sort { a, b -> compareVersions(a, b) }
+    def latest = sorted.last()
+    def xml = new StringBuilder()
+    xml << '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml << '<metadata>\n'
+    xml << "  <groupId>${groupId}</groupId>\n"
+    xml << "  <artifactId>${artifactId}</artifactId>\n"
+    xml << '  <versioning>\n'
+    xml << "    <latest>${latest}</latest>\n"
+    xml << "    <release>${latest}</release>\n"
+    xml << '    <versions>\n'
+    sorted.each { v -> xml << "      <version>${v}</version>\n" }
+    xml << '    </versions>\n'
+    xml << "    <lastUpdated>${new java.text.SimpleDateFormat('yyyyMMddHHmmss').format(new Date())}</lastUpdated>\n"
+    xml << '  </versioning>\n'
+    xml << '</metadata>\n'
+    def meta = new File(artifactDir, 'maven-metadata.xml')
+    meta.text = xml.toString()
+    writeChecksums(meta)
+}
+
+def dependOnBuilds = { org.gradle.api.Task t ->
+    t.dependsOn gradle.includedBuild('fabric').task(':build')
+    t.dependsOn gradle.includedBuild('neoforge').task(':build')
+    t.dependsOn gradle.includedBuild('storage-network').task(':build')
+    t.dependsOn gradle.includedBuild('crafting-network').task(':build')
+}
+
+/**
+ * Universal API bundle: thin container nesting the loader-specific API jars so each loader loads
+ * only its own copy of the public com.retiredroca.mcstorageareanetwork.api package.
+ */
+tasks.register('apiUniversalJar', Jar) {
+    dependOnBuilds(delegate)
+    archiveFileName = "universal_mc_san_api.${apiVersion}.jar"
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    def tokensCache = null
-    def tokens = {
-        if (tokensCache == null) {
-            def apiF = newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-')
-            def stF = newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-')
-            def crF = newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-')
-            tokensCache = [
-                    '@@VERSION@@'         : combinedVersion,
-                    '@@AUTHORS@@'         : 'Retired Roca',
-                    '@@LICENSE@@'         : 'Apache-2.0',
-                    '@@API_VERSION@@'     : apiF ? versionFromJar(apiF, 'fabric-mc_storage_area_network-') : combinedVersion,
-                    '@@STORAGE_VERSION@@' : stF ? versionFromJar(stF, 'fabric-storage_network-') : combinedVersion,
-                    '@@CRAFTING_VERSION@@': crF ? versionFromJar(crF, 'fabric-crafting_network-') : combinedVersion,
-            ]
-        }
-        tokensCache
-    }
-
-    from('bundle-all') {
+    from('bundle') {
         filter { String line ->
             def out = line
-            tokens().each { token, value -> out = out.replace(token, value) }
+            apiTokens.each { token, value -> out = out.replace(token, value) }
             out
         }
     }
-
-    // Fabric side: per-loader jars, loaded from META-INF/jars.
-    from({ def f = newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-'); f == null ? [] : f }) {
+    from({ def f = apiFab(); f == null ? [] : f }) {
         into 'META-INF/jars'
         rename { 'mc_storage_area_network-fabric.jar' }
     }
-    from({ def f = newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-'); f == null ? [] : f }) {
-        into 'META-INF/jars'
-        rename { 'storage-network-fabric.jar' }
-    }
-    from({ def f = newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-'); f == null ? [] : f }) {
-        into 'META-INF/jars'
-        rename { 'crafting-network-fabric.jar' }
-    }
-
-    // NeoForge side: per-loader jars, loaded from META-INF/jarjar.
-    from({ def f = newestArtifact('neoforge/build/libs', 'neoforge-mc_storage_area_network-'); f == null ? [] : f }) {
+    from({ def f = apiNeo(); f == null ? [] : f }) {
         into 'META-INF/jarjar'
         rename { 'mc_storage_area_network-neoforge.jar' }
     }
-    from({ def f = newestArtifact('storage-network/neoforge/build/libs', 'neoforge-storage_network-'); f == null ? [] : f }) {
-        into 'META-INF/jarjar'
-        rename { 'storage-network-neoforge.jar' }
+}
+
+/**
+ * Bundle container. `fabMods` are nested under META-INF/jars (Fabric), `neoMods` under
+ * META-INF/jarjar (NeoForge); one jar can only carry one mod per loader, hence the container.
+ */
+def registerBundle = { String taskName, String templateDir, String fileName, List fabMods, List neoMods ->
+    def t = tasks.register(taskName, Jar) {
+        dependOnBuilds(delegate)
+        archiveFileName = fileName
+        destinationDirectory = layout.buildDirectory.dir('libs')
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+        from(templateDir) {
+            filter { String line ->
+                def out = line
+                (baseTokens + versionTokens()).each { token, value -> out = out.replace(token, value) }
+                out
+            }
+        }
+        fabMods.each { m ->
+            from({ def f = fabJar[m](); f == null ? [] : f }) {
+                into 'META-INF/jars'
+                rename { fabName[m] }
+            }
+        }
+        neoMods.each { m ->
+            from({ def f = neoJar[m](); f == null ? [] : f }) {
+                into 'META-INF/jarjar'
+                rename { neoName[m] }
+            }
+        }
     }
-    from({ def f = newestArtifact('crafting-network/neoforge/build/libs', 'neoforge-crafting_network-'); f == null ? [] : f }) {
-        into 'META-INF/jarjar'
-        rename { 'crafting-network-neoforge.jar' }
+    return t
+}
+
+def apiMods = ['api']
+def storageMods = ['api', 'storage']
+def craftingMods = ['api', 'crafting']
+def allMods = ['api', 'storage', 'crafting']
+
+registerBundle('bundleAllJar', 'bundle-all',
+        "universal-bundle-all.${bundleVersion}.jar", allMods, allMods)
+registerBundle('bundleStorageJar', 'bundle-storage',
+        "universal-bundle-storage.${bundleVersion}.jar", storageMods, storageMods)
+registerBundle('bundleCraftingJar', 'bundle-crafting',
+        "universal-bundle-crafting.${bundleVersion}.jar", craftingMods, craftingMods)
+
+registerBundle('fabricBundleAllJar', 'bundle-all-fabric',
+        "fabric-bundle-all.${bundleVersion}.jar", allMods, [])
+registerBundle('fabricBundleStorageJar', 'bundle-storage-fabric',
+        "fabric-bundle-storage.${bundleVersion}.jar", storageMods, [])
+registerBundle('fabricBundleCraftingJar', 'bundle-crafting-fabric',
+        "fabric-bundle-crafting.${bundleVersion}.jar", craftingMods, [])
+
+registerBundle('neoforgeBundleAllJar', 'bundle-all-neoforge',
+        "neoforge-bundle-all.${bundleVersion}.jar", [], allMods)
+registerBundle('neoforgeBundleStorageJar', 'bundle-storage-neoforge',
+        "neoforge-bundle-storage.${bundleVersion}.jar", [], storageMods)
+registerBundle('neoforgeBundleCraftingJar', 'bundle-crafting-neoforge',
+        "neoforge-bundle-crafting.${bundleVersion}.jar", [], craftingMods)
+
+/**
+ * Collects every release jar under build/release/ with its final published name: the bundle
+ * containers plus the renamed per-loader / universal mod jars.
+ */
+tasks.register('releaseJars', Sync) {
+    dependOnBuilds(delegate)
+    dependsOn 'apiUniversalJar'
+    dependsOn 'bundleAllJar', 'bundleStorageJar', 'bundleCraftingJar'
+    dependsOn 'fabricBundleAllJar', 'fabricBundleStorageJar', 'fabricBundleCraftingJar'
+    dependsOn 'neoforgeBundleAllJar', 'neoforgeBundleStorageJar', 'neoforgeBundleCraftingJar'
+
+    into layout.buildDirectory.dir('release')
+
+    // Bundle/universal API containers (already finally named).
+    from(layout.buildDirectory.dir('libs')) {
+        include 'universal-bundle-*.jar'
+        include 'fabric-bundle-*.jar'
+        include 'neoforge-bundle-*.jar'
+        include 'universal_mc_san_api.*.jar'
     }
+
+    // API
+    from({ def f = apiFab(); f == null ? [] : f }) { rename { "fabric_mc_san_api.${apiVersion}.jar" } }
+    from({ def f = apiNeo(); f == null ? [] : f }) { rename { "neoforge_mc_san_api.${apiVersion}.jar" } }
+
+    // Universal gameplay mods
+    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${bundleVersion}.jar" } }
+    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${bundleVersion}.jar" } }
+
+    // Per-loader gameplay mods
+    from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${bundleVersion}.jar" } }
+    from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${bundleVersion}.jar" } }
+    from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${bundleVersion}.jar" } }
+    from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${bundleVersion}.jar" } }
+}
+
+tasks.named('build') {
+    dependsOn 'releaseJars'
 }
 
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            artifact(tasks.named('universalJar'))
+            artifact(tasks.named('apiUniversalJar'))
             artifactId = 'mc-storage-area-network'
         }
     }
@@ -194,4 +300,32 @@ tasks.register('publishRepo') {
     dependsOn gradle.includedBuild('fabric').task(':publishMavenJavaPublicationToRepoRepository')
     dependsOn gradle.includedBuild('neoforge').task(':publishMavenJavaPublicationToRepoRepository')
     dependsOn 'publishMavenJavaPublicationToRepoRepository'
+    finalizedBy 'pruneRepo'
+}
+
+// Keeps the in-repo maven small: newest 3 versions per artifact, with matching metadata.
+tasks.register('pruneRepo') {
+    group = 'publishing'
+    description = 'Keeps only the newest 3 versions of each artifact in ./repo and refreshes maven-metadata.'
+    doLast {
+        def keep = 3
+        def groupRoot = file('repo/com/retiredroca')
+        if (!groupRoot.exists()) {
+            return
+        }
+        groupRoot.eachDir { groupDir ->
+            groupDir.eachDir { artifactDir ->
+                def versionDirs = artifactDir.listFiles().findAll { it.isDirectory() }
+                if (versionDirs.size() <= keep) {
+                    return
+                }
+                versionDirs.sort { a, b -> compareVersions(a.name, b.name) }
+                def dropCount = versionDirs.size() - keep
+                versionDirs[0..<dropCount].each { it.deleteDir() }
+                def kept = versionDirs[dropCount..-1].collect { it.name }
+                writeMetadata(artifactDir, "com.retiredroca.${groupDir.name}", artifactDir.name, kept)
+                logger.lifecycle("pruneRepo: ${artifactDir.name} kept ${kept.join(', ')}")
+            }
+        }
+    }
 }

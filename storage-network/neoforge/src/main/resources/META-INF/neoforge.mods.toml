@@ -91,7 +91,7 @@ Centralized storage solution for Minecraft. A Storage Terminal scans nearby chun
 [[dependencies.${mod_id}]]
     modId="mc_storage_area_network"
     type="required"
-    versionRange="[1.0.2,)"
+    versionRange="[1.0,1.1)"
     ordering="AFTER"
     side="BOTH"
 

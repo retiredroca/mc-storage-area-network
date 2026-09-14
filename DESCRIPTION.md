@@ -117,18 +117,25 @@ Higher tiers also make processor terminals work faster.
 
 ## Installation
 
-The same jar works on both Fabric and NeoForge.
+Every jar below is **universal** — the same file works on both Fabric and NeoForge (it holds the
+loader-specific builds inside and each loader loads only its own copy).
 
-**All-in-one (recommended):** drop `mc-storage-area-network-<version>-all.jar` into your `mods/`
-folder — it bundles the API, Storage Network and Crafting Network in a single file.
+**Bundle (recommended):** drop `universal-bundle-all.<version>.jar` into your `mods/` folder — it
+bundles the API, Storage Network and Crafting Network in a single file. Want just one gameplay mod?
+Use `universal-bundle-storage` or `universal-bundle-crafting` instead.
 
 **Or install the mods individually:**
 
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for Minecraft 1.21.1.
-2. Install the **MC Storage Area Network API** jar (required by both gameplay mods).
-3. Drop the **Storage Network** and/or **Crafting Network** jar into `mods/`.
+2. Install the **MC Storage Area Network API** jar (`universal_mc_san_api.<version>.jar`) — required
+   by both gameplay mods.
+3. Drop the **Storage Network** (`universal-storage-network.<version>.jar`) and/or **Crafting
+   Network** (`universal-crafting-network.<version>.jar`) jar into `mods/`.
 
-> Never use the all-in-one jar together with the individual jars — the same mods would load twice.
+> Never use a bundle together with the individual jars — the same mods would load twice.
+
+The universal jars are on CurseForge/Modrinth. If you want a single-loader build (`fabric-*` /
+`neoforge-*`), grab it from [GitHub Releases](https://github.com/retiredroca/mc-storage-area-network/releases).
 
 ## Configuration
 

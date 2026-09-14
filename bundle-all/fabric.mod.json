@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "mc_storage_area_network_all",
+  "id": "mc_storage_area_network_bundle_all",
   "version": "@@VERSION@@",
   "name": "MC Storage Area Network (All-in-One)",
-  "description": "All-in-one install of MC Storage Area Network: the shared API plus the Storage Network and Crafting Network gameplay mods. Works on Fabric and NeoForge; each loader loads only its own nested jars.",
+  "description": "One-file install: the MC Storage Area Network API plus Storage Network and Crafting Network. Works on Fabric; each loader loads only its own nested jars.",
   "authors": ["@@AUTHORS@@"],
   "license": "@@LICENSE@@",
   "environment": "*",

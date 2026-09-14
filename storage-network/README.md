@@ -76,8 +76,9 @@ All of this is configurable on the server (see below).
 | Side | Client & Server |
 | Dependency | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately |
 
-> Easiest install: the **all-in-one** `mc-storage-area-network-<version>-all.jar` bundles this mod,
-> Crafting Network and the API. To install just this mod instead, also drop in the API jar.
+> Easiest install: the **bundle** `universal-bundle-all.<version>.jar` (or `universal-bundle-storage`
+> for just this one) bundles this mod, Crafting Network and the API. To install this mod on its own,
+> also drop in the universal API jar (`universal_mc_san_api.<version>.jar`).
 
 ## Configuration
 

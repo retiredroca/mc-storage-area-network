@@ -21,7 +21,7 @@ The mod id is `mc_storage_area_network`. Package: `com.retiredroca.mcstoragearea
 Download the **universal** jar:
 
 ```
-mc-storage-area-network-1.0.2-universal.jar
+universal_mc_san_api.1.0.<yymmddhh>.jar
 ```
 
 It is a thin container that bundles the Fabric and NeoForge builds; each loader loads only its own
@@ -52,16 +52,17 @@ repositories {
 
 ```groovy
 // Fabric
-modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.2'
+modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.+'
 
 // NeoForge
-implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.2'
+implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.+'
 ```
 
+The API version is `1.0.<yymmddhh>` (a date-based patch); `1.0.+` tracks the latest `1.0.x` build.
 Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
 
 ```
-com.retiredroca.mcstorageareanetwork:mc-storage-area-network:1.0.2:universal
+com.retiredroca.mcstorageareanetwork:mc-storage-area-network:1.0.<yymmddhh>:universal
 ```
 
 > Compile against the **per-loader** artifact for your mod. The `com.retiredroca.mcstorageareanetwork.api`
@@ -176,13 +177,15 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 ## Building / publishing
 
 ```bash
-./gradlew build           # universal bundle -> build/libs/mc-storage-area-network-1.0.2-universal.jar
+./gradlew build           # API + both hosts + every bundle -> build/release/ (final file names)
+./gradlew releaseJars     # just collect the release jars into build/release/
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
-./gradlew publishRepo     # per-loader jars + bundle -> ./repo (committed maven for distribution)
+./gradlew publishRepo     # per-loader jars + universal API -> ./repo (committed maven for distribution)
 ```
 
 The `repo/` directory in this repository is the published Maven repository consumed by hosts and
-modders. Commit it after `publishRepo`.
+modders. Commit it after `publishRepo`; it keeps only the newest 3 versions per artifact so it stays
+small.
 
 ## Compatibility
 
@@ -192,4 +195,4 @@ modders. Commit it after `publishRepo`.
 | Fabric | Loader 0.16.14+ / Fabric API |
 | NeoForge | 21.1.235+ |
 | Java | 21 |
-| API version | 1.0.2 |
+| API version | `1.0.<yymmddhh>` (date-based patch) |
