@@ -209,7 +209,10 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
                 this.minecraft.player.getInventory().setChanged();
             }
         }
-        this.recipeBookComponent.tick();
+        try {
+            this.recipeBookComponent.tick();
+        } catch (Exception ignored) {
+        }
     }
 
     private long catalogSignature() {

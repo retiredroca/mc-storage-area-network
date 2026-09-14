@@ -111,6 +111,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private ItemStack ingredient = ItemStack.EMPTY;
 
     private int networkTick = 0;
+    private boolean tickErrorLogged = false;
     private List<String> craftablePotions = List.of();
 
     private ItemStack cachedRecipeInput = ItemStack.EMPTY;
@@ -339,17 +340,27 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (level == null || level.isClientSide) {
             return;
         }
-        if ((networkTick++) % 40 == 0) {
-            scanNetwork();
-            recomputeCraftablePotions();
-        }
-        if (networkTick % 10 == 0) {
-            pumpNetwork();
-        }
-        if (type.isBrewing()) {
-            processBrewing();
-        } else {
-            processCooking();
+        try {
+            if ((networkTick++) % 40 == 0) {
+                scanNetwork();
+                recomputeCraftablePotions();
+            }
+            if (networkTick % 10 == 0) {
+                pumpNetwork();
+            }
+            if (type.isBrewing()) {
+                processBrewing();
+            } else {
+                processCooking();
+            }
+            tickErrorLogged = false;
+        } catch (Exception e) {
+            // Never let one bad tick kill the block entity ticker (which would freeze the station).
+            if (!tickErrorLogged) {
+                tickErrorLogged = true;
+                com.retiredroca.craftingnetwork.CraftingNetworkCommon.LOGGER.error(
+                        "[station] tick failed at {}", worldPosition, e);
+            }
         }
     }
 
@@ -413,18 +424,16 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     }
 
     private List<ItemStack> networkCatalogue() {
-        LinkedHashMap<ItemStack, Integer> merged = new LinkedHashMap<>();
+        com.retiredroca.craftingnetwork.util.ItemMerge merged = new com.retiredroca.craftingnetwork.util.ItemMerge();
         for (ScannedStorage storage : pumpHandlers()) {
             if (!storage.supportsExtraction()) continue;
             for (ItemStack stack : storage.enumerate()) {
-                if (stack.isEmpty()) continue;
-                ItemStack key = stack.copyWithCount(1);
-                merged.merge(key, stack.getCount(), Integer::sum);
+                merged.add(stack);
             }
         }
-        List<ItemStack> out = new ArrayList<>();
-        for (Map.Entry<ItemStack, Integer> entry : merged.entrySet()) {
-            out.add(entry.getKey().copyWithCount(entry.getValue()));
+        List<ItemStack> out = new ArrayList<>(merged.size());
+        for (int i = 0; i < merged.size(); i++) {
+            out.add(merged.key(i).copyWithCount(merged.count(i)));
         }
         return out;
     }
@@ -856,19 +865,19 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             List<com.retiredroca.craftingnetwork.station.StationSlot> slots = new ArrayList<>(5);
             for (int i = 0; i < 3; i++) {
                 slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
-                        "gui.crafting_network.slot_bottle", bottles[i]));
+                        "gui.crafting_network.slot_bottle", bottles[i].copy()));
             }
             slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
-                    "gui.crafting_network.slot_ingredient", ingredient));
+                    "gui.crafting_network.slot_ingredient", ingredient.copy()));
             slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
                     "gui.crafting_network.slot_fuel", fuelCharge > 0 ? new ItemStack(Items.BLAZE_POWDER) : ItemStack.EMPTY));
             StationStatus status = getStatus();
             return new StationState(status, slots, progressPct, brewTarget, craftablePotions, shulkersFirst, inventoryFirst);
         }
         List<com.retiredroca.craftingnetwork.station.StationSlot> slots = List.of(
-                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_input", input),
-                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_fuel", fuel),
-                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_result", result));
+                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_input", input.copy()),
+                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_fuel", fuel.copy()),
+                new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_result", result.copy()));
         StationStatus status = getStatus();
         return new StationState(status, slots, progressPct, "", List.of(), shulkersFirst, inventoryFirst);
     }

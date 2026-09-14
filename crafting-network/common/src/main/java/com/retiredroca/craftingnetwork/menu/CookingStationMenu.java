@@ -186,7 +186,7 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
             }
             support.refreshCatalog();
             StationState current = station.getState();
-            if (!java.util.Objects.equals(current, lastSentState) && owner != null) {
+            if (owner != null && !current.sameAs(lastSentState)) {
                 CraftingNetworkCommon.platform().sendStationState(owner, pos, current);
                 lastSentState = current;
             }

@@ -174,7 +174,7 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
             }
             support.refreshCatalog();
             StationState current = station.getState();
-            if (!java.util.Objects.equals(current, lastSentState) && owner != null) {
+            if (owner != null && !current.sameAs(lastSentState)) {
                 CraftingNetworkCommon.platform().sendStationState(owner, pos, current);
                 lastSentState = current;
             }

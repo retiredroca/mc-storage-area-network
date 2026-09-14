@@ -11,6 +11,7 @@ import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
 import com.retiredroca.craftingnetwork.blockentity.AbstractCraftingStationBlockEntity;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.mcstorageareanetwork.api.ShulkerBoxHelper;
+import com.retiredroca.craftingnetwork.util.ItemMerge;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -317,7 +318,7 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         if (station == null || station.getLevel() == null) {
             return;
         }
-        Map<ItemStack, Integer> merged = new HashMap<>();
+        ItemMerge merged = new ItemMerge();
         for (SourceTarget target : activeTargets()) {
             if (target.childIndex() < 0) {
                 ScannedStorage storage = handlerFor(target);
@@ -325,19 +326,28 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
                     continue;
                 }
                 for (ItemStack in : storage.enumerate()) {
-                    if (!in.isEmpty()) {
-                        ItemStack key = in.copyWithCount(1);
-                        merged.merge(key, in.getCount(), Integer::sum);
-                    }
+                    merged.add(in);
                 }
             } else {
                 mergeBoxLeaf(merged, target);
             }
         }
-        List<Map.Entry<ItemStack, Integer>> sorted = new ArrayList<>(merged.entrySet());
-        sorted.sort(Comparator.comparingInt(entry -> -entry.getValue()));
+        // Deterministic order (count desc, then item id) so identical networks produce an identical
+        // catalog and the recipe book does not recompute every tick.
+        List<Integer> order = new ArrayList<>(merged.size());
+        for (int i = 0; i < merged.size(); i++) {
+            order.add(i);
+        }
+        order.sort((a, b) -> {
+            int byCount = Integer.compare(merged.count(b), merged.count(a));
+            if (byCount != 0) {
+                return byCount;
+            }
+            return sortKey(merged.key(a)).compareTo(sortKey(merged.key(b)));
+        });
         for (int i = 0; i < CATALOG_SIZE; i++) {
-            ItemStack want = i < sorted.size() ? sorted.get(i).getKey().copyWithCount(sorted.get(i).getValue())
+            ItemStack want = i < order.size()
+                    ? merged.key(order.get(i)).copyWithCount(merged.count(order.get(i)))
                     : ItemStack.EMPTY;
             if (!ItemStack.matches(catalog.getItem(i), want)) {
                 catalog.setItem(i, want);
@@ -345,16 +355,17 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         }
     }
 
-    private void mergeBoxLeaf(Map<ItemStack, Integer> merged, SourceTarget target) {
+    private static String sortKey(ItemStack stack) {
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+    }
+
+    private void mergeBoxLeaf(ItemMerge merged, SourceTarget target) {
         ItemStack box = station.getBoxLeafStack(target.pos(), target.childIndex());
         if (box.isEmpty()) {
             return;
         }
         for (ItemStack s : ShulkerBoxHelper.contents(box)) {
-            if (!s.isEmpty()) {
-                ItemStack key = s.copyWithCount(1);
-                merged.merge(key, s.getCount(), Integer::sum);
-            }
+            merged.add(s);
         }
     }
 
@@ -481,21 +492,21 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     }
 
     private int maxCraftable() {
-        Map<ItemStack, Integer> needed = neededIngredients();
+        ItemMerge needed = neededIngredients();
         if (needed.isEmpty()) {
             return 0;
         }
         int max = Integer.MAX_VALUE;
-        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
-            int available = networkCount(entry.getKey()) + playerCount(entry.getKey());
-            max = Math.min(max, available / entry.getValue());
+        for (int i = 0; i < needed.size(); i++) {
+            int available = networkCount(needed.key(i)) + playerCount(needed.key(i));
+            max = Math.min(max, available / needed.count(i));
         }
         return Math.max(0, max);
     }
 
     /** True if the network + player have everything needed for at least one craft of {@code recipe}. */
     private boolean canCraftRecipe(RecipeHolder<?> recipe) {
-        Map<ItemStack, Integer> needed = new HashMap<>();
+        ItemMerge needed = new ItemMerge();
         for (Ingredient ingredient : recipe.value().getIngredients()) {
             if (ingredient.isEmpty()) {
                 continue;
@@ -504,14 +515,13 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             if (items.length == 0) {
                 continue;
             }
-            ItemStack key = items[0].copyWithCount(1);
-            needed.merge(key, 1, Integer::sum);
+            needed.add(items[0].copyWithCount(1));
         }
         if (needed.isEmpty()) {
             return false;
         }
-        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
-            if (networkCount(entry.getKey()) + playerCount(entry.getKey()) < entry.getValue()) {
+        for (int i = 0; i < needed.size(); i++) {
+            if (networkCount(needed.key(i)) + playerCount(needed.key(i)) < needed.count(i)) {
                 return false;
             }
         }
@@ -519,24 +529,22 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     }
 
     private boolean hasIngredients() {
-        Map<ItemStack, Integer> needed = neededIngredients();
-        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
-            if (networkCount(entry.getKey()) + playerCount(entry.getKey()) < entry.getValue()) {
+        ItemMerge needed = neededIngredients();
+        for (int i = 0; i < needed.size(); i++) {
+            if (networkCount(needed.key(i)) + playerCount(needed.key(i)) < needed.count(i)) {
                 return false;
             }
         }
         return true;
     }
 
-    private Map<ItemStack, Integer> neededIngredients() {
-        Map<ItemStack, Integer> needed = new HashMap<>();
+    private ItemMerge neededIngredients() {
+        ItemMerge needed = new ItemMerge();
         for (int i = 0; i < TEMPLATE_COUNT; i++) {
             ItemStack template = craftSlots.getItem(i);
-            if (template.isEmpty()) {
-                continue;
+            if (!template.isEmpty()) {
+                needed.add(template.copyWithCount(1));
             }
-            ItemStack key = template.copyWithCount(1);
-            needed.merge(key, 1, Integer::sum);
         }
         return needed;
     }
@@ -592,24 +600,32 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             routeOutput(player, resultOutput.copy());
             produced += perCraft;
         }
+        if (!hasIngredients()) {
+            // Out of ingredients: clear the ghost shape so it does not linger.
+            craftSlots.clearContent();
+        }
         updateResult();
     }
 
     private boolean consumeIngredients(Player player) {
-        Map<ItemStack, Integer> needed = neededIngredients();
-        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
-            if (networkCount(entry.getKey()) + playerCount(entry.getKey()) < entry.getValue()) {
+        ItemMerge needed = neededIngredients();
+        for (int i = 0; i < needed.size(); i++) {
+            if (networkCount(needed.key(i)) + playerCount(needed.key(i)) < needed.count(i)) {
                 return false;
             }
         }
-        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
-            int remaining = entry.getValue();
-            remaining -= consumeFromNetwork(entry.getKey(), remaining);
+        boolean ok = true;
+        for (int i = 0; i < needed.size(); i++) {
+            int remaining = needed.count(i);
+            remaining -= consumeFromNetwork(needed.key(i), remaining);
             if (remaining > 0) {
-                remaining -= consumeFromPlayer(player, entry.getKey(), remaining);
+                remaining -= consumeFromPlayer(player, needed.key(i), remaining);
+            }
+            if (remaining > 0) {
+                ok = false;
             }
         }
-        return true;
+        return ok;
     }
 
     private int consumeFromNetwork(ItemStack item, int max) {

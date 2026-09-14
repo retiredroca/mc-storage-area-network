@@ -58,6 +58,9 @@ public final class BrewPath {
     }
 
     public static BrewPath compute(ServerLevel level, Holder<Potion> target, Item targetItem) {
+        if (target == null) {
+            return emptyPath();
+        }
         String key = target.unwrapKey().map(k -> k.location().toString()).orElse("unknown")
                 + "|" + targetItem;
         List<ItemStack> cached = PATH_CACHE.get(key);

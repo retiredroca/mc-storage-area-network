@@ -9,6 +9,7 @@ import java.util.Map;
 
 import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
 import com.retiredroca.craftingnetwork.blockentity.AbstractStationBlockEntity;
+import com.retiredroca.craftingnetwork.util.ItemMerge;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.mcstorageareanetwork.api.ShulkerBoxHelper;
 
@@ -162,7 +163,7 @@ public class StationMenuSupport {
         if (station == null || station.getLevel() == null) {
             return;
         }
-        Map<ItemStack, Integer> merged = new HashMap<>();
+        ItemMerge merged = new ItemMerge();
         for (SourceTarget target : activeTargets()) {
             if (target.childIndex() < 0) {
                 ScannedStorage storage = handlerFor(target);
@@ -170,19 +171,26 @@ public class StationMenuSupport {
                     continue;
                 }
                 for (ItemStack in : storage.enumerate()) {
-                    if (!in.isEmpty()) {
-                        ItemStack key = in.copyWithCount(1);
-                        merged.merge(key, in.getCount(), Integer::sum);
-                    }
+                    merged.add(in);
                 }
             } else {
                 mergeBoxLeaf(merged, target);
             }
         }
-        List<Map.Entry<ItemStack, Integer>> sorted = new ArrayList<>(merged.entrySet());
-        sorted.sort(Comparator.comparingInt(entry -> -entry.getValue()));
+        List<Integer> order = new ArrayList<>(merged.size());
+        for (int i = 0; i < merged.size(); i++) {
+            order.add(i);
+        }
+        order.sort((a, b) -> {
+            int byCount = Integer.compare(merged.count(b), merged.count(a));
+            if (byCount != 0) {
+                return byCount;
+            }
+            return sortKey(merged.key(a)).compareTo(sortKey(merged.key(b)));
+        });
         for (int i = 0; i < CATALOG_SIZE; i++) {
-            ItemStack want = i < sorted.size() ? sorted.get(i).getKey().copyWithCount(sorted.get(i).getValue())
+            ItemStack want = i < order.size()
+                    ? merged.key(order.get(i)).copyWithCount(merged.count(order.get(i)))
                     : ItemStack.EMPTY;
             if (!ItemStack.matches(catalog.getItem(i), want)) {
                 catalog.setItem(i, want);
@@ -190,16 +198,17 @@ public class StationMenuSupport {
         }
     }
 
-    private void mergeBoxLeaf(Map<ItemStack, Integer> merged, SourceTarget target) {
+    private static String sortKey(ItemStack stack) {
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+    }
+
+    private void mergeBoxLeaf(ItemMerge merged, SourceTarget target) {
         ItemStack box = station.getBoxLeafStack(target.pos(), target.childIndex());
         if (box.isEmpty()) {
             return;
         }
         for (ItemStack s : ShulkerBoxHelper.contents(box)) {
-            if (!s.isEmpty()) {
-                ItemStack key = s.copyWithCount(1);
-                merged.merge(key, s.getCount(), Integer::sum);
-            }
+            merged.add(s);
         }
     }
 
