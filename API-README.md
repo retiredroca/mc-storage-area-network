@@ -58,7 +58,8 @@ modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-
 implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.+'
 ```
 
-The API version is `1.0.<yymmddhh>` (a date-based patch); `1.0.+` tracks the latest `1.0.x` build.
+The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the API source
+changes — releasing the gameplay mods does not bump it. `1.0.+` tracks the latest `1.0.x` build.
 Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
 
 ```
@@ -186,6 +187,9 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 The `repo/` directory in this repository is the published Maven repository consumed by hosts and
 modders. Commit it after `publishRepo`; it keeps only the newest 3 versions per artifact so it stays
 small.
+
+Component versions live in `versions.properties` at the repository root and are bumped by the release
+workflow (only for the component that changed), never by the clock at build time.
 
 ## Compatibility
 

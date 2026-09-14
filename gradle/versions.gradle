@@ -1,0 +1,24 @@
+// Component versions live in the repo-root versions.properties (bumped only by the
+// release workflow for the component that changed). This script locates that file
+// from whichever build applies it and exposes the versions as project extensions.
+
+def versionsFile = {
+    def d = projectDir
+    while (d != null && !new File(d, 'versions.properties').exists()) {
+        d = d.parentFile
+    }
+    if (d == null) {
+        throw new GradleException("versions.properties not found above ${projectDir}")
+    }
+    new File(d, 'versions.properties')
+}()
+
+def componentVersions = new Properties()
+versionsFile.withInputStream { componentVersions.load(it) }
+
+ext.apiVersion = componentVersions.getProperty('api')
+ext.storageVersion = componentVersions.getProperty('storage')
+ext.craftingVersion = componentVersions.getProperty('crafting')
+// Version stamps are fixed-width YYMMDDHH, so lexical max == most recent.
+ext.stampOf = { String v -> v.tokenize('.').last() as String }
+ext.newestStamp = { List<String> versions -> versions.collect { stampOf(it) }.max() }

@@ -3,11 +3,14 @@ plugins {
     id 'maven-publish'
 }
 
-import java.time.LocalDateTime
+def repoRoot = projectDir
+while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists()) {
+    repoRoot = repoRoot.parentFile
+}
+apply from: new File(repoRoot, 'gradle/versions.gradle')
 
-// Version is derived from the build date: 1.YY.MM.DD.HH (e.g. 1.26.09.10.14 for Sept 10, 2026 @ 14:00).
-def dateVersion = "1.0.0." + String.format("%02d%02d%02d%02d", LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(), LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
-version = dateVersion
+// Storage Network version from versions.properties (bumped only when it changed).
+version = storageVersion
 group = mod_group_id
 
 base {

@@ -30,25 +30,60 @@ jobs:
           java-version: '21'
 
       # The committed gradle.properties point at a local Windows JDK; drop that on CI
-      # and let the toolchain / JAVA_HOME take over. Also make sure gradlew is executable.
-      - name: Prepare build
+      # and let the toolchain / JAVA_HOME take over.
+      - name: Prepare
         run: |
           find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
           chmod +x ./gradlew
+          chmod +x .github/scripts/*.sh
 
-      # A single invocation builds the API, both hosts and every bundle container:
-      # `releaseJars` depends on each included build, and `publishRepo` refreshes ./repo.
+      # Only the component(s) in the trigger get a new version. Everything else keeps
+      # its version (and is still compiled, so bundles always have a local jar).
+      - name: Bump component versions
+        run: |
+          set -euo pipefail
+          mod='${{ inputs.mod }}'
+          stamp=$(date -u +%y%m%d%H)
+
+          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2)
+          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2)
+          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2)
+
+          api_changed=false
+          storage_changed=false
+          crafting_changed=false
+          case "$mod" in
+            api)      api="1.0.$stamp"; api_changed=true ;;
+            storage)  storage="1.0.0.$stamp"; storage_changed=true ;;
+            crafting) crafting="1.0.0.$stamp"; crafting_changed=true ;;
+            all)      api="1.0.$stamp"; storage="1.0.0.$stamp"; crafting="1.0.0.$stamp"
+                      api_changed=true; storage_changed=true; crafting_changed=true ;;
+            *) echo "Unknown mod: $mod" >&2; exit 1 ;;
+          esac
+
+          sed -i -E "s/^api=.*/api=$api/" versions.properties
+          sed -i -E "s/^storage=.*/storage=$storage/" versions.properties
+          sed -i -E "s/^crafting=.*/crafting=$crafting/" versions.properties
+          cat versions.properties
+
+          {
+            echo "API_VERSION=$api"
+            echo "STORAGE_VERSION=$storage"
+            echo "CRAFTING_VERSION=$crafting"
+            echo "API_CHANGED=$api_changed"
+            echo "STORAGE_CHANGED=$storage_changed"
+            echo "CRAFTING_CHANGED=$crafting_changed"
+          } >> "$GITHUB_ENV"
+
       - name: Build
         run: ./gradlew --no-daemon clean releaseJars publishRepo
 
-      # build/release/ already carries the final published file names.
       - name: Collect release jars
         run: |
           mkdir -p dist
           cp build/release/*.jar dist/
           ls -la dist
 
-      # Commit-derived changelog used for CurseForge and Modrinth.
       - name: Generate changelog
         run: |
           prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
@@ -64,23 +99,24 @@ jobs:
           } > dist/changelog.md
           cat dist/changelog.md
 
-      # CurseForge/Modrinth only receive the universal jars; read their versions for entry names.
-      - name: Resolve versions
+      - name: Resolve bundle versions
         run: |
-          api_ver=$(basename dist/universal_mc_san_api.*.jar | sed -E 's/^universal_mc_san_api\.(.*)\.jar$/\1/')
-          bundle_ver=$(basename dist/universal-bundle-all.*.jar | sed -E 's/^universal-bundle-all\.(.*)\.jar$/\1/')
+          set -euo pipefail
+          ba=$(basename dist/universal-bundle-all.*.jar | sed -E 's/^universal-bundle-all\.(.*)\.jar$/\1/')
+          bs=$(basename dist/universal-bundle-storage.*.jar | sed -E 's/^universal-bundle-storage\.(.*)\.jar$/\1/')
+          bc=$(basename dist/universal-bundle-crafting.*.jar | sed -E 's/^universal-bundle-crafting\.(.*)\.jar$/\1/')
           {
-            echo "API_VER=$api_ver"
-            echo "BUNDLE_VER=$bundle_ver"
+            echo "BUNDLE_ALL_VERSION=$ba"
+            echo "BUNDLE_STORAGE_VERSION=$bs"
+            echo "BUNDLE_CRAFTING_VERSION=$bc"
           } >> "$GITHUB_ENV"
-          echo "Trigger=${{ inputs.mod }} API=$api_ver Gameplay=$bundle_ver"
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-jars
           path: dist/*.jar
 
-      # --- GitHub release: every jar -------------------------------------------------
+      # --- GitHub release: every jar, including the unchanged API at its current version ------
       - name: Publish GitHub release
         uses: Kir-Antipov/mc-publish@v3.3
         with:
@@ -92,20 +128,21 @@ jobs:
           version: ${{ inputs.release_tag }}
           version-type: release
 
-      # --- CurseForge: 4 universal entries ------------------------------------------
-      # The universal API is the primary file of the SAN API entry and the two universal
-      # gameplay mods ride along as additional files, so one entry installs the full stack.
-      - name: Publish SAN API - CurseForge
+      # --- CurseForge -------------------------------------------------------------------------
+      # A new API version creates the "SAN API" entry (API primary, storage/crafting additional).
+      - name: CurseForge - new SAN API entry
+        id: cf_api
+        if: ${{ env.API_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/universal_mc_san_api.*.jar
-            dist/universal-storage-network.*.jar
-            dist/universal-crafting-network.*.jar
-          name: SAN API ${{ env.API_VER }}
-          version: san-api-${{ env.API_VER }}
+            dist/universal_mc_san_api.${{ env.API_VERSION }}.jar
+            dist/universal-storage-network.${{ env.STORAGE_VERSION }}.jar
+            dist/universal-crafting-network.${{ env.CRAFTING_VERSION }}.jar
+          name: SAN API ${{ env.API_VERSION }}
+          version: san-api-${{ env.API_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
@@ -119,14 +156,47 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Bundle All - CurseForge
+      - name: CurseForge - remember the SAN API file id
+        if: ${{ env.API_CHANGED == 'true' }}
+        run: |
+          set -euo pipefail
+          file_id=$(echo '${{ steps.cf_api.outputs.curseforge-files }}' | jq -r '.[0].id // empty')
+          if [ -z "$file_id" ]; then
+            echo "Could not read the CurseForge file id; cf.api.file left unchanged."
+            echo '${{ steps.cf_api.outputs.curseforge-files }}'
+          else
+            sed -i -E "s/^cf.api.file=.*/cf.api.file=$file_id/" release-state.properties
+            echo "cf.api.file=$file_id"
+          fi
+
+      # API unchanged: attach the updated mod(s) under the existing SAN API entry instead of
+      # re-uploading the API. Superseded child files must be archived on the CurseForge website.
+      - name: CurseForge - attach updated mods to the existing SAN API entry
+        if: ${{ env.API_CHANGED == 'false' && (env.STORAGE_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true') }}
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: |
+          set -euo pipefail
+          parent=$(grep -E '^cf.api.file=' release-state.properties | head -1 | cut -d= -f2)
+          files=()
+          if [ "$STORAGE_CHANGED" = true ]; then
+            files+=("dist/universal-storage-network.${STORAGE_VERSION}.jar")
+          fi
+          if [ "$CRAFTING_CHANGED" = true ]; then
+            files+=("dist/universal-crafting-network.${CRAFTING_VERSION}.jar")
+          fi
+          ./.github/scripts/curseforge-upload.sh "$parent" "${files[@]}"
+
+      # Bundles are their own CurseForge files. bundle-all always changes; the others only when
+      # something they contain changed.
+      - name: CurseForge - Bundle All
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/universal-bundle-all.*.jar
-          name: Bundle All ${{ env.BUNDLE_VER }}
-          version: bundle-all-${{ env.BUNDLE_VER }}
+          curseforge-files: dist/universal-bundle-all.${{ env.BUNDLE_ALL_VERSION }}.jar
+          name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
+          version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
@@ -140,14 +210,15 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Bundle Storage - CurseForge
+      - name: CurseForge - Bundle Storage
+        if: ${{ env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/universal-bundle-storage.*.jar
-          name: Bundle Storage ${{ env.BUNDLE_VER }}
-          version: bundle-storage-${{ env.BUNDLE_VER }}
+          curseforge-files: dist/universal-bundle-storage.${{ env.BUNDLE_STORAGE_VERSION }}.jar
+          name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
+          version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
@@ -161,14 +232,15 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Bundle Crafting - CurseForge
+      - name: CurseForge - Bundle Crafting
+        if: ${{ env.API_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/universal-bundle-crafting.*.jar
-          name: Bundle Crafting ${{ env.BUNDLE_VER }}
-          version: bundle-crafting-${{ env.BUNDLE_VER }}
+          curseforge-files: dist/universal-bundle-crafting.${{ env.BUNDLE_CRAFTING_VERSION }}.jar
+          name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
+          version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
@@ -182,141 +254,56 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      # --- Modrinth: universal jars, one entry per Modrinth project (gated by PUBLISH_MODRINTH)
-      # `modrinth-id` must be the base62 project ID (not the slug); set the repo variables
-      # MODRINTH_ID / MODRINTH_STORAGE_ID / MODRINTH_CRAFTING_ID, or grant the token
-      # "Read projects". Modrinth projects are per-mod, so the SAN API entry cannot carry
-      # the storage/crafting jars the way the single CurseForge project does.
-      - name: Publish SAN API - Modrinth
+      # --- Modrinth (per-project versions; the previous version is archived) -------------------
+      - name: Modrinth - SAN API + Bundle All
         if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal_mc_san_api.*.jar
-          name: SAN API ${{ env.API_VER }}
-          version: san-api-${{ env.API_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          ./.github/scripts/modrinth-sync.sh \
+            "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
+            mr.api.version "$API_VERSION" "SAN API $API_VERSION" \
+            "dist/universal_mc_san_api.${API_VERSION}.jar" \
+            "dist/universal-bundle-all.${BUNDLE_ALL_VERSION}.jar"
 
-      - name: Publish Storage - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal-storage-network.*.jar
-          name: Storage Network ${{ env.BUNDLE_VER }}
-          version: storage-network-${{ env.BUNDLE_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-            mc-storage-area-network(required){modrinth:mc-storage-area-network}#(ignore:curseforge)
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+      - name: Modrinth - Storage Network + Bundle Storage
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true') }}
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          ./.github/scripts/modrinth-sync.sh \
+            "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
+            mr.storage.version "$STORAGE_VERSION" "Storage Network $STORAGE_VERSION" \
+            "dist/universal-storage-network.${STORAGE_VERSION}.jar" \
+            "dist/universal-bundle-storage.${BUNDLE_STORAGE_VERSION}.jar"
 
-      - name: Publish Crafting - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal-crafting-network.*.jar
-          name: Crafting Network ${{ env.BUNDLE_VER }}
-          version: crafting-network-${{ env.BUNDLE_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-            mc-storage-area-network(required){modrinth:mc-storage-area-network}#(ignore:curseforge)
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+      - name: Modrinth - Crafting Network + Bundle Crafting
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true') }}
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          ./.github/scripts/modrinth-sync.sh \
+            "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
+            mr.crafting.version "$CRAFTING_VERSION" "Crafting Network $CRAFTING_VERSION" \
+            "dist/universal-crafting-network.${CRAFTING_VERSION}.jar" \
+            "dist/universal-bundle-crafting.${BUNDLE_CRAFTING_VERSION}.jar"
 
-      - name: Publish Bundle All - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal-bundle-all.*.jar
-          name: Bundle All ${{ env.BUNDLE_VER }}
-          version: bundle-all-${{ env.BUNDLE_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+      # --- Persist the bumped versions / learned platform ids back to main ---------------------
+      - name: Commit version + release state
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Publish Bundle Storage - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal-bundle-storage.*.jar
-          name: Bundle Storage ${{ env.BUNDLE_VER }}
-          version: bundle-storage-${{ env.BUNDLE_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+          if git diff --quiet -- versions.properties release-state.properties; then
+            echo "No version/state changes to commit."
+            exit 0
+          fi
 
-      - name: Publish Bundle Crafting - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-files: dist/universal-bundle-crafting.*.jar
-          name: Bundle Crafting ${{ env.BUNDLE_VER }}
-          version: bundle-crafting-${{ env.BUNDLE_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
+          git stash push -- versions.properties release-state.properties
+          git fetch origin main
+          git checkout -B main origin/main
+          git stash pop
+          git add versions.properties release-state.properties
+          git commit -m "Release ${{ inputs.release_tag }}: bump ${{ inputs.mod }} version"
+          git push origin main

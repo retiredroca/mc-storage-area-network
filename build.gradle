@@ -3,44 +3,24 @@ plugins {
     id 'maven-publish'
 }
 
-import java.time.LocalDateTime
+apply from: new File(projectDir, 'gradle/versions.gradle')
 
-// Build stamp: YYMMDDHH. The API uses it as the patch (1.0.<stamp>); the bundles use the
-// gameplay-mod scheme (1.0.0.<stamp>).
-def buildStamp = String.format('%02d%02d%02d%02d',
-        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
-        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
-def apiVersion = '1.0.' + buildStamp
-def bundleVersion = '1.0.0.' + buildStamp
-
+// The API version comes from versions.properties. Each bundle is versioned by the newest stamp
+// among the components it contains, so a bundle only changes when something inside it changed.
 version = apiVersion
 group = 'com.retiredroca.mcstorageareanetwork'
 
-// Newest non-sources / non-dev jar in a directory.
-def newestJar = { String dir ->
-    def d = file(dir)
-    def jars = (d.listFiles() ?: new File[0]).findAll {
-        it.name.endsWith('.jar') && !it.name.contains('sources') && !it.name.contains('dev')
-    }
-    if (jars.isEmpty()) {
-        return null
-    }
-    jars.sort { it.lastModified() }
-    return jars.last()
+def componentVersion = { String mod ->
+    mod == 'api' ? apiVersion : (mod == 'storage' ? storageVersion : craftingVersion)
+}
+def bundleVersionFor = { List<String> mods ->
+    '1.0.0.' + newestStamp(mods.collect { componentVersion(it) })
 }
 
-// Newest non-sources / non-dev jar whose name starts with the given prefix.
-def newestArtifact = { String dir, String prefix ->
-    def d = file(dir)
-    def jars = (d.listFiles() ?: new File[0]).findAll {
-        it.name.startsWith(prefix) && it.name.endsWith('.jar') &&
-                !it.name.contains('sources') && !it.name.contains('dev')
-    }
-    if (jars.isEmpty()) {
-        return null
-    }
-    jars.sort { it.lastModified() }
-    return jars.last()
+// Exact, version-pinned lookups so a stale jar from an earlier version can never be picked.
+def versionedJar = { String path ->
+    def f = file(path)
+    f.exists() ? f : null
 }
 
 def versionFromJar = { File jar, String prefix ->
@@ -52,14 +32,14 @@ def versionFromJar = { File jar, String prefix ->
 }
 
 // Per-mod, per-loader source jars (lazy so they resolve after the child builds run).
-def apiFab = { newestArtifact('fabric/build/libs', 'fabric-mc_storage_area_network-') }
-def apiNeo = { newestArtifact('neoforge/build/libs', 'neoforge-mc_storage_area_network-') }
-def stFab = { newestArtifact('storage-network/fabric/build/libs', 'fabric-storage_network-') }
-def stNeo = { newestArtifact('storage-network/neoforge/build/libs', 'neoforge-storage_network-') }
-def crFab = { newestArtifact('crafting-network/fabric/build/libs', 'fabric-crafting_network-') }
-def crNeo = { newestArtifact('crafting-network/neoforge/build/libs', 'neoforge-crafting_network-') }
-def stUni = { newestJar('storage-network/build/libs') }
-def crUni = { newestJar('crafting-network/build/libs') }
+def apiFab = { versionedJar("fabric/build/libs/fabric-mc_storage_area_network-${apiVersion}.jar") }
+def apiNeo = { versionedJar("neoforge/build/libs/neoforge-mc_storage_area_network-${apiVersion}.jar") }
+def stFab = { versionedJar("storage-network/fabric/build/libs/fabric-storage_network-${storageVersion}.jar") }
+def stNeo = { versionedJar("storage-network/neoforge/build/libs/neoforge-storage_network-${storageVersion}.jar") }
+def crFab = { versionedJar("crafting-network/fabric/build/libs/fabric-crafting_network-${craftingVersion}.jar") }
+def crNeo = { versionedJar("crafting-network/neoforge/build/libs/neoforge-crafting_network-${craftingVersion}.jar") }
+def stUni = { versionedJar("storage-network/build/libs/storage-network-${storageVersion}-universal.jar") }
+def crUni = { versionedJar("crafting-network/build/libs/crafting-network-${craftingVersion}-universal.jar") }
 
 def fabJar = [api: apiFab, storage: stFab, crafting: crFab]
 def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo]
@@ -70,24 +50,19 @@ def neoName = [api: 'mc_storage_area_network-neoforge.jar',
                storage: 'storage-network-neoforge.jar',
                crafting: 'crafting-network-neoforge.jar']
 
-def baseTokens = [
-        '@@VERSION@@': bundleVersion,
+def staticTokens = [
         '@@AUTHORS@@': 'Retired Roca',
         '@@LICENSE@@': 'Apache-2.0',
 ]
-def apiTokens = [
-        '@@VERSION@@': apiVersion,
-        '@@AUTHORS@@': 'Retired Roca',
-        '@@LICENSE@@': 'Apache-2.0',
-]
+def apiTokens = staticTokens + ['@@VERSION@@': apiVersion]
 def versionTokens = {
     def a = apiFab()
     def s = stFab()
     def c = crFab()
     [
             '@@API_VERSION@@'     : a ? versionFromJar(a, 'fabric-mc_storage_area_network-') : apiVersion,
-            '@@STORAGE_VERSION@@' : s ? versionFromJar(s, 'fabric-storage_network-') : bundleVersion,
-            '@@CRAFTING_VERSION@@': c ? versionFromJar(c, 'fabric-crafting_network-') : bundleVersion,
+            '@@STORAGE_VERSION@@' : s ? versionFromJar(s, 'fabric-storage_network-') : storageVersion,
+            '@@CRAFTING_VERSION@@': c ? versionFromJar(c, 'fabric-crafting_network-') : craftingVersion,
     ]
 }
 
@@ -173,17 +148,19 @@ tasks.register('apiUniversalJar', Jar) {
  * Bundle container. `fabMods` are nested under META-INF/jars (Fabric), `neoMods` under
  * META-INF/jarjar (NeoForge); one jar can only carry one mod per loader, hence the container.
  */
-def registerBundle = { String taskName, String templateDir, String fileName, List fabMods, List neoMods ->
+def registerBundle = { String taskName, String templateDir, String artifactPrefix, String bundleVersion, List fabMods, List neoMods ->
     def t = tasks.register(taskName, Jar) {
         dependOnBuilds(delegate)
-        archiveFileName = fileName
+        archiveFileName = "${artifactPrefix}.${bundleVersion}.jar"
         destinationDirectory = layout.buildDirectory.dir('libs')
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
         from(templateDir) {
             filter { String line ->
                 def out = line
-                (baseTokens + versionTokens()).each { token, value -> out = out.replace(token, value) }
+                (['@@VERSION@@': bundleVersion] + staticTokens + versionTokens()).each { token, value ->
+                    out = out.replace(token, value)
+                }
                 out
             }
         }
@@ -208,26 +185,21 @@ def storageMods = ['api', 'storage']
 def craftingMods = ['api', 'crafting']
 def allMods = ['api', 'storage', 'crafting']
 
-registerBundle('bundleAllJar', 'bundle-all',
-        "universal-bundle-all.${bundleVersion}.jar", allMods, allMods)
-registerBundle('bundleStorageJar', 'bundle-storage',
-        "universal-bundle-storage.${bundleVersion}.jar", storageMods, storageMods)
-registerBundle('bundleCraftingJar', 'bundle-crafting',
-        "universal-bundle-crafting.${bundleVersion}.jar", craftingMods, craftingMods)
+def allBundleVersion = bundleVersionFor(allMods)
+def storageBundleVersion = bundleVersionFor(storageMods)
+def craftingBundleVersion = bundleVersionFor(craftingMods)
 
-registerBundle('fabricBundleAllJar', 'bundle-all-fabric',
-        "fabric-bundle-all.${bundleVersion}.jar", allMods, [])
-registerBundle('fabricBundleStorageJar', 'bundle-storage-fabric',
-        "fabric-bundle-storage.${bundleVersion}.jar", storageMods, [])
-registerBundle('fabricBundleCraftingJar', 'bundle-crafting-fabric',
-        "fabric-bundle-crafting.${bundleVersion}.jar", craftingMods, [])
+registerBundle('bundleAllJar', 'bundle-all', 'universal-bundle-all', allBundleVersion, allMods, allMods)
+registerBundle('bundleStorageJar', 'bundle-storage', 'universal-bundle-storage', storageBundleVersion, storageMods, storageMods)
+registerBundle('bundleCraftingJar', 'bundle-crafting', 'universal-bundle-crafting', craftingBundleVersion, craftingMods, craftingMods)
 
-registerBundle('neoforgeBundleAllJar', 'bundle-all-neoforge',
-        "neoforge-bundle-all.${bundleVersion}.jar", [], allMods)
-registerBundle('neoforgeBundleStorageJar', 'bundle-storage-neoforge',
-        "neoforge-bundle-storage.${bundleVersion}.jar", [], storageMods)
-registerBundle('neoforgeBundleCraftingJar', 'bundle-crafting-neoforge',
-        "neoforge-bundle-crafting.${bundleVersion}.jar", [], craftingMods)
+registerBundle('fabricBundleAllJar', 'bundle-all-fabric', 'fabric-bundle-all', allBundleVersion, allMods, [])
+registerBundle('fabricBundleStorageJar', 'bundle-storage-fabric', 'fabric-bundle-storage', storageBundleVersion, storageMods, [])
+registerBundle('fabricBundleCraftingJar', 'bundle-crafting-fabric', 'fabric-bundle-crafting', craftingBundleVersion, craftingMods, [])
+
+registerBundle('neoforgeBundleAllJar', 'bundle-all-neoforge', 'neoforge-bundle-all', allBundleVersion, [], allMods)
+registerBundle('neoforgeBundleStorageJar', 'bundle-storage-neoforge', 'neoforge-bundle-storage', storageBundleVersion, [], storageMods)
+registerBundle('neoforgeBundleCraftingJar', 'bundle-crafting-neoforge', 'neoforge-bundle-crafting', craftingBundleVersion, [], craftingMods)
 
 /**
  * Collects every release jar under build/release/ with its final published name: the bundle
@@ -242,31 +214,47 @@ tasks.register('releaseJars', Sync) {
 
     into layout.buildDirectory.dir('release')
 
-    // Bundle/universal API containers (already finally named).
-    from(layout.buildDirectory.dir('libs')) {
-        include 'universal-bundle-*.jar'
-        include 'fabric-bundle-*.jar'
-        include 'neoforge-bundle-*.jar'
-        include 'universal_mc_san_api.*.jar'
+    // Fail loudly if any version-pinned component jar is missing, rather than silently
+    // assembling a bundle without it.
+    doFirst {
+        def expected = [apiFab(), apiNeo(), stFab(), stNeo(), crFab(), crNeo(), stUni(), crUni()]
+        if (expected.any { it == null }) {
+            throw new GradleException('releaseJars: a component jar is missing; did every included build run?')
+        }
     }
+
+    // Container jars come straight from their tasks, so stale versions in build/libs never leak in.
+    from(tasks.named('apiUniversalJar'))
+    from(tasks.named('bundleAllJar'), tasks.named('bundleStorageJar'), tasks.named('bundleCraftingJar'))
+    from(tasks.named('fabricBundleAllJar'), tasks.named('fabricBundleStorageJar'), tasks.named('fabricBundleCraftingJar'))
+    from(tasks.named('neoforgeBundleAllJar'), tasks.named('neoforgeBundleStorageJar'), tasks.named('neoforgeBundleCraftingJar'))
 
     // API
     from({ def f = apiFab(); f == null ? [] : f }) { rename { "fabric_mc_san_api.${apiVersion}.jar" } }
     from({ def f = apiNeo(); f == null ? [] : f }) { rename { "neoforge_mc_san_api.${apiVersion}.jar" } }
 
     // Universal gameplay mods
-    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${bundleVersion}.jar" } }
-    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${bundleVersion}.jar" } }
+    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${storageVersion}.jar" } }
+    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${craftingVersion}.jar" } }
 
     // Per-loader gameplay mods
-    from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${bundleVersion}.jar" } }
-    from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${bundleVersion}.jar" } }
-    from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${bundleVersion}.jar" } }
-    from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${bundleVersion}.jar" } }
+    from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${storageVersion}.jar" } }
+    from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${storageVersion}.jar" } }
+    from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${craftingVersion}.jar" } }
+    from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${craftingVersion}.jar" } }
 }
 
 tasks.named('build') {
     dependsOn 'releaseJars'
+}
+
+// Cleaning at the root cleans every included build too, so no stale jar of an older version
+// can survive a release build.
+tasks.named('clean') {
+    dependsOn gradle.includedBuild('fabric').task(':clean')
+    dependsOn gradle.includedBuild('neoforge').task(':clean')
+    dependsOn gradle.includedBuild('storage-network').task(':clean')
+    dependsOn gradle.includedBuild('crafting-network').task(':clean')
 }
 
 publishing {

@@ -58,6 +58,14 @@ Universal jars are published to **CurseForge / Modrinth**; the loader-specific (
 `neoforge-*`) builds are on
 **[GitHub Releases](https://github.com/retiredroca/mc-storage-area-network/releases)**.
 
+### Releases & versions
+
+Each mod is versioned independently, and a release only gets a **new version for the component that
+actually changed** — releasing Storage Network does not bump the API, and vice versa. Every GitHub
+release still carries the full set of jars (including the current, unchanged API) so one page has
+everything. The API uses `1.0.<yymmddhh>` (date-based patch); the gameplay mods and bundles use
+`1.0.0.<yymmddhh>`.
+
 ## Requirements
 
 | | |
@@ -82,8 +90,8 @@ dependencies {
 }
 ```
 
-The API version is `1.0.<yymmddhh>` (a date-based patch), so depending on `1.0.x` picks up the latest
-build without chasing an exact number.
+The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the API itself
+changes, so depending on `1.0.x` picks up the latest build without chasing an exact number.
 
 Register an item source:
 

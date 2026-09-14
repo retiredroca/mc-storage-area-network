@@ -137,6 +137,10 @@ Use `universal-bundle-storage` or `universal-bundle-crafting` instead.
 The universal jars are on CurseForge/Modrinth. If you want a single-loader build (`fabric-*` /
 `neoforge-*`), grab it from [GitHub Releases](https://github.com/retiredroca/mc-storage-area-network/releases).
 
+Each mod is versioned on its own: a release only bumps the mod that changed, so Storage Network,
+Crafting Network and the API can be updated independently. Every GitHub release lists all current
+jars together, so you can always grab a matching set from one place.
+
 ## Configuration
 
 - Fabric: `config/<mod>.json` — NeoForge: `config/<mod>-server.toml`

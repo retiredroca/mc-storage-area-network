@@ -2,11 +2,14 @@ plugins {
     id 'base'
 }
 
-import java.time.LocalDateTime
+def repoRoot = projectDir
+while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists()) {
+    repoRoot = repoRoot.parentFile
+}
+apply from: new File(repoRoot, 'gradle/versions.gradle')
 
-// Version is derived from the build date: 1.YY.MM.DD.HH.
-def dateVersion = "1.0.0." + String.format("%02d%02d%02d%02d", LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(), LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
-version = dateVersion
+// Crafting Network version from versions.properties (bumped only when it changed).
+version = craftingVersion
 group = 'com.retiredroca.craftingnetwork'
 
 // Newest non-sources / non-dev jar in a directory (loader builds are date-versioned).

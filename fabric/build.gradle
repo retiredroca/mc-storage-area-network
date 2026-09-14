@@ -4,12 +4,14 @@ plugins {
 }
 
 
-import java.time.LocalDateTime
+def repoRoot = projectDir
+while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists()) {
+    repoRoot = repoRoot.parentFile
+}
+apply from: new File(repoRoot, 'gradle/versions.gradle')
 
-// API version: 1.0.YYMMDDHH (date as the patch).
-version = '1.0.' + String.format('%02d%02d%02d%02d',
-        LocalDateTime.now().getYear() % 100, LocalDateTime.now().getMonthValue(),
-        LocalDateTime.now().getDayOfMonth(), LocalDateTime.now().getHour())
+// API version comes from versions.properties (bumped only when the API changed).
+version = apiVersion
 group = mod_group_id
 
 base {
