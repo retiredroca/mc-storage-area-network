@@ -97,7 +97,8 @@ public final class BrewPath {
             for (ItemStack ingredient : ingredientsFor(level)) {
                 ItemStack mixed;
                 try {
-                    mixed = brewing.mix(state.copy(), ingredient);
+                    // Vanilla's PotionBrewing.mix takes (ingredient, potion).
+                    mixed = brewing.mix(ingredient, state.copy());
                 } catch (Exception e) {
                     continue;
                 }

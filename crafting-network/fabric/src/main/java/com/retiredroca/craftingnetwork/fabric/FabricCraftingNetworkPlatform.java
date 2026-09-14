@@ -91,8 +91,8 @@ public final class FabricCraftingNetworkPlatform implements CraftingNetworkPlatf
     }
 
     @Override
-    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources) {
-        Networking.sendSources(player, sources);
+    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+        Networking.sendSources(player, sources, shulkersFirst);
     }
 
     @Override

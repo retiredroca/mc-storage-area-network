@@ -91,9 +91,10 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
     }
 
     private void addOwnSlots() {
-        this.addSlot(new Slot(new SimpleContainer(3), INPUT_SLOT, 56, 17));
-        this.addSlot(new Slot(new SimpleContainer(3), FUEL_SLOT, 56, 53));
-        this.addSlot(new Slot(new SimpleContainer(3), RESULT_SLOT, 116, 35));
+        SimpleContainer machineSlots = new SimpleContainer(3);
+        this.addSlot(new DisplaySlot(machineSlots, INPUT_SLOT, 56, 17));
+        this.addSlot(new DisplaySlot(machineSlots, FUEL_SLOT, 56, 53));
+        this.addSlot(new DisplaySlot(machineSlots, RESULT_SLOT, 116, 35));
         int startX = 8;
         int startY = 84;
         for (int row = 0; row < 3; ++row) {
@@ -120,7 +121,7 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
             return station.getState();
         }
         return lastSentState != null ? lastSentState
-                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of());
+                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false);
     }
 
     @Override
@@ -203,6 +204,12 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (id == 1000) {
+            if (station != null) {
+                station.setShulkersFirst(!station.isShulkersFirst());
+            }
+            return true;
+        }
         if (id >= SOURCE_ALL && id < getSourceCount()) {
             selectSource(id);
             return true;
@@ -315,17 +322,23 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
         if (!(recipe.value() instanceof AbstractCookingRecipe)) {
             return;
         }
+        List<Ingredient> ingredients = recipe.value().getIngredients();
+        if (ingredients.isEmpty()) {
+            return;
+        }
+        ItemStack[] items = ingredients.get(0).getItems();
+        if (items.length == 0) {
+            return;
+        }
+        // Only start if the input and a valid fuel are available in the selected source; otherwise do nothing.
+        if (support.countInSources(items[0]) <= 0 || !support.hasFuelInSources()) {
+            return;
+        }
         clearCraftingContent();
         this.placeRecipe(getGridWidth(), getGridHeight(), getResultSlotIndex(), recipe,
                 recipe.value().getIngredients().iterator(), 1);
         if (station != null) {
-            List<Ingredient> ingredients = recipe.value().getIngredients();
-            if (!ingredients.isEmpty()) {
-                ItemStack[] items = ingredients.get(0).getItems();
-                if (items.length > 0) {
-                    station.setRecipeFilter(items[0]);
-                }
-            }
+            station.setRecipeFilter(items[0]);
         }
         this.broadcastChanges();
     }

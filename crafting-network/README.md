@@ -16,7 +16,7 @@ chests, process them, and send the results back — automatically.
 - **Processor Terminals** — **Smelting**, **Blasting**, **Smoking** and **Brewing** terminals that pull inputs and fuel from the network, process them, and push results back.
 - **Recipe-book selector** — pick a recipe from the book; the terminal gathers the ingredients for you.
 - **Sources dropdown** — scope ingredients to *All Storage*, your *Inventory*, or a single container.
-- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then your inventory, then the nearest container.
+- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan a larger area (1×1 up to 11×11 chunks).
 - **Ownership & privacy** — terminals only use global (worldgen) storage plus storage placed by the terminal's owner.
 

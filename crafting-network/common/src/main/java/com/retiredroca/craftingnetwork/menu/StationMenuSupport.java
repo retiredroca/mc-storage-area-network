@@ -16,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 
 /**
  * Shared source/catalog plumbing for the cooking and brewing station menus: mirrors the station's
@@ -152,7 +153,7 @@ public class StationMenuSupport {
         rebuildFlatTargets();
         dataVersion++;
         if (owner != null) {
-            CraftingNetworkCommon.platform().sendSources(owner, sources);
+            CraftingNetworkCommon.platform().sendSources(owner, sources, false);
         }
         return true;
     }
@@ -221,6 +222,47 @@ public class StationMenuSupport {
             return null;
         }
         return station.getScannedStorages().get(target.handlerIndex());
+    }
+
+    /** Count of {@code item} available across the selected source(s), boxes included. */
+    public int countInSources(ItemStack item) {
+        if (station == null || item.isEmpty()) {
+            return 0;
+        }
+        int total = 0;
+        for (SourceTarget target : activeTargets()) {
+            if (target.childIndex() < 0) {
+                ScannedStorage storage = handlerFor(target);
+                if (storage != null && storage.supportsExtraction()) {
+                    total += storage.count(item);
+                }
+            } else {
+                total += station.countInBoxLeaf(target.pos(), target.childIndex(), item);
+            }
+        }
+        return total;
+    }
+
+    /** True if a valid fuel item is available across the selected source(s). */
+    public boolean hasFuelInSources() {
+        if (station == null) {
+            return false;
+        }
+        for (SourceTarget target : activeTargets()) {
+            if (target.childIndex() >= 0) {
+                continue;
+            }
+            ScannedStorage storage = handlerFor(target);
+            if (storage == null || !storage.supportsExtraction()) {
+                continue;
+            }
+            for (ItemStack s : storage.enumerate()) {
+                if (!s.isEmpty() && AbstractFurnaceBlockEntity.isFuel(s)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public ItemStack depositIntoNetwork(ItemStack stack) {

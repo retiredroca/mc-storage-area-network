@@ -46,7 +46,7 @@ public interface CraftingNetworkPlatform {
 
     void openStation(ServerPlayer player, AbstractStationBlockEntity station);
 
-    void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources);
+    void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst);
 
     void sendStationState(ServerPlayer player, BlockPos pos, StationState state);
 

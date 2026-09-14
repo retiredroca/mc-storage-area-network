@@ -42,6 +42,7 @@ import net.minecraft.world.level.block.state.BlockState;
 public abstract class AbstractCraftingStationBlockEntity extends BlockEntity implements MenuProvider {
     private static final String TAG_TIER = "tier";
     private static final String TAG_PINNED = "pinnedSource";
+    private static final String TAG_SHULKERS_FIRST = "shulkersFirst";
     private static final long[] CHUNK_RADII = { 0, 1, 2, 3, 4, 5 };
 
     private static final record BoxLeaf(String label, int[] slots) {}
@@ -55,6 +56,7 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
     private long lastScan = 0;
 
     private BlockPos pinnedSource = null;
+    private boolean shulkersFirst = false;
 
     protected AbstractCraftingStationBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -179,6 +181,21 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
         }
     }
 
+    public boolean isShulkersFirst() {
+        return shulkersFirst;
+    }
+
+    public void setShulkersFirst(boolean shulkersFirst) {
+        if (this.shulkersFirst == shulkersFirst) {
+            return;
+        }
+        this.shulkersFirst = shulkersFirst;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void tickServer() {
         if (level == null || level.isClientSide) {
             return;
@@ -249,6 +266,37 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
         return ShulkerBoxHelper.extractFromLeaf(container, leaves.get(childIndex).slots(), item, max);
     }
 
+    /**
+     * Inserts into the shulker boxes found in the scanned containers (same-type slots first, then any
+     * free slot), returning the remainder. Used by the "shulkers first" routing option.
+     */
+    public ItemStack insertIntoShulkers(ItemStack stack) {
+        ItemStack remaining = insertIntoBoxLeaves(stack.copy(), true);
+        return insertIntoBoxLeaves(remaining, false);
+    }
+
+    private ItemStack insertIntoBoxLeaves(ItemStack stack, boolean sameTypeOnly) {
+        ItemStack remaining = stack;
+        if (remaining.isEmpty() || level == null) {
+            return remaining;
+        }
+        for (Map.Entry<BlockPos, List<BoxLeaf>> entry : nestedBoxes.entrySet()) {
+            if (remaining.isEmpty()) {
+                break;
+            }
+            if (!(level.getBlockEntity(entry.getKey()) instanceof Container container)) {
+                continue;
+            }
+            for (BoxLeaf leaf : entry.getValue()) {
+                if (remaining.isEmpty()) {
+                    break;
+                }
+                remaining = ShulkerBoxHelper.insertIntoLeaf(container, leaf.slots(), remaining, sameTypeOnly);
+            }
+        }
+        return remaining;
+    }
+
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
@@ -262,12 +310,14 @@ public abstract class AbstractCraftingStationBlockEntity extends BlockEntity imp
         } else {
             pinnedSource = null;
         }
+        shulkersFirst = tag.getBoolean(TAG_SHULKERS_FIRST);
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt(TAG_TIER, tier);
+        tag.putBoolean(TAG_SHULKERS_FIRST, shulkersFirst);
         if (pinnedSource != null) {
             tag.putIntArray(TAG_PINNED, new int[] {
                     pinnedSource.getX() - worldPosition.getX(),

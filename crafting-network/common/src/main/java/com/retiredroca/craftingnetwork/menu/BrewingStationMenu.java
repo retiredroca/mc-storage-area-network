@@ -74,11 +74,12 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
     }
 
     private void addOwnSlots() {
-        this.addSlot(new Slot(new SimpleContainer(5), BOTTLE_SLOT_START + 0, 56, 51));
-        this.addSlot(new Slot(new SimpleContainer(5), BOTTLE_SLOT_START + 1, 79, 58));
-        this.addSlot(new Slot(new SimpleContainer(5), BOTTLE_SLOT_START + 2, 102, 51));
-        this.addSlot(new Slot(new SimpleContainer(5), INGREDIENT_SLOT, 79, 17));
-        this.addSlot(new Slot(new SimpleContainer(5), FUEL_SLOT, 17, 17));
+        SimpleContainer machineSlots = new SimpleContainer(5);
+        this.addSlot(new DisplaySlot(machineSlots, BOTTLE_SLOT_START + 0, 56, 51));
+        this.addSlot(new DisplaySlot(machineSlots, BOTTLE_SLOT_START + 1, 79, 58));
+        this.addSlot(new DisplaySlot(machineSlots, BOTTLE_SLOT_START + 2, 102, 51));
+        this.addSlot(new DisplaySlot(machineSlots, INGREDIENT_SLOT, 79, 17));
+        this.addSlot(new DisplaySlot(machineSlots, FUEL_SLOT, 17, 17));
         int startX = 8;
         int startY = 84;
         for (int row = 0; row < 3; ++row) {
@@ -105,7 +106,7 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
             return station.getState();
         }
         return lastSentState != null ? lastSentState
-                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of());
+                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false);
     }
 
     @Override
@@ -191,6 +192,12 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (id == 1000) {
+            if (station != null) {
+                station.setShulkersFirst(!station.isShulkersFirst());
+            }
+            return true;
+        }
         if (id >= SOURCE_ALL && id < getSourceCount()) {
             selectSource(id);
             return true;

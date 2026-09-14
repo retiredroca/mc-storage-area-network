@@ -61,6 +61,10 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     private ServerPlayer owner;
     private int dataVersion;
     private int selectedSource = SOURCE_ALL;
+    private boolean clientShulkersFirst;
+    private static final int SHULKERS_FIRST_BUTTON = 1000;
+    private ItemStack resultOutput = ItemStack.EMPTY;
+    private int resultPerCraft = 1;
 
     public CraftingStationMenu(int containerId, Inventory playerInventory, AbstractCraftingStationBlockEntity station) {
         super(CraftingNetworkCommon.platform().craftingStationMenuType(), containerId);
@@ -91,14 +95,16 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
 
     public static CraftingStationMenu fromNetwork(int containerId, Inventory playerInventory,
             CraftingStationOpenData data) {
-        return new CraftingStationMenu(containerId, playerInventory, data.pos(), data.sources());
+        return new CraftingStationMenu(containerId, playerInventory, data.pos(), data.sources(),
+                data.shulkersFirst());
     }
 
     public static CraftingStationMenu fromNetwork(int containerId, Inventory playerInventory,
             RegistryFriendlyByteBuf buffer) {
         BlockPos pos = buffer.readBlockPos();
         List<CraftingSourceInfo> sources = readSources(buffer);
-        return new CraftingStationMenu(containerId, playerInventory, pos, sources);
+        boolean shulkersFirst = buffer.readBoolean();
+        return new CraftingStationMenu(containerId, playerInventory, pos, sources, shulkersFirst);
     }
 
     public static void writeSources(RegistryFriendlyByteBuf buffer, List<CraftingSourceInfo> sources) {
@@ -118,11 +124,12 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     }
 
     private CraftingStationMenu(int containerId, Inventory playerInventory, BlockPos pos,
-            List<CraftingSourceInfo> sources) {
+            List<CraftingSourceInfo> sources, boolean shulkersFirst) {
         super(CraftingNetworkCommon.platform().craftingStationMenuType(), containerId);
         this.station = null;
         this.pos = pos;
         this.playerInventory = playerInventory;
+        this.clientShulkersFirst = shulkersFirst;
         this.craftSlots = new TransientCraftingContainer(this, 3, 3);
         this.resultSlots = new ResultContainer();
         this.menuStorages = new ArrayList<>();
@@ -232,12 +239,18 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         return dataVersion;
     }
 
-    public void setServerSources(List<CraftingSourceInfo> sources) {
+    public void setServerSources(List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+        this.clientShulkersFirst = shulkersFirst;
         if (!this.sources.equals(sources)) {
             this.sources = new ArrayList<>(sources);
             rebuildFlatTargets();
             this.dataVersion++;
         }
+    }
+
+    /** Whether the "shulkers first" output option is enabled for this station. */
+    public boolean isShulkersFirst() {
+        return station != null ? station.isShulkersFirst() : clientShulkersFirst;
     }
 
     public int getSelectedSource() {
@@ -258,10 +271,20 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             }
         }
         refreshCatalog();
+        updateResult();
     }
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (id == SHULKERS_FIRST_BUTTON) {
+            if (station != null) {
+                station.setShulkersFirst(!station.isShulkersFirst());
+                if (owner != null) {
+                    CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst());
+                }
+            }
+            return true;
+        }
         selectSource(id);
         return id >= 0 && id < getSourceCount();
     }
@@ -350,7 +373,7 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         rebuildFlatTargets();
         this.dataVersion++;
         if (owner != null) {
-            CraftingNetworkCommon.platform().sendSources(owner, sources);
+            CraftingNetworkCommon.platform().sendSources(owner, sources, station.isShulkersFirst());
         }
     }
 
@@ -375,9 +398,9 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     public void clicked(int slotId, int button, ClickType clickType, Player player) {
         if (slotId == RESULT_SLOT_INDEX) {
             if (clickType == ClickType.QUICK_MOVE) {
-                craftResult(player, true);
+                craftResult(player, true); // shift-click: a stack, or as much as possible
             } else if (clickType == ClickType.PICKUP) {
-                craftResult(player, button == 1);
+                craftResult(player, false); // plain click: one craft
             }
             return;
         }
@@ -403,6 +426,8 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         if (resultSlots == null) {
             return;
         }
+        this.resultOutput = ItemStack.EMPTY;
+        this.resultPerCraft = 1;
         resultSlots.setItem(0, ItemStack.EMPTY);
         Level level = station == null ? null : station.getLevel();
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -420,9 +445,57 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             this.broadcastChanges();
             return;
         }
-        resultSlots.setItem(0, holder.value().assemble(input, level.registryAccess()));
+        ItemStack out = holder.value().assemble(input, level.registryAccess());
+        if (out.isEmpty()) {
+            this.broadcastChanges();
+            return;
+        }
+        this.resultOutput = out.copy();
+        this.resultPerCraft = Math.max(1, out.getCount());
+        int maxCrafts = maxCraftable();
+        int batch = Math.max(this.resultPerCraft,
+                Math.min(maxCrafts * this.resultPerCraft, out.getMaxStackSize()));
+        resultSlots.setItem(0, out.copyWithCount(batch));
         resultSlots.setChanged();
         this.broadcastChanges();
+    }
+
+    private int maxCraftable() {
+        Map<ItemStack, Integer> needed = neededIngredients();
+        if (needed.isEmpty()) {
+            return 0;
+        }
+        int max = Integer.MAX_VALUE;
+        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
+            int available = networkCount(entry.getKey()) + playerCount(entry.getKey());
+            max = Math.min(max, available / entry.getValue());
+        }
+        return Math.max(0, max);
+    }
+
+    /** True if the network + player have everything needed for at least one craft of {@code recipe}. */
+    private boolean canCraftRecipe(RecipeHolder<?> recipe) {
+        Map<ItemStack, Integer> needed = new HashMap<>();
+        for (Ingredient ingredient : recipe.value().getIngredients()) {
+            if (ingredient.isEmpty()) {
+                continue;
+            }
+            ItemStack[] items = ingredient.getItems();
+            if (items.length == 0) {
+                continue;
+            }
+            ItemStack key = items[0].copyWithCount(1);
+            needed.merge(key, 1, Integer::sum);
+        }
+        if (needed.isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<ItemStack, Integer> entry : needed.entrySet()) {
+            if (networkCount(entry.getKey()) + playerCount(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean hasIngredients() {
@@ -481,27 +554,25 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         return total;
     }
 
-    private void craftResult(Player player, boolean fullStack) {
+    private void craftResult(Player player, boolean stack) {
         Level level = station == null ? null : station.getLevel();
         if (!(level instanceof ServerLevel)) {
             return;
         }
-        if (resultSlots.getItem(0).isEmpty()) {
+        if (resultOutput.isEmpty()) {
             return;
         }
-        ItemStack result = resultSlots.getItem(0);
-        int max = fullStack ? Integer.MAX_VALUE : 1;
-        for (int made = 0; made < max; made++) {
-            if (resultSlots.getItem(0).isEmpty()) {
-                break;
-            }
+        int perCraft = Math.max(1, resultPerCraft);
+        int maxItems = stack ? 64 : perCraft;
+        int produced = 0;
+        while (produced < maxItems) {
             if (!consumeIngredients(player)) {
-                updateResult();
                 break;
             }
-            routeOutput(player, resultSlots.getItem(0).copy());
-            updateResult();
+            routeOutput(player, resultOutput.copy());
+            produced += perCraft;
         }
+        updateResult();
     }
 
     private boolean consumeIngredients(Player player) {
@@ -564,14 +635,21 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     }
 
     /**
-     * Routes a crafted stack: into a network container already holding the item, then the player's
-     * inventory, then the scanned container nearest to the station, and finally drops at the player.
+     * Routes a crafted stack: into a network container already holding the item, then the scanned
+     * container nearest to the station, then the player's inventory, and finally drops at the player.
      */
     private void routeOutput(Player player, ItemStack stack) {
         if (stack.isEmpty() || station == null) {
             return;
         }
         ItemStack remaining = stack;
+        // "Shulkers first": fill shulker-box contents before anything else.
+        if (station.isShulkersFirst()) {
+            remaining = station.insertIntoShulkers(remaining);
+            if (remaining.isEmpty()) {
+                return;
+            }
+        }
         // Collection-only sinks (Network Share Terminal) receive crafted output first.
         for (ScannedStorage storage : station.getScannedStorages()) {
             if (remaining.isEmpty()) {
@@ -595,10 +673,6 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         if (remaining.isEmpty()) {
             return;
         }
-        player.getInventory().add(remaining);
-        if (remaining.isEmpty()) {
-            return;
-        }
         List<ScannedStorage> nearest = new ArrayList<>(station.getScannedStorages());
         BlockPos stationPos = station.getBlockPos();
         nearest.sort(Comparator.comparingDouble(s -> s.pos().distSqr(stationPos)));
@@ -608,6 +682,10 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             }
             remaining = storage.insert(remaining);
         }
+        if (remaining.isEmpty()) {
+            return;
+        }
+        player.getInventory().add(remaining);
         if (!remaining.isEmpty()) {
             player.drop(remaining, false);
         }
@@ -730,6 +808,9 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         }
         if (!(recipe.value() instanceof CraftingRecipe)) {
             return;
+        }
+        if (!canCraftRecipe(recipe)) {
+            return; // not enough ingredients: do nothing when the recipe is clicked
         }
         clearCraftingContent();
         placeRecipe(getGridWidth(), getGridHeight(), getResultSlotIndex(), recipe,

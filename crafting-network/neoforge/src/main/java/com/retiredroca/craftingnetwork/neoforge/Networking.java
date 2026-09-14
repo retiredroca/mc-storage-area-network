@@ -72,7 +72,7 @@ public final class Networking {
         context.enqueueWork(() -> {
             if (net.minecraft.client.Minecraft.getInstance().player != null
                     && net.minecraft.client.Minecraft.getInstance().player.containerMenu instanceof CraftingStationMenu menu) {
-                menu.setServerSources(payload.sources());
+                menu.setServerSources(payload.sources(), payload.shulkersFirst());
             }
         });
     }
@@ -102,8 +102,8 @@ public final class Networking {
         });
     }
 
-    public static void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources) {
-        PacketDistributor.sendToPlayer(player, new StationPackets.CraftingSourcesPayload(sources));
+    public static void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+        PacketDistributor.sendToPlayer(player, new StationPackets.CraftingSourcesPayload(sources, shulkersFirst));
     }
 
     public static void sendStationState(ServerPlayer player, BlockPos pos, StationState state) {

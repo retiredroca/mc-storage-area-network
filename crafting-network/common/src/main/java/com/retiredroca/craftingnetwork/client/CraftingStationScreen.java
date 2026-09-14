@@ -64,6 +64,7 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
     private final RecipeBookComponent recipeBookComponent = new RecipeBookComponent();
     private Button storageToggle;
     private Button recipeBookToggle;
+    private CheckboxWidget shulkerToggle;
     private EditBox searchBox;
     private boolean widthTooNarrow;
     private boolean storagePanelVisible;
@@ -99,12 +100,16 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
                     this.storagePanelVisible = !this.storagePanelVisible;
                     recomputeLeftPos();
                 }).bounds(0, 0, 44, 14).build();
+        this.shulkerToggle = new CheckboxWidget(0, 0, this.menu.isShulkersFirst(),
+                Component.translatable("gui.crafting_network.shulkers_first.tooltip"),
+                value -> sendShulkerToggle());
         this.searchBox = new EditBox(this.font, 0, 0, SEARCH_W, 14, Component.translatable("gui.recipebook.search_hint"));
         this.searchBox.setMaxLength(50);
         this.searchBox.setBordered(false);
         this.searchBox.setTextColor(0xFFFFFFFF);
         this.searchBox.setHint(Component.translatable("gui.recipebook.search_hint"));
         this.addRenderableWidget(this.recipeBookToggle);
+        this.addRenderableWidget(this.shulkerToggle);
         this.addWidget(this.storageToggle);
         this.addWidget(this.recipeBookComponent);
         this.addWidget(this.searchBox);
@@ -122,6 +127,14 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         this.menu.selectSource(sourceId);
         if (this.minecraft != null && this.minecraft.player != null) {
             this.minecraft.player.getInventory().setChanged();
+        }
+    }
+
+    private void sendShulkerToggle() {
+        if (this.minecraft != null && this.minecraft.getConnection() != null) {
+            this.minecraft.getConnection().send(
+                    new net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket(
+                            this.menu.containerId, 1000));
         }
     }
 
@@ -145,6 +158,10 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
         if (this.storageToggle != null) {
             this.storageToggle.setPosition(this.leftPos + this.imageWidth - 52, this.topPos - 22);
         }
+        if (this.shulkerToggle != null) {
+            // Right of the output slot, centered over the last inventory column and the output slot.
+            this.shulkerToggle.setPosition(this.leftPos + 156, this.topPos + 39);
+        }
         if (this.searchBox != null) {
             int panelX = this.leftPos - 10 - PANEL_W;
             if (panelX >= 4) {
@@ -159,6 +176,9 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
     public void containerTick() {
         super.containerTick();
         layoutHud();
+        if (this.shulkerToggle != null) {
+            this.shulkerToggle.setSelected(this.menu.isShulkersFirst());
+        }
         if (!this.recipeBookComponent.isVisible()) {
             this.bookSourcesOpen = false;
         }
@@ -464,9 +484,9 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta, double horizontalDelta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (hasShiftDown() || hasControlDown()) {
-            return super.mouseScrolled(mouseX, mouseY, delta, horizontalDelta);
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
         if (this.bookSourcesOpen && this.recipeBookComponent.isVisible()) {
             List<SourceRow> rows = buildSourceRows();
@@ -477,11 +497,11 @@ public class CraftingStationScreen extends AbstractContainerScreen<CraftingStati
             int py = machineTabPanelY() + SOURCE_PANEL_TOP;
             if (mouseX >= px && mouseX < px + SOURCE_PANEL_W && mouseY >= py && mouseY < py + panelH) {
                 int maxScroll = Math.max(0, total - rowsVisible);
-                this.sourceScroll = Math.max(0, Math.min(maxScroll, this.sourceScroll - (delta > 0 ? 1 : -1)));
+                this.sourceScroll = Math.max(0, Math.min(maxScroll, this.sourceScroll - (scrollY > 0 ? 1 : -1)));
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, delta, horizontalDelta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

@@ -235,18 +235,18 @@ public class StorageTerminalScreen extends AbstractContainerScreen<StorageTermin
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta, double horizontalDelta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (hasShiftDown() || hasControlDown()) {
-            return super.mouseScrolled(mouseX, mouseY, delta, horizontalDelta);
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
         if (chestOpen && mouseX >= chestX && mouseX <= chestX + chestListWidth()
                 && mouseY >= chestY + CHEST_DROP_H + 2) {
             int maxScroll = Math.max(0, chestRowCount() - CHEST_MAX_ROWS);
-            chestScroll = Math.max(0, Math.min(maxScroll, chestScroll - (delta > 0 ? 1 : -1)));
+            chestScroll = Math.max(0, Math.min(maxScroll, chestScroll - (scrollY > 0 ? 1 : -1)));
             return true;
         }
         int maxOffset = Math.max(0, (int) Math.ceil(displayItems.size() / (double) (GRID_COLS * GRID_ROWS)) - 1);
-        scrollOffset = Math.max(0, Math.min(maxOffset, scrollOffset - (delta > 0 ? 1 : -1)));
+        scrollOffset = Math.max(0, Math.min(maxOffset, scrollOffset - (scrollY > 0 ? 1 : -1)));
         return true;
     }
 

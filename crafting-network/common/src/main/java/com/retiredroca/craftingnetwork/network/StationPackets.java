@@ -38,11 +38,24 @@ public final class StationPackets {
         }
     }
 
-    public record CraftingSourcesPayload(List<CraftingSourceInfo> sources) implements CustomPacketPayload {
+    public record CraftingSourcesPayload(List<CraftingSourceInfo> sources, boolean shulkersFirst)
+            implements CustomPacketPayload {
         public static final Type<CraftingSourcesPayload> TYPE = new Type<>(CRAFTING_SOURCES);
-        public static final StreamCodec<RegistryFriendlyByteBuf, CraftingSourcesPayload> STREAM_CODEC = CraftingSourceInfo.STREAM_CODEC
-                .apply(ByteBufCodecs.list())
-                .map(CraftingSourcesPayload::new, CraftingSourcesPayload::sources);
+        public static final StreamCodec<RegistryFriendlyByteBuf, CraftingSourcesPayload> STREAM_CODEC = StreamCodec.of(
+                CraftingSourcesPayload::encode,
+                CraftingSourcesPayload::decode);
+
+        private static void encode(RegistryFriendlyByteBuf buf, CraftingSourcesPayload payload) {
+            CraftingSourceInfo.STREAM_CODEC.<RegistryFriendlyByteBuf>cast().apply(ByteBufCodecs.list())
+                    .encode(buf, payload.sources());
+            buf.writeBoolean(payload.shulkersFirst());
+        }
+
+        private static CraftingSourcesPayload decode(RegistryFriendlyByteBuf buf) {
+            List<CraftingSourceInfo> sources = CraftingSourceInfo.STREAM_CODEC.<RegistryFriendlyByteBuf>cast()
+                    .apply(ByteBufCodecs.list()).decode(buf);
+            return new CraftingSourcesPayload(sources, buf.readBoolean());
+        }
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

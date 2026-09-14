@@ -61,6 +61,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private static final String TAG_TIER = "tier";
     private static final String TAG_PINNED = "pinnedSource";
     private static final String TAG_BREW = "brewTarget";
+    private static final String TAG_BREW_DONE = "brewDone";
     private static final String TAG_FUEL_CHARGE = "fuelCharge";
     private static final String TAG_BREW_PROGRESS = "brewProgress";
     private static final String TAG_BURN_TIME = "burnTime";
@@ -72,6 +73,8 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private static final String TAG_RESULT = "result";
     private static final String TAG_BOTTLES = "bottles";
     private static final String TAG_INGREDIENT = "ingredient";
+    private static final String TAG_SHULKERS_FIRST = "shulkersFirst";
+    private static final String TAG_STORED_XP = "storedXp";
     private static final long[] CHUNK_RADII = { 0, 1, 2, 3, 4, 5 };
 
     private static final record BoxLeaf(String label, int[] slots) {}
@@ -87,9 +90,12 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private BlockPos pinnedSource = null;
     private String brewTarget = "";
     private ItemStack recipeFilter = ItemStack.EMPTY;
+    private boolean shulkersFirst = false;
+    private float storedExperience = 0f;
 
     private int fuelCharge = 0;
     private float brewProgress = 0f;
+    private boolean brewDone = false;
 
     private int burnTime = 0;
     private int burnTimeTotal = 0;
@@ -240,6 +246,35 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
     }
 
+    public boolean isShulkersFirst() {
+        return shulkersFirst;
+    }
+
+    public void setShulkersFirst(boolean shulkersFirst) {
+        if (this.shulkersFirst == shulkersFirst) {
+            return;
+        }
+        this.shulkersFirst = shulkersFirst;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /** Experience accumulated by completed cooks, collectable by the owner via crouch + right-click. */
+    public float getStoredExperience() {
+        return storedExperience;
+    }
+
+    public int collectExperience() {
+        int whole = Mth.floor(storedExperience);
+        if (whole > 0) {
+            storedExperience -= whole;
+            setChanged();
+        }
+        return whole;
+    }
+
     public String getBrewTarget() {
         return brewTarget;
     }
@@ -272,8 +307,10 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             changed = !brewTarget.isEmpty();
             brewTarget = "";
         } else {
-            changed = !potionId.equals(brewTarget);
+            // Re-selecting a target starts a fresh single batch.
+            changed = !potionId.equals(brewTarget) || brewDone;
             brewTarget = potionId;
+            brewDone = false;
         }
         if (changed) {
             setChanged();
@@ -332,6 +369,17 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private ItemStack pushToNetwork(ItemStack stack) {
         if (stack.isEmpty()) return ItemStack.EMPTY;
         ItemStack remaining = stack.copy();
+        // "Shulkers first": fill shulker-box contents before plain container slots.
+        if (shulkersFirst) {
+            remaining = insertIntoShulkers(remaining);
+        }
+        // Collection-only sinks (Network Share Terminal) receive output next.
+        for (ScannedStorage storage : pumpHandlers()) {
+            if (remaining.isEmpty()) break;
+            if (storage.collectionOnly()) {
+                remaining = storage.insert(remaining);
+            }
+        }
         for (ScannedStorage storage : pumpHandlers()) {
             if (remaining.isEmpty()) break;
             remaining = storage.insert(remaining);
@@ -505,6 +553,10 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (!result.isEmpty() && !(ItemStack.isSameItemSameComponents(result, out) && result.getCount() + 1 <= result.getMaxStackSize())) {
             return;
         }
+        // Cooking only progresses while the station is actually burning fuel.
+        if (burnTime <= 0) {
+            return;
+        }
         float speed = type.speed(getTier());
         cookProgress += speed;
         int base = type.baseCookTicks();
@@ -516,6 +568,8 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                 result.grow(1);
             }
             input.shrink(1);
+            // Cooking recipes award experience; the owner can collect it via crouch + right-click.
+            storedExperience += h.value().getExperience();
             setChanged();
         }
     }
@@ -551,12 +605,21 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                     ItemStack rem = pushToNetwork(bottles[i].copy());
                     if (rem.isEmpty()) {
                         bottles[i] = ItemStack.EMPTY;
+                    } else if (pumpHandlers().isEmpty()) {
+                        // No network storage at all: drop the finished potion so it is never lost.
+                        net.minecraft.world.Containers.dropItemStack(level, worldPosition.getX() + 0.5,
+                                worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, rem);
+                        bottles[i] = ItemStack.EMPTY;
                     } else {
                         bottles[i] = rem;
                     }
                     setChanged();
                 }
             }
+        }
+        if (brewDone) {
+            // One batch per target selection: wait until the target is re-selected.
+            return;
         }
         if (fuelCharge < 20) {
             int got = pullFromNetwork(new ItemStack(Items.BLAZE_POWDER), 1);
@@ -567,25 +630,25 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
         if (path == null || path.empty()) return;
 
-        int cur = currentStep(path);
-        if (cur >= 0 && cur < path.ingredients().size()) {
-            ItemStack need = path.ingredients().get(cur);
-            if (ingredient.isEmpty()) {
-                int got = pullFromNetwork(need, need.getMaxStackSize());
-                if (got > 0) {
-                    ingredient = need.copyWithCount(got);
-                    setChanged();
-                }
-            }
-        }
+        // Fill empty bottle slots with water first, then pull the ingredient for the current step.
         ItemStack water = PotionContents.createItemStack(Items.POTION, Potions.WATER);
         for (int i = 0; i < 3; i++) {
-            if (bottles[i].isEmpty() && !ingredient.isEmpty()) {
+            if (bottles[i].isEmpty()) {
                 int got = pullFromNetwork(water, 1);
                 if (got > 0) {
                     bottles[i] = water.copy();
                     setChanged();
                 }
+            }
+        }
+        int cur = currentStep(path);
+        if (cur >= 0 && cur < path.ingredients().size() && ingredient.isEmpty()) {
+            ItemStack need = path.ingredients().get(cur);
+            // Brewing consumes one ingredient per step; pull a single item, not a whole stack.
+            int got = pullFromNetwork(need, 1);
+            if (got > 0) {
+                ingredient = need.copyWithCount(got);
+                setChanged();
             }
         }
     }
@@ -624,11 +687,19 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (brewProgress >= base) {
             brewProgress -= base;
             try {
-                ItemStack next = level.potionBrewing().mix(bottles[0].copy(), ingredient);
-                if (!next.isEmpty() && BrewPath.potionIdOf(next).equals(BrewPath.potionIdOf(path.states().get(cur + 1)))) {
+                ItemStack next = level.potionBrewing().mix(ingredient, bottles[0].copy());
+                if (!next.isEmpty() && !ItemStack.isSameItemSameComponents(next, bottles[0])) {
                     for (int i = 0; i < 3; i++) bottles[i] = next.copy();
                     ingredient.shrink(1);
+                    if (cur + 1 >= path.states().size() - 1) {
+                        brewDone = true; // single batch complete
+                    }
                     setChanged();
+                } else {
+                    com.retiredroca.craftingnetwork.CraftingNetworkCommon.LOGGER.info(
+                            "[brew] no mix: ingredient={} potion={} expected={} target={}",
+                            BuiltInRegistries.ITEM.getKey(ingredient.getItem()), BrewPath.potionIdOf(bottles[0]),
+                            BrewPath.potionIdOf(path.states().get(cur + 1)), brewTarget);
                 }
             } catch (Exception ignored) {}
         }
@@ -679,6 +750,37 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         return ShulkerBoxHelper.extractFromLeaf(container, leaves.get(childIndex).slots(), item, max);
     }
 
+    /**
+     * Inserts into the shulker boxes found in the scanned containers (same-type slots first, then any
+     * free slot), returning the remainder. Used by the "shulkers first" routing option.
+     */
+    public ItemStack insertIntoShulkers(ItemStack stack) {
+        ItemStack remaining = insertIntoBoxLeaves(stack.copy(), true);
+        return insertIntoBoxLeaves(remaining, false);
+    }
+
+    private ItemStack insertIntoBoxLeaves(ItemStack stack, boolean sameTypeOnly) {
+        ItemStack remaining = stack;
+        if (remaining.isEmpty() || level == null) {
+            return remaining;
+        }
+        for (Map.Entry<BlockPos, List<BoxLeaf>> entry : nestedBoxes.entrySet()) {
+            if (remaining.isEmpty()) {
+                break;
+            }
+            if (!(level.getBlockEntity(entry.getKey()) instanceof Container container)) {
+                continue;
+            }
+            for (BoxLeaf leaf : entry.getValue()) {
+                if (remaining.isEmpty()) {
+                    break;
+                }
+                remaining = ShulkerBoxHelper.insertIntoLeaf(container, leaf.slots(), remaining, sameTypeOnly);
+            }
+        }
+        return remaining;
+    }
+
     public StationStatus getStatus() {
         if (type.isBrewing()) {
             if (brewTarget.isEmpty()) return StationStatus.IDLE;
@@ -706,14 +808,14 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
                     "gui.crafting_network.slot_fuel", fuelCharge > 0 ? new ItemStack(Items.BLAZE_POWDER) : ItemStack.EMPTY));
             StationStatus status = getStatus();
-            return new StationState(status, slots, progressPct, brewTarget, craftablePotions);
+            return new StationState(status, slots, progressPct, brewTarget, craftablePotions, shulkersFirst);
         }
         List<com.retiredroca.craftingnetwork.station.StationSlot> slots = List.of(
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_input", input),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_fuel", fuel),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_result", result));
         StationStatus status = getStatus();
-        return new StationState(status, slots, progressPct, "", List.of());
+        return new StationState(status, slots, progressPct, "", List.of(), shulkersFirst);
     }
 
     public boolean stillValid(Player player) {
@@ -749,6 +851,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             pinnedSource = null;
         }
         brewTarget = tag.getString(TAG_BREW);
+        brewDone = tag.getBoolean(TAG_BREW_DONE);
         fuelCharge = tag.getInt(TAG_FUEL_CHARGE);
         brewProgress = tag.getFloat(TAG_BREW_PROGRESS);
         burnTime = tag.getInt(TAG_BURN_TIME);
@@ -775,6 +878,8 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (tag.contains(TAG_RECIPE_FILTER)) {
             recipeFilter = ItemStack.parseOptional(registries, tag.getCompound(TAG_RECIPE_FILTER));
         }
+        shulkersFirst = tag.getBoolean(TAG_SHULKERS_FIRST);
+        storedExperience = tag.getFloat(TAG_STORED_XP);
     }
 
     @Override
@@ -789,6 +894,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             });
         }
         tag.putString(TAG_BREW, brewTarget);
+        tag.putBoolean(TAG_BREW_DONE, brewDone);
         tag.putInt(TAG_FUEL_CHARGE, fuelCharge);
         tag.putFloat(TAG_BREW_PROGRESS, brewProgress);
         tag.putInt(TAG_BURN_TIME, burnTime);
@@ -804,6 +910,8 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
         tag.put(TAG_BOTTLES, bottleList);
         tag.put(TAG_INGREDIENT, ingredient.saveOptional(registries));
+        tag.putBoolean(TAG_SHULKERS_FIRST, shulkersFirst);
+        tag.putFloat(TAG_STORED_XP, storedExperience);
     }
 
     @Override

@@ -100,6 +100,19 @@ public class StationBlock extends BaseEntityBlock {
             return InteractionResult.SUCCESS;
         }
         if (level.getBlockEntity(pos) instanceof AbstractStationBlockEntity station) {
+            // Crouch + right-click collects accumulated cooking experience (owner/team only). Only
+            // cooking stations (smelting/blasting/smoking) earn experience; brewing does not.
+            if (level instanceof ServerLevel serverLevel && !station.type().isBrewing()
+                    && player.isSecondaryUseActive() && player instanceof ServerPlayer serverPlayer
+                    && ContainerOwnership.canSee(serverLevel, ContainerOwnership.ownerOf(serverLevel, pos),
+                            new ContainerOwnership.Entry(serverPlayer.getUUID(),
+                                    serverPlayer.getGameProfile().getName()))) {
+                int xp = station.collectExperience();
+                if (xp > 0) {
+                    serverPlayer.giveExperiencePoints(xp);
+                    return InteractionResult.CONSUME;
+                }
+            }
             station.scanNetwork();
             if (player instanceof ServerPlayer serverPlayer) {
                 station.startOpen(serverPlayer);

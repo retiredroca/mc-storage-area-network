@@ -29,5 +29,7 @@
   "gui.crafting_network.slot_result": "Result",
   "gui.crafting_network.slot_bottle": "Bottle",
   "gui.crafting_network.slot_ingredient": "Ingredient",
+  "gui.crafting_network.shulkers_first": "Shulkers first",
+  "gui.crafting_network.shulkers_first.tooltip": "Fill shulker boxes in the network before other storage",
   "disconnect.crafting_network.server_requires.reason": "This server requires Crafting Network. Please install it and reconnect."
 }

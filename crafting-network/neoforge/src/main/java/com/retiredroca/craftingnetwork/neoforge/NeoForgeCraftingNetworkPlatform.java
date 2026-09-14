@@ -82,6 +82,7 @@ public final class NeoForgeCraftingNetworkPlatform implements CraftingNetworkPla
         player.openMenu(station, buffer -> {
             buffer.writeBlockPos(station.getBlockPos());
             CraftingStationMenu.writeSources(buffer, station.getSourceInfos());
+            buffer.writeBoolean(station.isShulkersFirst());
         });
     }
 
@@ -92,8 +93,8 @@ public final class NeoForgeCraftingNetworkPlatform implements CraftingNetworkPla
     }
 
     @Override
-    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources) {
-        Networking.sendSources(player, sources);
+    public void sendSources(ServerPlayer player, List<CraftingSourceInfo> sources, boolean shulkersFirst) {
+        Networking.sendSources(player, sources, shulkersFirst);
     }
 
     @Override

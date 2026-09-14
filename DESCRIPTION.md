@@ -25,7 +25,7 @@ or pick only the mods you want:
 - **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. Click to craft one, shift-click to craft all available.
 - **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back.
 - **Sources dropdown** — scope any terminal to *All Storage*, your *Inventory*, or a single container.
-- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then your inventory, then the nearest container.
+- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan from **1×1 up to 11×11 chunks** (capped by the server's view/simulation distance).
 - **Shulker flattening** — shulker-box contents (and boxes inside boxes) appear as ordinary items, ready to craft with.
 - **Ownership & privacy** — a terminal only shows global (worldgen) storage plus storage placed by the terminal's owner.

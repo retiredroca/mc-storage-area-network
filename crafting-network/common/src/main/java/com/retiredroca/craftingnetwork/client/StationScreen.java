@@ -87,6 +87,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
 
     private RecipeBookComponent recipeBookComponent;
     private Button recipeBookToggle;
+    private CheckboxWidget shulkerToggle;
     private EditBox searchBox;
     private boolean widthTooNarrow;
     private long lastCatalogSig = -1;
@@ -124,6 +125,9 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         rebuildPotionList();
         this.recipeBookToggle = new ImageButton(0, 0, 20, 18,
                 RecipeBookComponent.RECIPE_BUTTON_SPRITES, button -> toggleBook());
+        this.shulkerToggle = new CheckboxWidget(0, 0, shulkersFirst(),
+                Component.translatable("gui.crafting_network.shulkers_first.tooltip"),
+                value -> sendShulkerToggle());
         this.searchBox = new EditBox(this.font, 0, 0, SEARCH_W, 14,
                 Component.translatable("gui.recipebook.search_hint"));
         this.searchBox.setMaxLength(50);
@@ -137,7 +141,21 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         if (recipeBookComponent != null) {
             this.addWidget(this.recipeBookComponent);
         }
+        this.addRenderableWidget(this.shulkerToggle);
         recomputeLeftPos();
+    }
+
+    private void sendShulkerToggle() {
+        if (this.minecraft != null && this.minecraft.getConnection() != null) {
+            this.minecraft.getConnection().send(
+                    new net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket(
+                            this.menu.containerId, 1000));
+        }
+    }
+
+    private boolean shulkersFirst() {
+        StationState state = getStationMenu().getState();
+        return state != null && state.shulkersFirst();
     }
 
     private void toggleBook() {
@@ -260,6 +278,10 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         if (this.recipeBookToggle != null) {
             this.recipeBookToggle.setPosition(this.leftPos + 5, this.height / 2 - 49);
         }
+        if (this.shulkerToggle != null) {
+            // Right of the output, centered over the last inventory column (brewing: over the bottles).
+            this.shulkerToggle.setPosition(this.leftPos + 156, this.topPos + (isBrewing() ? 55 : 39));
+        }
         if (this.searchBox != null) {
             int panelX = machineTabPanelX();
             if (panelX >= 4 && isBookVisible()) {
@@ -324,11 +346,14 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
     @Override
     public void containerTick() {
         super.containerTick();
+        layoutHud();
+        if (this.shulkerToggle != null) {
+            this.shulkerToggle.setSelected(shulkersFirst());
+        }
         if (!isBookVisible()) {
             this.sourcesOpen = false;
         }
         if (recipeBookComponent != null) {
-            layoutHud();
             if (recipeBookComponent.isVisible() && this.minecraft != null && this.minecraft.player != null) {
                 long sig = catalogSignature();
                 if (sig != this.lastCatalogSig) {
@@ -411,10 +436,13 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
                 guiGraphics.blit(bg, x + 81, y + 36 + flameProgress, 176, flameProgress, 14, 14 - flameProgress);
             }
         } else if (state.progress() > 0) {
-            int barW = 80;
+            // Small bar below the bottle row so it does not overlap the slots.
+            int barW = 60;
+            int barX = x + 58;
+            int barY = y + 78;
             int fill = barW * state.progress() / 100;
-            guiGraphics.fill(x + 48, y + 64, x + 48 + barW, y + 70, 0xFF303030);
-            guiGraphics.fill(x + 48, y + 64, x + 48 + Math.min(barW, fill), y + 70, 0xFF70C570);
+            guiGraphics.fill(barX, barY, barX + barW, barY + 4, 0xFF303030);
+            guiGraphics.fill(barX, barY, barX + Math.min(barW, fill), barY + 4, 0xFF70C570);
         }
 
         this.menu.slots.stream()
@@ -754,9 +782,9 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta, double horizontalDelta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (hasShiftDown() || hasControlDown()) {
-            return super.mouseScrolled(mouseX, mouseY, delta, horizontalDelta);
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
         if (this.sourcesOpen && isBookVisible() && machineTabPanelX() >= 4) {
             int px = machineTabPanelX() + SOURCE_PANEL_X;
@@ -767,7 +795,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
             int panelH = SOURCE_HEADER_H + rowsVisible * SOURCE_ROW_H;
             if (mouseX >= px && mouseX < px + SOURCE_PANEL_W && mouseY >= py && mouseY < py + panelH) {
                 int maxScroll = Math.max(0, total - rowsVisible);
-                this.sourcesScroll = Math.max(0, Math.min(maxScroll, this.sourcesScroll - (delta > 0 ? 1 : -1)));
+                this.sourcesScroll = Math.max(0, Math.min(maxScroll, this.sourcesScroll - (scrollY > 0 ? 1 : -1)));
                 return true;
             }
         }
@@ -776,7 +804,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
             int py = machineTabPanelY();
             if (mouseX >= px && mouseX < px + PANEL_W && mouseY >= py && mouseY < py + PANEL_H) {
                 int totalPages = Math.max(1, (visiblePotions().size() + BREW_PER_PAGE - 1) / BREW_PER_PAGE);
-                if (delta > 0) {
+                if (scrollY > 0) {
                     this.brewPage = Math.max(0, this.brewPage - 1);
                 } else {
                     this.brewPage = Math.min(totalPages - 1, this.brewPage + 1);
@@ -784,7 +812,7 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, delta, horizontalDelta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

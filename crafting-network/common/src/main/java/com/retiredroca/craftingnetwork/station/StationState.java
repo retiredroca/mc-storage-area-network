@@ -13,7 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
  * the set of potion ids that can currently be brewed from the scanned network (brewing only).
  */
 public record StationState(StationStatus status, List<StationSlot> slots, int progress, String target,
-        List<String> craftable) {
+        List<String> craftable, boolean shulkersFirst) {
     public static final StreamCodec<RegistryFriendlyByteBuf, StationState> STREAM_CODEC = StreamCodec.of(
             StationState::encode,
             StationState::decode);
@@ -29,6 +29,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
         for (String id : state.craftable()) {
             buf.writeUtf(id);
         }
+        buf.writeBoolean(state.shulkersFirst());
     }
 
     private static StationState decode(RegistryFriendlyByteBuf buf) {
@@ -44,6 +45,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
         for (int i = 0; i < craftableCount; i++) {
             craftable.add(buf.readUtf());
         }
-        return new StationState(status, slots, progress, target, craftable);
+        boolean shulkersFirst = buf.readBoolean();
+        return new StationState(status, slots, progress, target, craftable, shulkersFirst);
     }
 }
