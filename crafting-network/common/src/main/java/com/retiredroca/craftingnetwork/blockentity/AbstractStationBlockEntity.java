@@ -386,6 +386,13 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
 
     private ItemStack pushToNetwork(ItemStack stack) {
         if (stack.isEmpty()) return ItemStack.EMPTY;
+        // "Inventory first": if a player is standing right here, drop the output for them to pick up.
+        if (inventoryFirst && level.hasNearbyAlivePlayer(worldPosition.getX() + 0.5,
+                worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, 2.0)) {
+            net.minecraft.world.Containers.dropItemStack(level, worldPosition.getX() + 0.5,
+                    worldPosition.getY() + 1.0, worldPosition.getZ() + 0.5, stack.copy());
+            return ItemStack.EMPTY;
+        }
         ItemStack remaining = stack.copy();
         // "Shulkers first": fill shulker-box contents before plain container slots.
         if (shulkersFirst) {

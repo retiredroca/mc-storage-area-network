@@ -22,7 +22,7 @@ or pick only the mods you want:
 
 - **One network for all your storage** — chests, barrels, hoppers, shulker boxes, and any modded inventory-bearing block within range.
 - **No redstone, no item filters** — say goodbye to hopper chains, sorters and filter systems; one Terminal replaces your whole automated storage setup.
-- **Craft even when your inventory is full** — crafted output is routed into the network, or straight back to your inventory with the *Inventory first* option.
+- **Craft even when your inventory is full** — crafted output is routed into the network, or straight back to your inventory with the *Inventory first* option (on processor terminals it drops the output next to the machine when you're within 2 blocks).
 - **Storage Terminal** — a searchable, sortable grid of every item in the network, with draggable search and source panels. Search by name or id; sort by name, type, tag, mod or equipment.
 - **Crafting Terminal** — an upgradable crafting table with a full recipe book that crafts using items drawn from the network plus your inventory. The result shows how many you can make; **click** to craft one, **shift-click** to craft a stack.
 - **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back. Smelting/Blasting/Smoking earn experience you can collect with **crouch + right-click**.
