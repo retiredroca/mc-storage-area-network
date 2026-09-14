@@ -1,26 +1,23 @@
-name: Build & Release
+name: Release Mod (reusable)
 
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-  issue_comment:
-    types: [created]
+  workflow_call:
+    inputs:
+      mod:
+        description: 'Which mod to publish: api | storage | crafting | all'
+        required: true
+        type: string
+      release_tag:
+        description: 'Git tag / version for this release'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   build:
-    # issue_comment runs on the default branch; only proceed on the keyword.
-    if: >-
-      github.event_name != 'issue_comment' ||
-      contains(github.event.comment.body, '/release')
     runs-on: ubuntu-latest
-    env:
-      # v<tag> for tag pushes, otherwise v<run number> (manual dispatch / /release comment).
-      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.run_number) }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -39,15 +36,13 @@ jobs:
           find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
           chmod +x ./gradlew
 
+      # Every mod build needs the others' outputs to assemble the all-in-one bundle.
       - name: Build API + in-repo maven
         run: ./gradlew --no-daemon clean build publishRepo
-
       - name: Build storage-network
         run: ./gradlew --no-daemon -p storage-network clean build
-
       - name: Build crafting-network
         run: ./gradlew --no-daemon -p crafting-network clean build
-
       - name: Build all-in-one jar
         run: ./gradlew --no-daemon combinedJar
 
@@ -58,7 +53,7 @@ jobs:
           cp build/libs/*-all.jar dist/
           cp storage-network/build/libs/*-universal.jar dist/
           cp crafting-network/build/libs/*-universal.jar dist/
-          # Per-loader API jars, attached to the universal API entry as additional files.
+          # Per-loader API jars (the universal bundle is not detectable by Modrinth).
           cp fabric/build/libs/fabric-mc_storage_area_network-*.jar dist/api/ 2>/dev/null || true
           cp neoforge/build/libs/neoforge-mc_storage_area_network-*.jar dist/api/ 2>/dev/null || true
           rm -f dist/api/*-sources.jar
@@ -75,89 +70,69 @@ jobs:
             git log "$range" --no-merges --pretty=format:'- %s (`%h`)'
             echo
           } > dist/changelog.md
-          echo "----- changelog.md -----"
           cat dist/changelog.md
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: universal-jars
-          path: dist/*.jar
-
-      # Read each mod's own version from its built jar so every published version
-      # gets a distinct number (required by Modrinth within a single project).
+      # Read each mod's own version and pick the GitHub asset set for the requested mod.
       - name: Resolve versions
         run: |
           api_ver=$(basename dist/mc-storage-area-network-*-universal.jar | sed -E 's/^mc-storage-area-network-(.*)-universal\.jar$/\1/')
           storage_ver=$(basename dist/storage-network-*-universal.jar | sed -E 's/^storage-network-(.*)-universal\.jar$/\1/')
           crafting_ver=$(basename dist/crafting-network-*-universal.jar | sed -E 's/^crafting-network-(.*)-universal\.jar$/\1/')
           bundled_ver=$(basename dist/mc-storage-area-network-*-all.jar | sed -E 's/^mc-storage-area-network-(.*)-all\.jar$/\1/')
-          # Strip the leading "v" from the release tag for display names/versions.
-          release_version="${RELEASE_TAG#v}"
+          case "${{ inputs.mod }}" in
+            api) gh_files=$(printf '%s\n' \
+              'dist/mc-storage-area-network-*-universal.jar' \
+              'dist/mc-storage-area-network-*-all.jar') ;;
+            storage) gh_files=$(printf '%s\n' \
+              'dist/storage-network-*.jar' \
+              'dist/mc-storage-area-network-*-all.jar') ;;
+            crafting) gh_files=$(printf '%s\n' \
+              'dist/crafting-network-*.jar' \
+              'dist/mc-storage-area-network-*-all.jar') ;;
+            all) gh_files=$(printf '%s\n' \
+              'dist/mc-storage-area-network-*-universal.jar' \
+              'dist/storage-network-*.jar' \
+              'dist/crafting-network-*.jar' \
+              'dist/mc-storage-area-network-*-all.jar') ;;
+            *) echo "Unknown mod: ${{ inputs.mod }}"; exit 1 ;;
+          esac
           {
             echo "API_VER=$api_ver"
             echo "STORAGE_VER=$storage_ver"
             echo "CRAFTING_VER=$crafting_ver"
             echo "BUNDLED_VER=$bundled_ver"
-            echo "RELEASE_VERSION=$release_version"
+            echo "GH_FILES<<EOF"
+            echo "$gh_files"
+            echo "EOF"
           } >> "$GITHUB_ENV"
-          echo "RELEASE_VERSION=$release_version API=$api_ver Storage=$storage_ver Crafting=$crafting_ver Bundled=$bundled_ver"
+          echo "API=$api_ver Storage=$storage_ver Crafting=$crafting_ver Bundled=$bundled_ver"
 
-      # One GitHub release containing every jar.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-jars
+          path: dist/*.jar
+
+      # --- GitHub release ----------------------------------------------------------
       - name: Publish GitHub release
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: ${{ env.RELEASE_TAG }}
+          github-tag: ${{ inputs.release_tag }}
           github-generate-changelog: true
-          files: dist/*.jar
-          name: MC Storage Area Network ${{ env.RELEASE_VERSION }}
-          version: ${{ env.RELEASE_VERSION }}
+          files: ${{ env.GH_FILES }}
+          name: MC Storage Area Network ${{ inputs.release_tag }}
+          version: ${{ inputs.release_tag }}
           version-type: release
 
-      # CurseForge and Modrinth are published in separate steps so each platform can be
-      # configured and verified independently. Four entries go to the shared project:
-      #   Bundled       - the all-in-one jar
-      #   Universal API - the universal API jar, with the loader-specific API jars as additional files
-      #   Storage       - Storage Network
-      #   Crafting      - Crafting Network
-      #
-      # The `mc-storage-area-network` dependency is skipped on CurseForge because these all live on
-      # the same project (a project cannot depend on itself).
-      #
-      # Modrinth `modrinth-id` must be the base62 project ID (e.g. "AANobbMI"), NOT the slug:
-      # `mc-storage-area-network` contains hyphens, which Modrinth rejects while parsing that
-      # field as base62. Set the repository variable `MODRINTH_ID` to the ID, or grant the
-      # token the "Read projects" scope so mc-publish can resolve the slug itself.
-
-      # --- CurseForge ---------------------------------------------------------------
-      - name: Publish Bundled - CurseForge
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          curseforge-id: 1690770
-          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/mc-storage-area-network-*-all.jar
-          name: Bundle ${{ env.BUNDLED_VER }}
-          version: bundled-${{ env.BUNDLED_VER }}
-          dependencies: |
-            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
-          version-type: release
-          game-versions: 1.21.1
-          loaders: |
-            fabric
-            neoforge
-          java: 21
-          retry-attempts: 5
-          retry-delay: 15000
-          fail-mode: warn
-
-      - name: Publish Universal API - CurseForge
+      # --- CurseForge: the mod(s) + the bundle -------------------------------------
+      - name: Publish API - CurseForge
+        if: ${{ inputs.mod == 'api' || inputs.mod == 'all' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           # Universal API jar first (primary); the loader-specific API jars become additional files.
-          files: |
+          curseforge-files: |
             dist/mc-storage-area-network-*-universal.jar
             dist/api/fabric-mc_storage_area_network-*.jar
             dist/api/neoforge-mc_storage_area_network-*.jar
@@ -177,11 +152,12 @@ jobs:
           fail-mode: warn
 
       - name: Publish Storage - CurseForge
+        if: ${{ inputs.mod == 'storage' || inputs.mod == 'all' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/storage-network-*.jar
+          curseforge-files: dist/storage-network-*.jar
           name: Storage Network ${{ env.STORAGE_VER }}
           version: storage-network-${{ env.STORAGE_VER }}
           dependencies: |
@@ -199,11 +175,12 @@ jobs:
           fail-mode: warn
 
       - name: Publish Crafting - CurseForge
+        if: ${{ inputs.mod == 'crafting' || inputs.mod == 'all' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/crafting-network-*.jar
+          curseforge-files: dist/crafting-network-*.jar
           name: Crafting Network ${{ env.CRAFTING_VER }}
           version: crafting-network-${{ env.CRAFTING_VER }}
           dependencies: |
@@ -220,18 +197,13 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      # --- Modrinth -----------------------------------------------------------------
-      # Disabled until the project is approved (it has no project ID yet). Enable by setting
-      # the repository variable `PUBLISH_MODRINTH` to `true` (and `MODRINTH_ID` to the base62
-      # project ID, or grant the token "Read projects").
-      - name: Publish Bundled - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
+      - name: Publish Bundle - CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/mc-storage-area-network-*-all.jar
-          name: Bundled ${{ env.RELEASE_VERSION }}
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          curseforge-files: dist/mc-storage-area-network-*-all.jar
+          name: Bundle ${{ env.BUNDLED_VER }}
           version: bundled-${{ env.BUNDLED_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -246,17 +218,20 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
-      - name: Publish Universal API - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
+      # --- Modrinth: the mod(s) + the bundle (gated by PUBLISH_MODRINTH) -----------
+      # `modrinth-id` must be the base62 project ID (not the slug); set the repo
+      # variable `MODRINTH_ID`, or grant the token "Read projects".
+      - name: Publish API - Modrinth
+        if: ${{ (inputs.mod == 'api' || inputs.mod == 'all') && vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: |
+          modrinth-files: |
             dist/mc-storage-area-network-*-universal.jar
             dist/api/fabric-mc_storage_area_network-*.jar
             dist/api/neoforge-mc_storage_area_network-*.jar
-          name: Universal API ${{ env.RELEASE_VERSION }}
+          name: SAN API ${{ env.API_VER }}
           version: mc-storage-area-network-${{ env.API_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -272,13 +247,13 @@ jobs:
           fail-mode: warn
 
       - name: Publish Storage - Modrinth
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
+        if: ${{ (inputs.mod == 'storage' || inputs.mod == 'all') && vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/storage-network-*.jar
-          name: Storage ${{ env.RELEASE_VERSION }}
+          modrinth-files: dist/storage-network-*.jar
+          name: Storage Network ${{ env.STORAGE_VER }}
           version: storage-network-${{ env.STORAGE_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -295,17 +270,39 @@ jobs:
           fail-mode: warn
 
       - name: Publish Crafting - Modrinth
+        if: ${{ (inputs.mod == 'crafting' || inputs.mod == 'all') && vars.PUBLISH_MODRINTH == 'true' }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-files: dist/crafting-network-*.jar
+          name: Crafting Network ${{ env.CRAFTING_VER }}
+          version: crafting-network-${{ env.CRAFTING_VER }}
+          dependencies: |
+            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
+            mc-storage-area-network(required){modrinth:mc-storage-area-network}#(ignore:curseforge)
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: 1.21.1
+          loaders: |
+            fabric
+            neoforge
+          java: 21
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
+      - name: Publish Bundle - Modrinth
         if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/crafting-network-*.jar
-          name: Crafting ${{ env.RELEASE_VERSION }}
-          version: crafting-network-${{ env.CRAFTING_VER }}
+          modrinth-files: dist/mc-storage-area-network-*-all.jar
+          name: Bundle ${{ env.BUNDLED_VER }}
+          version: bundled-${{ env.BUNDLED_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-            mc-storage-area-network(required){modrinth:mc-storage-area-network}#(ignore:curseforge)
           changelog-file: dist/changelog.md
           version-type: release
           game-versions: 1.21.1
