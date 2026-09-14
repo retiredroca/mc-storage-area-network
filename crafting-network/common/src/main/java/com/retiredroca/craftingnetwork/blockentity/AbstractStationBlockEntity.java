@@ -39,6 +39,7 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionContents;
@@ -424,30 +425,47 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             return;
         }
         List<String> out = new ArrayList<>();
+        java.util.Set<String> seenNames = new java.util.HashSet<>();
         for (var holder : BuiltInRegistries.POTION.holders().toList()) {
-            if (holder.value().getEffects().isEmpty()) {
-                continue;
-            }
             String id = holder.key().location().toString();
-            BrewPath path = BrewPath.compute(serverLevel, holder);
-            if (path == null || path.empty()) {
+            if (id.equals("minecraft:water")) {
                 continue;
             }
-            boolean ok = true;
-            for (ItemStack ingredient : path.ingredients()) {
-                if (!containsStack(catalogue, ingredient)) {
-                    ok = false;
-                    break;
-                }
+            // Keep one entry per potion name (the long_/strong_ variants share a display name).
+            String name = PotionContents.createItemStack(Items.POTION, holder).getHoverName().getString();
+            if (!seenNames.add(name)) {
+                continue;
             }
-            if (ok) {
+            if (brewable(serverLevel, catalogue, holder, Items.POTION)) {
                 out.add(id);
+            }
+            if (brewable(serverLevel, catalogue, holder, Items.SPLASH_POTION)) {
+                out.add(id + "|splash");
+            }
+            if (brewable(serverLevel, catalogue, holder, Items.LINGERING_POTION)) {
+                out.add(id + "|linger");
             }
         }
         if (!craftablePotions.equals(out)) {
             craftablePotions = out;
             setChanged();
         }
+    }
+
+    /** True if every ingredient for the given potion/container is present in the catalogue. */
+    private static boolean brewable(ServerLevel level, List<ItemStack> catalogue,
+            net.minecraft.core.Holder<net.minecraft.world.item.alchemy.Potion> holder,
+            net.minecraft.world.item.Item container) {
+        BrewPath path = BrewPath.compute(level, holder, container);
+        if (path == null || path.empty()) {
+            return false;
+        }
+        for (ItemStack ingredient : path.ingredients()) {
+            if (!containsStack(catalogue, ingredient)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean containsStack(List<ItemStack> catalogue, ItemStack needle) {
@@ -599,9 +617,9 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private void pumpBrewing() {
         BrewPath path = brewPathForTarget();
         if (path != null && !path.empty()) {
-            String targetId = brewTarget;
+            ItemStack finished = path.states().get(path.states().size() - 1);
             for (int i = 0; i < 3; i++) {
-                if (!bottles[i].isEmpty() && BrewPath.potionIdOf(bottles[i]).equals(targetId)) {
+                if (!bottles[i].isEmpty() && ItemStack.isSameItemSameComponents(bottles[i], finished)) {
                     ItemStack rem = pushToNetwork(bottles[i].copy());
                     if (rem.isEmpty()) {
                         bottles[i] = ItemStack.EMPTY;
@@ -655,16 +673,25 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
 
     private BrewPath brewPathForTarget() {
         if (brewTarget.isEmpty() || level == null) return null;
+        Item container = Items.POTION;
+        String id = brewTarget;
+        if (id.endsWith("|splash")) {
+            container = Items.SPLASH_POTION;
+            id = id.substring(0, id.length() - "|splash".length());
+        } else if (id.endsWith("|linger")) {
+            container = Items.LINGERING_POTION;
+            id = id.substring(0, id.length() - "|linger".length());
+        }
+        Item finalContainer = container;
         return BrewPath.compute((ServerLevel) level, BuiltInRegistries.POTION.getHolder(
                 net.minecraft.resources.ResourceKey.create(Registries.POTION,
-                        ResourceLocation.parse(brewTarget))).orElse(null));
+                        ResourceLocation.parse(id))).orElse(null), finalContainer);
     }
 
     private int currentStep(BrewPath path) {
         if (bottles[0].isEmpty()) return -1;
-        String id = BrewPath.potionIdOf(bottles[0]);
         for (int i = 0; i < path.states().size(); i++) {
-            if (BrewPath.potionIdOf(path.states().get(i)).equals(id)) {
+            if (ItemStack.isSameItemSameComponents(bottles[0], path.states().get(i))) {
                 return i;
             }
         }
@@ -785,7 +812,11 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (type.isBrewing()) {
             if (brewTarget.isEmpty()) return StationStatus.IDLE;
             if (bottles[0].isEmpty()) return StationStatus.IDLE;
-            if (BrewPath.potionIdOf(bottles[0]).equals(brewTarget)) return StationStatus.DONE;
+            BrewPath path = brewPathForTarget();
+            if (path != null && !path.empty() && ItemStack.isSameItemSameComponents(
+                    bottles[0], path.states().get(path.states().size() - 1))) {
+                return StationStatus.DONE;
+            }
             return StationStatus.RUNNING;
         }
         if (!result.isEmpty()) return StationStatus.DONE;

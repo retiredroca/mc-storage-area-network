@@ -136,7 +136,7 @@ jobs:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           files: dist/mc-storage-area-network-*-all.jar
-          name: Bundled ${{ env.RELEASE_VERSION }}
+          name: Bundle
           version: bundled-${{ env.BUNDLED_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -161,7 +161,7 @@ jobs:
             dist/mc-storage-area-network-*-universal.jar
             dist/api/fabric-mc_storage_area_network-*.jar
             dist/api/neoforge-mc_storage_area_network-*.jar
-          name: Universal API ${{ env.RELEASE_VERSION }}
+          name: SAN API
           version: mc-storage-area-network-${{ env.API_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -182,7 +182,7 @@ jobs:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           files: dist/storage-network-*.jar
-          name: Storage ${{ env.RELEASE_VERSION }}
+          name: Storage Network
           version: storage-network-${{ env.STORAGE_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
@@ -204,7 +204,7 @@ jobs:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           files: dist/crafting-network-*.jar
-          name: Crafting ${{ env.RELEASE_VERSION }}
+          name: Crafting Network
           version: crafting-network-${{ env.CRAFTING_VER }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}

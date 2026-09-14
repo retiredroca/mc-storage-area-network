@@ -54,18 +54,23 @@ public final class BrewPath {
     }
 
     public static BrewPath compute(ServerLevel level, Holder<Potion> target) {
-        String key = target.unwrapKey().map(k -> k.location().toString()).orElse("unknown");
+        return compute(level, target, Items.POTION);
+    }
+
+    public static BrewPath compute(ServerLevel level, Holder<Potion> target, Item targetItem) {
+        String key = target.unwrapKey().map(k -> k.location().toString()).orElse("unknown")
+                + "|" + targetItem;
         List<ItemStack> cached = PATH_CACHE.get(key);
         if (cached != null && STATE_CACHE.containsKey(key)) {
             return new BrewPath(STATE_CACHE.get(key), cached);
         }
-        BrewPath built = resolve(level, target);
+        BrewPath built = resolve(level, target, targetItem);
         PATH_CACHE.put(key, built.ingredients());
         STATE_CACHE.put(key, built.states());
         return built;
     }
 
-    private static BrewPath resolve(ServerLevel level, Holder<Potion> target) {
+    private static BrewPath resolve(ServerLevel level, Holder<Potion> target, Item targetItem) {
         PotionBrewing brewing = level.potionBrewing();
         ItemStack water = PotionContents.createItemStack(Items.POTION, Potions.WATER);
 
@@ -132,6 +137,19 @@ public final class BrewPath {
             states.add(PotionContents.createItemStack(Items.POTION, holderByKey().get(chain.get(i))));
             if (i > 0) {
                 ingredients.add(stepIngredient.get(chain.get(i)));
+            }
+        }
+        // Splash / lingering variants add a final container step (gunpowder, then dragon's breath).
+        if (targetItem == Items.SPLASH_POTION || targetItem == Items.LINGERING_POTION) {
+            ItemStack gunpowder = new ItemStack(Items.GUNPOWDER);
+            ItemStack splashed = brewing.mix(gunpowder, states.get(states.size() - 1).copy());
+            states.add(splashed);
+            ingredients.add(gunpowder);
+            if (targetItem == Items.LINGERING_POTION) {
+                ItemStack dragonBreath = new ItemStack(Items.DRAGON_BREATH);
+                ItemStack lingered = brewing.mix(dragonBreath, splashed.copy());
+                states.add(lingered);
+                ingredients.add(dragonBreath);
             }
         }
         return new BrewPath(states, ingredients);

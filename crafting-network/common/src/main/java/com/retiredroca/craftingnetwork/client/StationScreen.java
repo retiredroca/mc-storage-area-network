@@ -32,6 +32,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.RecipeBookMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
@@ -213,9 +214,18 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
 
     private void rebuildPotionList() {
         this.brewablePotions.clear();
+        java.util.Set<String> seenNames = new java.util.HashSet<>();
         BuiltInRegistries.POTION.holders().forEach(holder -> {
-            if (!holder.value().getEffects().isEmpty()) {
-                this.brewablePotions.add(holder.key().location().toString());
+            String id = holder.key().location().toString();
+            if (id.equals("minecraft:water")) {
+                return; // every path starts from water
+            }
+            // The long_/strong_ variants share a display name with the base potion, so keep one per name.
+            String name = PotionContents.createItemStack(Items.POTION, holder).getHoverName().getString();
+            if (seenNames.add(name)) {
+                this.brewablePotions.add(id);
+                this.brewablePotions.add(id + "|splash");
+                this.brewablePotions.add(id + "|linger");
             }
         });
     }
@@ -236,11 +246,20 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
 
     private ItemStack potionStack(String id) {
         try {
-            Potion potion = BuiltInRegistries.POTION.get(ResourceLocation.parse(id));
+            Item item = Items.POTION;
+            String potionId = id;
+            if (id.endsWith("|splash")) {
+                item = Items.SPLASH_POTION;
+                potionId = id.substring(0, id.length() - "|splash".length());
+            } else if (id.endsWith("|linger")) {
+                item = Items.LINGERING_POTION;
+                potionId = id.substring(0, id.length() - "|linger".length());
+            }
+            Potion potion = BuiltInRegistries.POTION.get(ResourceLocation.parse(potionId));
             if (potion == null) {
                 return ItemStack.EMPTY;
             }
-            return PotionContents.createItemStack(Items.POTION, BuiltInRegistries.POTION.wrapAsHolder(potion));
+            return PotionContents.createItemStack(item, BuiltInRegistries.POTION.wrapAsHolder(potion));
         } catch (Exception ignored) {
             return ItemStack.EMPTY;
         }
