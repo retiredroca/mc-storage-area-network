@@ -35,3 +35,18 @@ def versionPropsFile = {
 }()
 ext.versionPropsFile = versionPropsFile
 ext.targetMc = versionPropsFile?.parentFile?.name
+
+// Per-version Minecraft/toolchain pins live in versions/<mc>/version.properties. They are exposed
+// here under their original gradle.properties names, so build scripts keep using ${minecraft_version},
+// ${loader_version}, ${neo_version}, etc. unchanged.
+if (versionPropsFile != null) {
+    def versionPins = new Properties()
+    versionPropsFile.withInputStream { versionPins.load(it) }
+    ['minecraft_version', 'minecraft_version_range', 'loader_version', 'fabric_version',
+     'neo_version', 'neo_version_range', 'java_version', 'toolchain_era'].each { key ->
+        def value = versionPins.getProperty(key)
+        if (value != null) {
+            ext.set(key, value)
+        }
+    }
+}

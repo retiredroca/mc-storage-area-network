@@ -4,6 +4,7 @@ plugins {
 }
 
 apply from: new File(projectDir, 'gradle/versions.gradle')
+apply from: new File(projectDir, 'gradle/version-resolver.gradle')
 
 // Which Minecraft version this build targets (directory under versions/). The same selector
 // the settings uses, so a single `-Pmc=<version>` drives the whole build.
