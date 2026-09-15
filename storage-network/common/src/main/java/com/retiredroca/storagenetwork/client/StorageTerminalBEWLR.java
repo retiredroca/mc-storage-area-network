@@ -2,11 +2,13 @@ package com.retiredroca.storagenetwork.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -23,9 +25,12 @@ public class StorageTerminalBEWLR {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        BlockState defaultState = StorageNetworkCommon.platform().terminalBlock().defaultBlockState();
+        // Chest-geometry items render like vanilla chests: front (lock) toward the viewer, which the
+        // shared item transform shows for FACING = SOUTH.
+        BlockState itemState = StorageNetworkCommon.platform().terminalBlock().defaultBlockState()
+                .setValue(StorageTerminalBlock.FACING, Direction.SOUTH);
         AbstractStorageTerminalBlockEntity entity = StorageNetworkCommon.platform()
-                .createTerminalBlockEntity(BlockPos.ZERO, defaultState);
+                .createTerminalBlockEntity(BlockPos.ZERO, itemState);
 
         CompoundTag loadTag = new CompoundTag();
         loadTag.putInt("tier", tier);

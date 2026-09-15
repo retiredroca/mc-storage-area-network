@@ -77,6 +77,11 @@ sourceSets {
             srcDir(tasks.named('relocateCommonSources'))
             srcDir(tasks.named('relocateLoaderSources'))
         }
+        resources {
+            // Gameplay assets/data live once in the shared common sources; only loader metadata
+            // (fabric.mod.json / neoforge.mods.toml / mixins / AT) stays per-loader.
+            srcDir(rootProject.file('../common/src/main/resources'))
+        }
     }
 }
 
@@ -134,7 +139,7 @@ runs {
         // workingDirectory project.file('run-data')
 
         // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-        arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath(), '--existing', rootProject.file('../common/src/main/resources').getAbsolutePath()
     }
 }
 

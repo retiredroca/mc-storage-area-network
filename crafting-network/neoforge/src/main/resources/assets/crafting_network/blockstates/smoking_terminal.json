@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=north": { "model": "crafting_network:block/smoking_terminal" },
-    "facing=south": { "model": "crafting_network:block/smoking_terminal", "y": 180 },
-    "facing=west": { "model": "crafting_network:block/smoking_terminal", "y": 270 },
-    "facing=east": { "model": "crafting_network:block/smoking_terminal", "y": 90 }
-  }
-}

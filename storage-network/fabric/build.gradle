@@ -63,6 +63,11 @@ sourceSets {
             srcDir(tasks.named('relocateCommonSources'))
             srcDir(tasks.named('relocateLoaderSources'))
         }
+        resources {
+            // Gameplay assets/data live once in the shared common sources; only loader metadata
+            // (fabric.mod.json / neoforge.mods.toml / mixins / AT) stays per-loader.
+            srcDir(rootProject.file('../common/src/main/resources'))
+        }
     }
 }
 

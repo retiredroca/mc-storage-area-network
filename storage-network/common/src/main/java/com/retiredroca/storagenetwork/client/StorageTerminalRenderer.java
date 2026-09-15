@@ -2,7 +2,6 @@ package com.retiredroca.storagenetwork.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 
@@ -40,12 +39,9 @@ public class StorageTerminalRenderer<T extends AbstractStorageTerminalBlockEntit
         float eased = 1.0F - (float) Math.pow(1.0F - (double) openness, 3.0);
 
         Direction facing = entity.getBlockState().getValue(StorageTerminalBlock.FACING);
-        float rotation = facing.get2DDataValue() * 90.0F;
 
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.5, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
-        poseStack.translate(-0.5, -0.5, -0.5);
+        TerminalRender.applyFacing(poseStack, facing);
 
         this.lid.xRot = -eased * 1.5707964F;
         this.lock.xRot = -eased * 1.5707964F;

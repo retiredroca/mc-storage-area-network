@@ -128,9 +128,13 @@ public final class Registration {
             if (!Networking.isServerModded()) {
                 return;
             }
+            // Group by terminal type (all Crafting Terminal tiers, then all Smelting, ...),
+            // matching the Storage Network tab's ordering.
             for (int i = 0; i < TIER_NAMES.length; i++) {
                 output.accept(stationWithTier(i));
-                for (StationType type : StationType.values()) {
+            }
+            for (StationType type : StationType.values()) {
+                for (int i = 0; i < TIER_NAMES.length; i++) {
                     output.accept(stationWithTier(type, i));
                 }
             }
