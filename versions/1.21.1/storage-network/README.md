@@ -6,7 +6,7 @@ Tired of running between chests? Place a **Storage Terminal** and it scans the c
 gathering every inventory-bearing block — vanilla or modded — into a single, searchable index.
 Browse, search, sort, take and deposit from one screen.
 
-![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/storage-network/storage-network.gif)
+![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/storage-network/storage-network.gif)
 
 ---
 

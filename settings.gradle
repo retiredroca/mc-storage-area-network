@@ -14,12 +14,18 @@ pluginManagement {
 
 rootProject.name = 'mc-storage-area-network'
 
+// Multi-version, directory-per-version layout. Select the Minecraft version with
+// `-Pmc=<version>` (default 1.21.1). Only that version's builds are included, which keeps
+// configuration fast and focuses the IDE on one version at a time.
+def mc = providers.gradleProperty('mc').getOrElse('1.21.1')
+def versionRoot = "versions/${mc}"
+
 // The loader builds are separate (included) builds because Fabric Loom and NeoGradle
-// cannot share a single Gradle project. The root project merges their outputs into one
-// universal jar that both loaders accept.
-includeBuild('fabric')
-includeBuild('neoforge')
+// cannot share a single Gradle project. Each version's root project merges their outputs
+// into one universal jar that both loaders accept.
+includeBuild("${versionRoot}/api/fabric")
+includeBuild("${versionRoot}/api/neoforge")
 
 // The gameplay mods live in this monorepo as child builds and depend on the API.
-includeBuild('storage-network')
-includeBuild('crafting-network')
+includeBuild("${versionRoot}/storage-network")
+includeBuild("${versionRoot}/crafting-network")

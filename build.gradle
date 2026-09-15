@@ -5,6 +5,11 @@ plugins {
 
 apply from: new File(projectDir, 'gradle/versions.gradle')
 
+// Which Minecraft version this build targets (directory under versions/). The same selector
+// the settings uses, so a single `-Pmc=<version>` drives the whole build.
+def mc = providers.gradleProperty('mc').getOrElse('1.21.1')
+def versionRoot = "versions/${mc}"
+
 // The API version comes from versions.properties. Each bundle is versioned by the newest stamp
 // among the components it contains, so a bundle only changes when something inside it changed.
 version = apiVersion
@@ -32,14 +37,14 @@ def versionFromJar = { File jar, String prefix ->
 }
 
 // Per-mod, per-loader source jars (lazy so they resolve after the child builds run).
-def apiFab = { versionedJar("fabric/build/libs/fabric-mc_storage_area_network-${apiVersion}.jar") }
-def apiNeo = { versionedJar("neoforge/build/libs/neoforge-mc_storage_area_network-${apiVersion}.jar") }
-def stFab = { versionedJar("storage-network/fabric/build/libs/fabric-storage_network-${storageVersion}.jar") }
-def stNeo = { versionedJar("storage-network/neoforge/build/libs/neoforge-storage_network-${storageVersion}.jar") }
-def crFab = { versionedJar("crafting-network/fabric/build/libs/fabric-crafting_network-${craftingVersion}.jar") }
-def crNeo = { versionedJar("crafting-network/neoforge/build/libs/neoforge-crafting_network-${craftingVersion}.jar") }
-def stUni = { versionedJar("storage-network/build/libs/storage-network-${storageVersion}-universal.jar") }
-def crUni = { versionedJar("crafting-network/build/libs/crafting-network-${craftingVersion}-universal.jar") }
+def apiFab = { versionedJar("${versionRoot}/api/fabric/build/libs/fabric-mc_storage_area_network-${apiVersion}.jar") }
+def apiNeo = { versionedJar("${versionRoot}/api/neoforge/build/libs/neoforge-mc_storage_area_network-${apiVersion}.jar") }
+def stFab = { versionedJar("${versionRoot}/storage-network/fabric/build/libs/fabric-storage_network-${storageVersion}.jar") }
+def stNeo = { versionedJar("${versionRoot}/storage-network/neoforge/build/libs/neoforge-storage_network-${storageVersion}.jar") }
+def crFab = { versionedJar("${versionRoot}/crafting-network/fabric/build/libs/fabric-crafting_network-${craftingVersion}.jar") }
+def crNeo = { versionedJar("${versionRoot}/crafting-network/neoforge/build/libs/neoforge-crafting_network-${craftingVersion}.jar") }
+def stUni = { versionedJar("${versionRoot}/storage-network/build/libs/storage-network-${storageVersion}-universal.jar") }
+def crUni = { versionedJar("${versionRoot}/crafting-network/build/libs/crafting-network-${craftingVersion}-universal.jar") }
 
 def fabJar = [api: apiFab, storage: stFab, crafting: crFab]
 def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo]

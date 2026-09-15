@@ -20,7 +20,7 @@ base {
 repositories {
     maven {
         name = 'itemNetworkRepo'
-        url = uri("${projectDir}/../../repo")
+        url = uri("${repoRoot}/repo")
     }
     mavenLocal()
     maven {

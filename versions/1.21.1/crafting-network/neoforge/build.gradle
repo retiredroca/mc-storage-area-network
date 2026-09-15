@@ -19,8 +19,8 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 }
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
-// Storage Network version from versions.properties (bumped only when it changed).
-version = storageVersion
+// Crafting Network version from versions.properties (bumped only when it changed).
+version = craftingVersion
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -32,23 +32,10 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache") // datagen cache files
 }
 
-repositories {
-    // Add here additional repositories if required by some of the dependencies below.
-    maven {
-        name = 'itemNetworkRepo'
-        url = uri("${projectDir}/../../repo")
-    }
-    mavenLocal()
-    maven {
-        name = 'itemNetwork'
-        url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo'
-    }
-}
-
-// See the Fabric build for why the shared sources are relocated into a loader-specific package:
-// it lets a single merged jar contain both the Fabric and NeoForge mapping variants.
-def commonPrefix = 'com.retiredroca.storagenetwork'
-def relocatedPrefix = 'com.retiredroca.storagenetwork.neoforge.common'
+// See the storage-network Fabric build for why the shared sources are relocated into a
+// loader-specific package: it lets a single merged jar contain both mapping variants.
+def commonPrefix = 'com.retiredroca.craftingnetwork'
+def relocatedPrefix = 'com.retiredroca.craftingnetwork.neoforge.common'
 
 tasks.register('relocateCommonSources', Copy) {
     from(rootProject.file('../common/src/main/java'))
@@ -62,9 +49,9 @@ tasks.register('relocateLoaderSources', Copy) {
     from('src/main/java')
     into(layout.buildDirectory.dir('generated/loader'))
     filter { String line ->
-        def matcher = line =~ /import com\.retiredroca\.storagenetwork\.(?!fabric\b|neoforge\b|mixin\b)([A-Za-z0-9_.]+);/
+        def matcher = line =~ /import com\.retiredroca\.craftingnetwork\.(?!fabric\b|neoforge\b|mixin\b)([A-Za-z0-9_.]+);/
         if (matcher.find()) {
-            return "import com.retiredroca.storagenetwork.neoforge.common.${matcher.group(1)};"
+            return "import com.retiredroca.craftingnetwork.neoforge.common.${matcher.group(1)};"
         }
         return line
     }
@@ -85,6 +72,19 @@ sourceSets {
     }
 }
 
+repositories {
+    // Add here additional repositories if required by some of the dependencies below.
+    maven {
+        name = 'itemNetworkRepo'
+        url = uri("${repoRoot}/repo")
+    }
+    mavenLocal()
+    maven {
+        name = 'itemNetwork'
+        url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo'
+    }
+}
+
 base {
     archivesName = 'neoforge-' + mod_id
 }
@@ -93,6 +93,7 @@ base {
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 //minecraft.accessTransformers.file rootProject.file('src/main/resources/META-INF/accesstransformer.cfg')
+minecraft.accessTransformers.file file('src/main/resources/META-INF/accesstransformer.cfg')
 //minecraft.accessTransformers.entry public net.minecraft.client.Minecraft textureManager # textureManager
 
 // Default run configurations.
@@ -199,7 +200,7 @@ tasks.withType(ProcessResources).configureEach {
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : storageVersion,
+            mod_version            : craftingVersion,
     ]
     inputs.properties replaceProperties
 

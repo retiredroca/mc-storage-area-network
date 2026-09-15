@@ -13,8 +13,8 @@ or pick only the mods you want:
 | **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
 | **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. **Required by both**; other mods can hook into it. |
 
-![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/storage-network/storage-network.gif)
-![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/crafting-network/crafting-network.gif)
+![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/storage-network/storage-network.gif)
+![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/crafting-network/crafting-network.gif)
 
 ---
 

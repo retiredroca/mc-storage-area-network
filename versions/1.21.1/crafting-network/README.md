@@ -6,7 +6,7 @@ Crafting Network turns nearby storage into a shared item network and adds a fami
 **Terminals** that craft, smelt, blast, smoke and brew directly from it. Pull ingredients from your
 chests, process them, and send the results back — automatically.
 
-![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/crafting-network/crafting-network.gif)
+![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/crafting-network/crafting-network.gif)
 
 ---
 
