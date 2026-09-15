@@ -74,7 +74,6 @@ def neoLine = { String mc ->
 def resolvePins = { String mc ->
     def pins = [:]
     pins.minecraft_version = mc
-    pins.minecraft_version_range = "[${mc}]"
     pins.java_version = javaFor(mc)
     pins.toolchain_era = eraFor(mc)
 
@@ -107,7 +106,6 @@ def writeVersionProps = { File versionDir, String mc ->
     sb << "# This file is the canonical source for this version's Minecraft/loader/toolchain values;\n"
     sb << "# the loader builds read it via gradle/versions.gradle.\n"
     sb << "minecraft_version=${pins.minecraft_version}\n"
-    sb << "minecraft_version_range=${pins.minecraft_version_range}\n"
     sb << "java_version=${pins.java_version}\n"
     sb << "toolchain_era=${pins.toolchain_era}\n"
     sb << "\n"

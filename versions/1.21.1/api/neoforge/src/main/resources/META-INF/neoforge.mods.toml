@@ -20,6 +20,6 @@ Shared item-source API for Storage Network, Crafting Network and shulker-box add
 [[dependencies.${mod_id}]]
     modId="minecraft"
     type="required"
-    versionRange="${minecraft_version_range}"
+    versionRange="[${minecraft_version}]"
     ordering="NONE"
     side="BOTH"
