@@ -519,8 +519,11 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                 result = rem;
             }
         }
-        // Cooking stations stay idle until a recipe is selected from the recipe book.
+        // Cooking stations stay idle until a recipe is selected from the recipe book. If the recipe
+        // is deselected while an ingredient is held, return it to the network instead of leaving it
+        // stuck in the machine.
         if (recipeFilter.isEmpty()) {
+            releaseHeldInput();
             return;
         }
         if (input.isEmpty()) {
@@ -538,12 +541,37 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
         if (fuel.isEmpty() && !input.isEmpty() && burnTime == 0) {
             ItemStack f = selectFuel();
-            if (!f.isEmpty()) {
-                int got = pullFromNetwork(f, 1);
-                if (got > 0) {
-                    fuel = f.copy();
-                }
+            int got = f.isEmpty() ? 0 : pullFromNetwork(f, 1);
+            if (got > 0) {
+                fuel = f.copy();
+            } else {
+                // Out of fuel: there is nothing to burn with, so return the held ingredient to the
+                // network rather than letting it get stuck in the machine.
+                releaseHeldInput();
             }
+        }
+    }
+
+    /**
+     * Returns the held input (and any leftover fuel item) to the network and clears the slots, so an
+     * ingredient is never stranded when the machine cannot continue - out of fuel, or the recipe was
+     * deselected while an item was held.
+     */
+    private void releaseHeldInput() {
+        boolean changed = false;
+        if (!input.isEmpty()) {
+            ItemStack rem = pushToNetwork(input.copy());
+            input = rem.isEmpty() ? ItemStack.EMPTY : rem;
+            cookProgress = 0f;
+            changed = true;
+        }
+        if (!fuel.isEmpty()) {
+            ItemStack rem = pushToNetwork(fuel.copy());
+            fuel = rem.isEmpty() ? ItemStack.EMPTY : rem;
+            changed = true;
+        }
+        if (changed) {
+            setChanged();
         }
     }
 
