@@ -152,6 +152,13 @@ tasks.register('newVersion') {
         }
         def pins = writeVersionProps(dst, target)
         reportPins("Created versions/${target} from versions/${from}", pins)
+        logger.lifecycle('')
+        logger.lifecycle('Next: publish this version\'s API to repo/ so its host builds can resolve it,')
+        logger.lifecycle('then build. (The API artifact ids are Minecraft-scoped, so a new version')
+        logger.lifecycle('needs its own API artifacts before the hosts can configure.)')
+        logger.lifecycle("  ./gradlew -p versions/${target}/api/fabric publishMavenJavaPublicationToRepoRepository")
+        logger.lifecycle("  ./gradlew -p versions/${target}/api/neoforge publishMavenJavaPublicationToRepoRepository")
+        logger.lifecycle("  ./gradlew -Pmc=${target} build")
     }
 }
 
