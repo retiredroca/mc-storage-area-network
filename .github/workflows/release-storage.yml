@@ -9,6 +9,9 @@ on:
       minecraft:
         description: 'Minecraft version to build (folder under versions/)'
         default: '1.21.1'
+      tag:
+        description: 'Release tag/name (e.g. routing-v1.0.0). Must be unique - reusing an existing tag updates that release. Leave blank to auto-generate v<run id>.'
+        default: ''
   issue_comment:
     types: [created]
 
@@ -23,6 +26,6 @@ jobs:
     uses: ./.github/workflows/release-mod.yml
     with:
       mod: storage
-      release_tag: ${{ startsWith(github.ref, 'refs/tags/storage-v') && github.ref_name || format('v{0}', github.run_id) }}
+      release_tag: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/storage-v') && github.ref_name) || format('v{0}', github.run_id) }}
       minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
     secrets: inherit
