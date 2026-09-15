@@ -103,9 +103,32 @@ jobs:
 
       - name: Collect release jars
         run: |
+          set -euo pipefail
+          # Clear any pre-existing dist/ so a reused/self-hosted workspace can't leak a stale jar.
+          rm -rf dist
           mkdir -p dist
           cp build/release/*.jar dist/
           ls -la dist
+
+      # Safety net: only the expected release jars may be published. Anything else (for example a
+      # leftover jar with an old name) fails the run instead of being uploaded.
+      - name: Verify release jar set
+        run: |
+          set -euo pipefail
+          allowed='^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-bundle-all|-bundle-storage|-bundle-crafting)\.[0-9].*\.jar$'
+          bad=$(ls -1 dist | grep -vE "$allowed" || true)
+          if [ -n "$bad" ]; then
+            echo "Unexpected file(s) in dist/ (refusing to publish):" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
+          count=$(ls -1 dist/*.jar | wc -l)
+          if [ "$count" -ne 18 ]; then
+            echo "Expected 18 release jars, found $count:" >&2
+            ls -la dist >&2
+            exit 1
+          fi
+          echo "Release jar set OK ($count files)"
 
       - name: Generate changelog
         run: |
