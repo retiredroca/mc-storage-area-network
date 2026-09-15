@@ -26,6 +26,9 @@ Thumbs.db
 # local deploy script (machine-specific Prism paths + WinSCP sessions)
 deploy.sh
 
+# local reference notes (untracked)
+universal-jar-loading.txt
+
 # local dev session script (untracked)
 oc.sh
 
