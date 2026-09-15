@@ -1,0 +1,5 @@
+{
+  "textures": {
+    "particle": "network_routing:item/routing_linker"
+  }
+}

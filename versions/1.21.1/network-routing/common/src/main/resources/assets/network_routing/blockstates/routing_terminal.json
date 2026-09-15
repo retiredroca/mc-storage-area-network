@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "network_routing:block/routing_terminal" },
+    "facing=south": { "model": "network_routing:block/routing_terminal", "y": 180 },
+    "facing=west": { "model": "network_routing:block/routing_terminal", "y": 270 },
+    "facing=east": { "model": "network_routing:block/routing_terminal", "y": 90 }
+  }
+}

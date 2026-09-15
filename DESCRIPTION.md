@@ -3,7 +3,7 @@
 **Turn every chest, barrel and container around you into one shared, searchable item network — then craft with it.**
 
 Have you ever filled a chunk with chests? Now you can — and access, search, sort, and craft with
-everything inside them from a single block. MC Storage Area Network is a suite of three mods for
+everything inside them from a single block. MC Storage Area Network is a suite of four mods for
 **Minecraft 1.21.1** on **Fabric** and **NeoForge** — install them all from one **all-in-one jar**,
 or pick only the mods you want:
 
@@ -11,7 +11,8 @@ or pick only the mods you want:
 |-----|--------------|
 | **Storage Network** | **Storage Terminal** — browse, search, take and deposit from every nearby container from one interface. Plus the **Output Terminal** for collecting crafted output. |
 | **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
-| **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. **Required by both**; other mods can hook into it. |
+| **Network Routing** | **Routing Terminal** and **Routing Linker** — label containers with item filters so matching containers win routing priority; the terminal can also sort, defrag and trim the network. |
+| **MC Storage Area Network** | The shared library/API that scans storage and powers the mods above. **Required by all**; other mods can hook into it. |
 
 ![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/storage-network/storage-network.gif)
 ![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/crafting-network/crafting-network.gif)
@@ -113,7 +114,7 @@ Higher tiers also make processor terminals work faster.
 | Java | 21 |
 | Side | Client & Server |
 
-> **MC Storage Area Network (`mc_storage_area_network`) is required by both gameplay mods.** It is
+> **MC Storage Area Network (`mc_storage_area_network`) is required by every gameplay mod.** It is
 > bundled in the all-in-one jar; when installing the mods individually, install the API jar too.
 
 ## Installation
@@ -122,16 +123,18 @@ Every jar below is **universal** — the same file works on both Fabric and NeoF
 loader-specific builds inside and each loader loads only its own copy).
 
 **Bundle (recommended):** drop `universal-bundle-all.<version>.jar` into your `mods/` folder — it
-bundles the API, Storage Network and Crafting Network in a single file. Want just one gameplay mod?
-Use `universal-bundle-storage` or `universal-bundle-crafting` instead.
+bundles the API, Storage Network, Crafting Network and Network Routing in a single file. Want just
+one gameplay mod? Use `universal-bundle-storage`, `universal-bundle-crafting` or
+`universal-bundle-routing` instead.
 
 **Or install the mods individually:**
 
 1. Install **Fabric Loader + Fabric API**, or **NeoForge 21.1.235+**, for Minecraft 1.21.1.
 2. Install the **MC Storage Area Network API** jar (`universal_mc_san_api.<version>.jar`) — required
-   by both gameplay mods.
-3. Drop the **Storage Network** (`universal-storage-network.<version>.jar`) and/or **Crafting
-   Network** (`universal-crafting-network.<version>.jar`) jar into `mods/`.
+   by every gameplay mod.
+3. Drop the **Storage Network** (`universal-storage-network.<version>.jar`), **Crafting Network**
+   (`universal-crafting-network.<version>.jar`) and/or **Network Routing**
+   (`universal-network-routing.<version>.jar`) jar into `mods/`.
 
 > Never use a bundle together with the individual jars — the same mods would load twice.
 
@@ -139,8 +142,8 @@ The universal jars are on CurseForge/Modrinth. If you want a single-loader build
 `neoforge-*`), grab it from [GitHub Releases](https://github.com/retiredroca/mc-storage-area-network/releases).
 
 Each mod is versioned on its own: a release only bumps the mod that changed, so Storage Network,
-Crafting Network and the API can be updated independently. Every GitHub release lists all current
-jars together, so you can always grab a matching set from one place.
+Crafting Network, Network Routing and the API can be updated independently. Every GitHub release
+lists all current jars together, so you can always grab a matching set from one place.
 
 ## Configuration
 

@@ -1,0 +1,10 @@
+{
+  "itemGroup.network_routing": "Network Routing",
+  "block.network_routing.routing_terminal": "Routing Terminal",
+  "container.network_routing.routing_terminal": "Routing Terminal",
+  "container.network_routing.routing_label": "Routing Label",
+  "item.network_routing.routing_linker": "Routing Linker",
+  "block.network_routing.terminal_locked": "This terminal belongs to another player",
+  "message.network_routing.no_network": "There is no network to connect to. Please install a Storage Terminal.",
+  "message.network_routing.filter_cleared": "Routing label cleared"
+}

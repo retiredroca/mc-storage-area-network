@@ -1,0 +1,57 @@
+plugins {
+    id 'base'
+}
+
+def repoRoot = projectDir
+while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists()) {
+    repoRoot = repoRoot.parentFile
+}
+apply from: new File(repoRoot, 'gradle/versions.gradle')
+
+// Network Routing version from versions.properties (bumped only when it changed).
+version = routingVersion
+group = 'com.retiredroca.networkrouting'
+
+// Newest non-sources / non-dev jar in a directory (loader builds are date-versioned).
+def newestJar = { String dir ->
+    def d = file(dir)
+    def jars = (d.listFiles() ?: new File[0]).findAll {
+        it.name.endsWith('.jar') && !it.name.contains('sources') && !it.name.contains('dev')
+    }
+    if (jars.isEmpty()) {
+        return null
+    }
+    jars.sort { it.lastModified() }
+    return jars.last()
+}
+
+/**
+ * Universal jar: contains common + fabric classes + fabric.mod.json from the Fabric build, and the
+ * NeoForge-only classes + neoforge.mods.toml from the NeoForge build. Each loader reads only its own
+ * metadata and entrypoint, so the same jar loads on both.
+ */
+tasks.register('universalJar', Jar) {
+    dependsOn gradle.includedBuild('fabric').task(':build')
+    dependsOn gradle.includedBuild('neoforge').task(':build')
+
+    archiveBaseName = 'network-routing'
+    archiveClassifier = 'universal'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from({
+        def jar = newestJar('fabric/build/libs')
+        jar == null ? [] : zipTree(jar)
+    })
+    from({
+        def jar = newestJar('neoforge/build/libs')
+        jar == null ? [] : zipTree(jar)
+    }) {
+        include 'com/retiredroca/networkrouting/neoforge/**'
+        include 'META-INF/neoforge.mods.toml'
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'universalJar'
+}

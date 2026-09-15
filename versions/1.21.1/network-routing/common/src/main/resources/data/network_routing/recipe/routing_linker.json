@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " L ",
+    "CRC",
+    " C "
+  ],
+  "key": {
+    "L": { "item": "minecraft:lightning_rod" },
+    "C": { "item": "minecraft:copper_ingot" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": {
+    "id": "network_routing:routing_linker",
+    "count": 1
+  }
+}

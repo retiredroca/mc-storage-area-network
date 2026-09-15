@@ -1,11 +1,11 @@
 # MC Storage Area Network
 
-**The shared item-network library behind _Storage Network_ and _Crafting Network_.**
+**The shared item-network library behind _Storage Network_, _Crafting Network_ and _Network Routing_.**
 
 MC Storage Area Network scans the world around a block, finds every inventory-bearing
 container (chests, barrels, hoppers, shulker boxes, modded storage — anything with an
 inventory), and exposes them as one shared **item network**. It provides the loader-neutral
-API that the two gameplay mods use, and lets **other mods register their own item sources**.
+API that the gameplay mods use, and lets **other mods register their own item sources**.
 
 A single jar works on **Fabric** and **NeoForge**.
 
@@ -19,6 +19,7 @@ A single jar works on **Fabric** and **NeoForge**.
 - **Hidden-item filters** — hides "container" items that are represented by their contents instead.
 - **Shulker-box helpers** — read/write shulker-box contents as a normal item list.
 - **Ownership model** — records who placed each container so hosts can show only global + player-owned storage.
+- **Routing hooks** — `StorageRouter` lets a mod bias which container receives an inserted stack (e.g. labeled containers get priority); `NetworkHost` lets hardware bind to an existing host's scan.
 
 ## Where it's used
 
@@ -26,6 +27,7 @@ A single jar works on **Fabric** and **NeoForge**.
 |-----|--------------|
 | **Storage Network** | Storage Terminal — one searchable interface for every nearby container |
 | **Crafting Network** | Crafting / Smelting / Blasting / Smoking / Brewing Terminals — craft using the network |
+| **Network Routing** | Label containers with item filters; matching labels win routing priority, plus a chest-shaped Routing Terminal to sort/defrag/trim |
 
 ## Installation
 
@@ -39,9 +41,10 @@ A single jar works on **Fabric** and **NeoForge**.
    One jar for both loaders — a thin container holding the Fabric and NeoForge builds, where each
    loader loads only its own nested copy.
 
-> This API is a **required dependency** of Storage Network and Crafting Network. For the whole suite,
-> use a **bundle**: `universal-bundle-all.<version>.jar` (API + both gameplay mods), or
-> `universal-bundle-storage` / `universal-bundle-crafting` for one gameplay mod each.
+> This API is a **required dependency** of Storage Network, Crafting Network and Network Routing. For
+> the whole suite, use a **bundle**: `universal-bundle-all.<version>.jar` (API + all gameplay mods),
+> or `universal-bundle-storage` / `universal-bundle-crafting` / `universal-bundle-routing` for one
+> gameplay mod each.
 
 ### Downloads
 
@@ -50,8 +53,9 @@ A single jar works on **Fabric** and **NeoForge**.
 | `universal_mc_san_api.<version>.jar` | Fabric + NeoForge | This API |
 | `universal-storage-network.<version>.jar` | Fabric + NeoForge | Storage Network (needs the API) |
 | `universal-crafting-network.<version>.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
-| `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network |
-| `universal-bundle-storage` / `universal-bundle-crafting` | Fabric + NeoForge | API + one gameplay mod |
+| `universal-network-routing.<version>.jar` | Fabric + NeoForge | Network Routing (needs the API) |
+| `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing |
+| `universal-bundle-storage` / `-crafting` / `-routing` | Fabric + NeoForge | API + one gameplay mod |
 | `fabric-*` / `neoforge-*` | single loader | any of the above, loader-specific |
 
 Universal jars are published to **CurseForge / Modrinth**; the loader-specific (`fabric-*` /

@@ -17,6 +17,12 @@
       "version": { "range": "[1,)", "artifactVersion": "@@CRAFTING_VERSION@@" },
       "path": "META-INF/jarjar/crafting-network-neoforge.jar",
       "isObfuscated": false
+    },
+    {
+      "identifier": { "group": "com.retiredroca.networkrouting", "artifact": "network-routing-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@ROUTING_VERSION@@" },
+      "path": "META-INF/jarjar/network-routing-neoforge.jar",
+      "isObfuscated": false
     }
   ]
 }

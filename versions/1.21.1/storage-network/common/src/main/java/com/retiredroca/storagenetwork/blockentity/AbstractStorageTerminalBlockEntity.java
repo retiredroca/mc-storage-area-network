@@ -9,6 +9,7 @@ import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ItemSource;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
 import com.retiredroca.mcstorageareanetwork.api.NestedSource;
+import com.retiredroca.mcstorageareanetwork.api.NetworkHost;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
 import com.retiredroca.storagenetwork.config.TerminalSettings;
@@ -37,7 +38,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
 /** Loader-neutral Storage Terminal logic. The loader subclass supplies the block entity type. */
-public abstract class AbstractStorageTerminalBlockEntity extends BlockEntity implements MenuProvider {
+public abstract class AbstractStorageTerminalBlockEntity extends BlockEntity implements MenuProvider, NetworkHost {
     private static final String TAG_TIER = "tier";
     private static final long[] CHUNK_RADII = { 0, 1, 2, 3, 4, 5 };
 
@@ -73,6 +74,21 @@ public abstract class AbstractStorageTerminalBlockEntity extends BlockEntity imp
     public int getChunkRadius() {
         int effectiveTier = Math.min(tier, getEffectiveMaxTier());
         return (int) CHUNK_RADII[Math.min(effectiveTier, CHUNK_RADII.length - 1)];
+    }
+
+    @Override
+    public BlockPos pos() {
+        return worldPosition;
+    }
+
+    @Override
+    public int chunkRadius() {
+        return getChunkRadius();
+    }
+
+    @Override
+    public int tier() {
+        return tier;
     }
 
     public void startOpen(Player player) {

@@ -19,6 +19,7 @@ versionsFile.withInputStream { componentVersions.load(it) }
 ext.apiVersion = componentVersions.getProperty('api')
 ext.storageVersion = componentVersions.getProperty('storage')
 ext.craftingVersion = componentVersions.getProperty('crafting')
+ext.routingVersion = componentVersions.getProperty('routing')
 // Version stamps are fixed-width YYMMDDHH, so lexical max == most recent.
 ext.stampOf = { String v -> v.tokenize('.').last() as String }
 ext.newestStamp = { List<String> versions -> versions.collect { stampOf(it) }.max() }

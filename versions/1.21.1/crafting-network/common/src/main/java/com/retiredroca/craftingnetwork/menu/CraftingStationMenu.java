@@ -11,6 +11,7 @@ import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
 import com.retiredroca.craftingnetwork.blockentity.AbstractCraftingStationBlockEntity;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.mcstorageareanetwork.api.ShulkerBoxHelper;
+import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 import com.retiredroca.craftingnetwork.util.ItemMerge;
 
 import net.minecraft.core.BlockPos;
@@ -700,6 +701,23 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
             }
             if (storage.collectionOnly()) {
                 remaining = storage.insert(remaining);
+            }
+        }
+        if (remaining.isEmpty()) {
+            return;
+        }
+        // Routing priority: containers whose label matches this stack are filled before the generic
+        // "already holds it / nearest" fallback below.
+        if (station.getLevel() instanceof ServerLevel serverLevel) {
+            for (ScannedStorage storage : StorageRouter.order(serverLevel, station.getBlockPos(),
+                    station.getScannedStorages(), remaining)) {
+                if (remaining.isEmpty()) {
+                    return;
+                }
+                if (!storage.collectionOnly() && StorageRouter.priority(serverLevel, station.getBlockPos(),
+                        storage.pos(), remaining) > 0) {
+                    remaining = storage.insert(remaining);
+                }
             }
         }
         if (remaining.isEmpty()) {

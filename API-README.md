@@ -152,6 +152,22 @@ List<ItemStack> contents = ShulkerBoxHelper.contents(stack);
 ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 ```
 
+### Routing priority (companions)
+
+A companion mod can bias which container receives an inserted stack without the host mods depending
+on it. Register a `StoragePriority`; hosts consult the registry via `StorageRouter` on every insert:
+
+```java
+StorageRouter.register((level, refPos, pos, stack) ->
+        matches(level, pos, stack) ? 1_000_000 - (int) Math.sqrt(refPos.distSqr(pos)) : 0);
+
+List<ScannedStorage> ordered = StorageRouter.order(level, refPos, storages, stack); // highest first
+int score = StorageRouter.priority(level, refPos, pos, stack);                     // 0 = no opinion
+```
+
+`NetworkHost` is implemented by host block entities (the Storage Terminal), so companion hardware
+can bind to an existing host and reuse its `pos()`, `chunkRadius()` and `tier()`.
+
 ---
 
 ## API surface
@@ -164,6 +180,9 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 | `ScannedStorage` | Loader-neutral view of a scanned container. |
 | `ItemScanner` | Loader-specific chunk scanner (`scan(level, center, chunkRadius)`). |
 | `ItemNetworkServices` | Holds/resolves the active `ItemScanner`. |
+| `StoragePriority` | A routing rule: `priority(level, refPos, pos, stack)`, higher wins. |
+| `StorageRouter` | Register rules; `order(...)`/`priority(...)` for insertion priority. |
+| `NetworkHost` | A host block entity a companion can bind to (`pos()`, `chunkRadius()`, `tier()`). |
 | `ShulkerBoxHelper` | Read/write shulker-box contents. |
 
 ### Semantics
@@ -179,7 +198,7 @@ ItemStack leaf = ShulkerBoxHelper.stackAt(container, new int[]{ slot });
 ## Building / publishing
 
 ```bash
-./gradlew build           # API + both hosts + every bundle -> build/release/ (final file names)
+./gradlew build           # API + all gameplay mods + every bundle -> build/release/ (final file names)
 ./gradlew releaseJars     # just collect the release jars into build/release/
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
 ./gradlew publishRepo     # per-loader jars + universal API -> ./repo (committed maven for distribution)

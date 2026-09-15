@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " R ",
+    "RTR",
+    " R "
+  ],
+  "key": {
+    "R": { "item": "minecraft:redstone_block" },
+    "T": { "item": "storage_network:storage_terminal" }
+  },
+  "result": {
+    "id": "network_routing:routing_terminal",
+    "count": 1
+  }
+}

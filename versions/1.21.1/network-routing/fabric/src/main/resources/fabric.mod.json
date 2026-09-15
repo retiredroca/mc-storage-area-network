@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Label storage containers with item filters and make matching containers win routing priority. Includes a chest-shaped Routing Terminal with a terminal-screen lid and a handheld Routing Linker.",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.retiredroca.networkrouting.fabric.NetworkRouting"
+    ],
+    "client": [
+      "com.retiredroca.networkrouting.fabric.NetworkRoutingClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "mc_storage_area_network": "~1.0",
+    "java": ">=21"
+  }
+}

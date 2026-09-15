@@ -1,0 +1,28 @@
+name: Release Network Routing
+
+on:
+  push:
+    tags:
+      - 'routing-v*'
+  workflow_dispatch:
+    inputs:
+      minecraft:
+        description: 'Minecraft version to build (folder under versions/)'
+        default: '1.21.1'
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      contains(github.event.comment.body, '/release-routing')
+    uses: ./.github/workflows/release-mod.yml
+    with:
+      mod: routing
+      release_tag: ${{ startsWith(github.ref, 'refs/tags/routing-v') && github.ref_name || format('v{0}', github.run_id) }}
+      minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
+    secrets: inherit

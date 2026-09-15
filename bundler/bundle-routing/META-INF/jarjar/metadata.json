@@ -1,0 +1,16 @@
+{
+  "jars": [
+    {
+      "identifier": { "group": "com.retiredroca.mcstorageareanetwork", "artifact": "mc_storage_area_network-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@API_VERSION@@" },
+      "path": "META-INF/jarjar/mc_storage_area_network-neoforge.jar",
+      "isObfuscated": false
+    },
+    {
+      "identifier": { "group": "com.retiredroca.networkrouting", "artifact": "network-routing-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@ROUTING_VERSION@@" },
+      "path": "META-INF/jarjar/network-routing-neoforge.jar",
+      "isObfuscated": false
+    }
+  ]
+}

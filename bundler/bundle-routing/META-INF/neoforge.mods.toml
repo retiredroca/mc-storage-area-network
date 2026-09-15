@@ -1,0 +1,11 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="@@LICENSE@@"
+
+[[mods]]
+modId="mc_storage_area_network_bundle_routing"
+version="@@VERSION@@"
+displayName="MC Storage Area Network (Routing)"
+description='''
+One-file install: the MC Storage Area Network API plus Network Routing. Works on NeoForge; each loader loads only its own nested jars.
+'''

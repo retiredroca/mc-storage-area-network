@@ -1,0 +1,133 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+def repoRoot = projectDir
+while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists()) {
+    repoRoot = repoRoot.parentFile
+}
+apply from: new File(repoRoot, 'gradle/versions.gradle')
+
+// Network Routing version from versions.properties (bumped only when it changed).
+version = routingVersion
+group = mod_group_id
+
+base {
+    archivesName = 'fabric-' + mod_id
+}
+
+repositories {
+    maven {
+        name = 'itemNetworkRepo'
+        url = uri("${repoRoot}/repo")
+    }
+    mavenLocal()
+    maven {
+        name = 'itemNetwork'
+        url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo'
+    }
+}
+
+// The shared sources are compiled once per loader. To let a single merged jar hold both the
+// Fabric (intermediary) and NeoForge (Mojang) variants, each loader gets its own copy of the
+// common classes under a loader-specific sub-package (e.g. ...networkrouting.fabric.common.*),
+// so the two mapping variants no longer collide by class name.
+def commonPrefix = 'com.retiredroca.networkrouting'
+def relocatedPrefix = 'com.retiredroca.networkrouting.fabric.common'
+
+tasks.register('relocateCommonSources', Copy) {
+    from(rootProject.file('../common/src/main/java'))
+    into(layout.buildDirectory.dir('generated/common'))
+    filter { String line ->
+        line.replace(commonPrefix, relocatedPrefix)
+    }
+}
+
+tasks.register('relocateLoaderSources', Copy) {
+    from('src/main/java')
+    into(layout.buildDirectory.dir('generated/loader'))
+    filter { String line ->
+        def matcher = line =~ /import com\.retiredroca\.networkrouting\.(?!fabric\b|neoforge\b|mixin\b)([A-Za-z0-9_.]+);/
+        if (matcher.find()) {
+            return "import com.retiredroca.networkrouting.fabric.common.${matcher.group(1)};"
+        }
+        return line
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = []
+            srcDir(tasks.named('relocateCommonSources'))
+            srcDir(tasks.named('relocateLoaderSources'))
+        }
+        resources {
+            // Gameplay assets/data live once in the shared common sources; only loader metadata
+            // (fabric.mod.json / neoforge.mods.toml / mixins / AT) stays per-loader.
+            srcDir(rootProject.file('../common/src/main/resources'))
+        }
+    }
+}
+
+loom {
+    // Use Mojang mappings so the source matches the NeoForge build 1:1.
+    officialMojangMappings()
+}
+
+dependencies {
+    // Minecraft + Fabric loader + Fabric API
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
+    modImplementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-${targetMc}:${api_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", minecraft_version
+    inputs.property "loader_version", loader_version
+    inputs.property "mod_id", mod_id
+    inputs.property "mod_name", mod_name
+    inputs.property "mod_license", mod_license
+    inputs.property "mod_authors", mod_authors
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+                "minecraft_version": minecraft_version,
+                "loader_version": loader_version,
+                "mod_id": mod_id,
+                "mod_name": mod_name,
+                "mod_license": mod_license,
+                "mod_authors": mod_authors
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(java_version)
+    }
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${mod_id}" }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}

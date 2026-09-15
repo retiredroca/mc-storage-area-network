@@ -17,6 +17,7 @@ import com.retiredroca.craftingnetwork.station.StationType;
 import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.mcstorageareanetwork.api.ShulkerBoxHelper;
+import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -416,7 +417,11 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                 remaining = storage.insert(remaining);
             }
         }
-        for (ScannedStorage storage : pumpHandlers()) {
+        // Routing priority: matching labeled containers fill before the generic scan-order fallback.
+        List<ScannedStorage> fallback = level instanceof ServerLevel serverLevel
+                ? StorageRouter.order(serverLevel, worldPosition, pumpHandlers(), remaining)
+                : pumpHandlers();
+        for (ScannedStorage storage : fallback) {
             if (remaining.isEmpty()) break;
             remaining = storage.insert(remaining);
         }

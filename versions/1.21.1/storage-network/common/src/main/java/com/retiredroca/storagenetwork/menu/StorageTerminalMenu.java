@@ -7,6 +7,7 @@ import com.retiredroca.mcstorageareanetwork.api.ItemSource;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
 import com.retiredroca.mcstorageareanetwork.api.NestedSource;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
+import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 import com.retiredroca.storagenetwork.network.TerminalPackets.ChestSync;
@@ -149,7 +150,10 @@ public class StorageTerminalMenu extends AbstractContainerMenu {
         }
         if (depositTargetPos == null) {
             ItemStack remaining = stack.copy();
-            for (ScannedStorage storage : terminal.getStorages()) {
+            List<ScannedStorage> routed = terminal.getLevel() instanceof net.minecraft.server.level.ServerLevel serverLevel
+                    ? StorageRouter.order(serverLevel, terminal.getBlockPos(), terminal.getStorages(), remaining)
+                    : terminal.getStorages();
+            for (ScannedStorage storage : routed) {
                 remaining = storage.insert(remaining);
                 if (remaining.isEmpty()) {
                     break;
