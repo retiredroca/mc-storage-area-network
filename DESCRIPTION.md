@@ -124,8 +124,8 @@ loader-specific builds inside and each loader loads only its own copy).
 
 **Bundle (recommended):** drop `universal-bundle-all.<version>.jar` into your `mods/` folder — it
 bundles the API, Storage Network, Crafting Network and Network Routing in a single file. Want just
-one gameplay mod? Use `universal-bundle-storage`, `universal-bundle-crafting` or
-`universal-bundle-routing` instead.
+one gameplay mod? Use `universal-bundle-storage` or `universal-bundle-crafting`; for routing use
+`universal-bundle-routing` (API + Storage Network + Network Routing).
 
 **Or install the mods individually:**
 

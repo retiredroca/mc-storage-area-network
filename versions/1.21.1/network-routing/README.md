@@ -74,11 +74,11 @@ Automatic passes run about every 2 seconds while their toggle is on.
 | Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
 | Java | 21 |
 | Side | Client & Server |
-| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately. **Storage Network** provides the Storage Terminal the Routing Terminal binds to (and the deposit flow routing applies to); **Crafting Network** adds crafted-output routing. Without a host mod there is nothing to route. |
+| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**. **Storage Network** (`storage_network`) — **required** (it provides the Storage Terminal the Routing Terminal binds to). Crafting Network is optional and adds crafted-output routing. |
 
-> Easiest install: the **bundle** `universal-bundle-all.<version>.jar` (or `universal-bundle-routing`
-> for just this one) bundles this mod, the API and the other gameplay mods. To install this mod on its
-> own, also drop in the universal API jar (`universal_mc_san_api.<version>.jar`).
+> Easiest install: the **bundle** `universal-bundle-routing.<version>.jar` (API + Storage Network +
+> Network Routing); for the whole suite use `universal-bundle-all`. To install this mod on its own,
+> also drop in the universal API jar and Storage Network.
 
 ## Configuration
 

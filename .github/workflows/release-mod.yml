@@ -318,7 +318,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - Bundle Routing
-        if: ${{ env.API_CHANGED == 'true' || env.ROUTING_CHANGED == 'true' }}
+        if: ${{ env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' || env.ROUTING_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
@@ -344,6 +344,7 @@ jobs:
         if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
@@ -355,6 +356,7 @@ jobs:
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
@@ -366,6 +368,7 @@ jobs:
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
@@ -374,9 +377,10 @@ jobs:
             "dist/universal-bundle-crafting.${BUNDLE_CRAFTING_VERSION}.jar"
 
       - name: Modrinth - Network Routing + Bundle Routing
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.ROUTING_CHANGED == 'true') }}
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' || env.ROUTING_CHANGED == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ROUTING_ID || 'network-routing' }}" \

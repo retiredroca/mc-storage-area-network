@@ -43,8 +43,8 @@ A single jar works on **Fabric** and **NeoForge**.
 
 > This API is a **required dependency** of Storage Network, Crafting Network and Network Routing. For
 > the whole suite, use a **bundle**: `universal-bundle-all.<version>.jar` (API + all gameplay mods),
-> or `universal-bundle-storage` / `universal-bundle-crafting` / `universal-bundle-routing` for one
-> gameplay mod each.
+> or `universal-bundle-storage` / `universal-bundle-crafting` for one gameplay mod each, or
+> `universal-bundle-routing` for Storage Network + Network Routing.
 
 ### Downloads
 
@@ -55,7 +55,7 @@ A single jar works on **Fabric** and **NeoForge**.
 | `universal-crafting-network.<version>.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
 | `universal-network-routing.<version>.jar` | Fabric + NeoForge | Network Routing (needs the API) |
 | `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing |
-| `universal-bundle-storage` / `-crafting` / `-routing` | Fabric + NeoForge | API + one gameplay mod |
+| `universal-bundle-storage` / `-crafting` / `-routing` | Fabric + NeoForge | API + one gameplay mod (routing also includes Storage Network) |
 | `fabric-*` / `neoforge-*` | single loader | any of the above, loader-specific |
 
 Universal jars are published to **CurseForge / Modrinth**; the loader-specific (`fabric-*` /
@@ -69,6 +69,26 @@ actually changed** — releasing Storage Network does not bump the API, and vice
 release still carries the full set of jars (including the current, unchanged API) so one page has
 everything. The API uses `1.0.<yymmddhh>` (date-based patch); the gameplay mods and bundles use
 `1.0.0.<yymmddhh>`.
+
+### Release configuration (maintainers)
+
+Releases run through the reusable workflow under `.github/workflows/` (`release-all.yml` plus the
+per-mod callers). Configure these on the repository:
+
+| Kind | Name | Purpose |
+|------|------|---------|
+| Secret | `CURSEFORGE_API_KEY` | CurseForge upload key |
+| Secret | `MODRINTH_TOKEN` | Modrinth personal access token |
+| Variable | `PUBLISH_MODRINTH` | `true` to publish to Modrinth (skipped when unset/`false`) |
+| Variable | `MODRINTH_ID` | SAN API project slug/ID |
+| Variable | `MODRINTH_STORAGE_ID` / `MODRINTH_CRAFTING_ID` / `MODRINTH_ROUTING_ID` | gameplay mod projects |
+
+**Token scopes** — CurseForge: a standard upload key. Modrinth PAT: `VERSION_CREATE` (upload) and
+`VERSION_WRITE` (archive superseded versions); `VERSION_DELETE` is not used by the workflow.
+
+The CurseForge/Modrinth changelog is the last few commits plus a link to the full changelog on the
+GitHub release. A Modrinth project only becomes publicly visible once **Approved**; versions can be
+uploaded while it is still *Processing*.
 
 ## Requirements
 

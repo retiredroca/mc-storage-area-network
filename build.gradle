@@ -205,7 +205,7 @@ def registerBundle = { String taskName, String templateDir, String artifactPrefi
 def apiMods = ['api']
 def storageMods = ['api', 'storage']
 def craftingMods = ['api', 'crafting']
-def routingMods = ['api', 'routing']
+def routingMods = ['api', 'storage', 'routing']
 def allMods = ['api', 'storage', 'crafting', 'routing']
 
 def allBundleVersion = bundleVersionFor(allMods)

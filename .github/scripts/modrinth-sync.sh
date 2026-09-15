@@ -10,6 +10,16 @@
 #
 # Usage: modrinth-sync.sh <projectIdOrSlug> <stateKey> <versionNumber> <versionName> <primaryFile> [<extraFile>...]
 #
+# Required Modrinth personal-access-token scopes:
+#   VERSION_CREATE  - upload new versions
+#   VERSION_WRITE   - archive superseded versions (PATCH requested_status)
+#   (VERSION_DELETE is NOT used here; the workflow never deletes versions.)
+#
+# Optional environment:
+#   MODRINTH_LOADERS        comma-separated (default: fabric,neoforge)
+#   MODRINTH_GAME_VERSIONS  comma-separated (default: 1.21.1)
+#   MODRINTH_ENVIRONMENT    default: client_and_server
+#
 set -euo pipefail
 
 : "${MODRINTH_TOKEN:?MODRINTH_TOKEN is required}"
@@ -26,15 +36,23 @@ api='https://api.modrinth.com/v2'
 state_file='release-state.properties'
 previous="$(grep -E "^${state_key}=" "$state_file" | head -1 | cut -d= -f2 || true)"
 
+loaders_json="$(jq -nc --arg s "${MODRINTH_LOADERS:-fabric,neoforge}" \
+  '$s | split(",") | map(gsub("^\\s+|\\s+$"; ""))')"
+game_versions_json="$(jq -nc --arg s "${MODRINTH_GAME_VERSIONS:-1.21.1}" \
+  '$s | split(",") | map(gsub("^\\s+|\\s+$"; ""))')"
+
 data="$(jq -nc \
   --arg project_id "$project" \
   --arg name "$version_name" \
   --arg version_number "$version_number" \
   --arg changelog "$(cat dist/changelog.md 2>/dev/null || true)" \
+  --arg environment "${MODRINTH_ENVIRONMENT:-client_and_server}" \
+  --argjson loaders "$loaders_json" \
+  --argjson game_versions "$game_versions_json" \
   '{project_id: $project_id, name: $name, version_number: $version_number,
     changelog: $changelog,
     version_type: "release", status: "listed", featured: false,
-    loaders: ["fabric", "neoforge"], game_versions: ["1.21.1"], dependencies: []}')"
+    environment: $environment, loaders: $loaders, game_versions: $game_versions, dependencies: []}')"
 
 echo "modrinth: creating version ${version_number} on ${project}"
 args=(-fsS -X POST "${api}/version" -H "Authorization: ${MODRINTH_TOKEN}"

@@ -7,6 +7,12 @@
       "isObfuscated": false
     },
     {
+      "identifier": { "group": "com.retiredroca.storagenetwork", "artifact": "storage-network-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@STORAGE_VERSION@@" },
+      "path": "META-INF/jarjar/storage-network-neoforge.jar",
+      "isObfuscated": false
+    },
+    {
       "identifier": { "group": "com.retiredroca.networkrouting", "artifact": "network-routing-neoforge" },
       "version": { "range": "[1,)", "artifactVersion": "@@ROUTING_VERSION@@" },
       "path": "META-INF/jarjar/network-routing-neoforge.jar",
