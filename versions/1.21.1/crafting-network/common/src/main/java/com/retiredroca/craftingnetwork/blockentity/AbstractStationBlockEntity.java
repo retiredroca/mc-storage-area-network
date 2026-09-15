@@ -541,9 +541,11 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
         if (fuel.isEmpty() && !input.isEmpty() && burnTime == 0) {
             ItemStack f = selectFuel();
-            int got = f.isEmpty() ? 0 : pullFromNetwork(f, 1);
+            // Pull a whole stack so the fuel stays visible in the fuel slot and is consumed one item
+            // per burn (like a furnace), instead of being pulled and consumed within a single tick.
+            int got = f.isEmpty() ? 0 : pullFromNetwork(f, f.getMaxStackSize());
             if (got > 0) {
-                fuel = f.copy();
+                fuel = f.copyWithCount(got);
             } else {
                 // Out of fuel: there is nothing to burn with, so return the held ingredient to the
                 // network rather than letting it get stuck in the machine.
