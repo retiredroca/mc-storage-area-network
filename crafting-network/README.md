@@ -22,7 +22,7 @@ chests, process them, and send the results back — automatically.
 - **"Inventory first" toggle** — a per-machine checkbox that sends crafted output to your inventory first. On processor terminals it drops the output next to the machine when you're within 2 blocks, so you can pick it up.
 - **XP collection** — Smelting/Blasting/Smoking terminals build up experience; **crouch + right-click** to collect it (owner and scoreboard team).
 - **Sources dropdown** — scope ingredients to *All Storage*, your *Inventory*, or a single container.
-- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
+- **Smart output routing** — crafted items go to an **Output Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan a larger area (1×1 up to 11×11 chunks).
 - **Ownership & privacy** — terminals only use global (worldgen) storage plus storage placed by the terminal's owner.
 
@@ -60,7 +60,7 @@ Each processor terminal runs automatically once it has a recipe to work on; clic
 1. Craft a **Crafting Terminal** and place it near your storage.
 2. Right-click to open; pick a recipe from the recipe book.
 3. Craft the processor terminals you need and let them run.
-4. Add a **Network Share Terminal** (from Storage Network) so outputs are collected automatically.
+4. Add an **Output Terminal** (from Storage Network) so outputs are collected automatically.
 
 ## Recipes
 
@@ -86,7 +86,7 @@ All terminals are shaped 3×3: **8× Copper Ingot** around a core block.
 
 **Scan radius by tier:** Copper 1×1 → Iron 3×3 → Gold 5×5 → Emerald 7×7 → Diamond 9×9 → Netherite 11×11 chunks.
 
-> Pair with **Storage Network** for the Storage Terminal and the Network Share Terminal used for output collection.
+> Pair with **Storage Network** for the Storage Terminal and the Output Terminal used for output collection.
 
 ## Requirements
 
@@ -96,7 +96,7 @@ All terminals are shaped 3×3: **8× Copper Ingot** around a core block.
 | Loaders | Fabric Loader + Fabric API, or NeoForge 21.1.235+ |
 | Java | 21 |
 | Side | Client & Server |
-| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately; Storage Network recommended for the share terminal |
+| Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**, install separately; Storage Network recommended for the output terminal |
 
 > Easiest install: the **bundle** `universal-bundle-all.<version>.jar` (or `universal-bundle-crafting`
 > for just this one) bundles this mod, Storage Network and the API. To install this mod on its own,

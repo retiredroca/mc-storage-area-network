@@ -84,7 +84,7 @@ public final class Registration {
         tag.putInt("tier", tier);
         BlockEntity.addEntityType(tag, getCraftingStationBEType());
         stack.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(tag));
-        stack.set(DataComponents.CUSTOM_NAME, Component.literal(TIER_NAMES[tier] + " Crafting Terminal"));
+        stack.set(DataComponents.CUSTOM_NAME, Component.literal("Crafting Terminal " + TIER_NAMES[tier]));
         return stack;
     }
 

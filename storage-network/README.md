@@ -16,7 +16,7 @@ Browse, search, sort, take and deposit from one screen.
 - **Search & sort** — search by name or id; sort by name, type, tag, mod or equipment slot.
 - **Virtual item grid** — stacks are merged and counted, with draggable search and source panels.
 - **Range tiers** — upgrade the terminal to scan a larger area (1×1 up to 11×11 chunks).
-- **Network Share Terminal** — a collection-only sink for crafted outputs (see below).
+- **Output Terminal** — a collection-only sink for crafted outputs (see below).
 - **Shulker flattening** — shulker-box contents (and boxes inside boxes) appear as ordinary items.
 - **Ownership & privacy** — a terminal only shows global (worldgen) storage plus storage placed by the terminal's owner.
 
@@ -27,7 +27,7 @@ Browse, search, sort, take and deposit from one screen.
 - Shift-click items in your inventory to deposit them into the network.
 - The **source dropdown** lets you scope the view to *All Storage*, your *Inventory*, or a single container.
 
-## The Network Share Terminal
+## The Output Terminal
 
 A companion block that **receives crafted output** from Crafting Network terminals and holds it for you.
 
@@ -56,7 +56,7 @@ All of this is configurable on the server (see below).
 | Result | Recipe |
 |--------|--------|
 | **Storage Terminal** | 3×3: 8× Copper Ingot + 1× Chest (center) |
-| **Network Share Terminal** | 3×3: 4× Chest around a Storage Terminal |
+| **Output Terminal** | 3×3: 4× Chest around a Storage Terminal |
 | **Iron (tier 1) upgrade** | Terminal (center) + 4× Iron Ingot |
 | **Gold (tier 2) upgrade** | Iron Terminal (center) + 4× Gold Ingot |
 | **Emerald (tier 3) upgrade** | Gold Terminal (center) + 4× Emerald |

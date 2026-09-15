@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
- * Network Share Terminal: a collection-only sink that receives crafted output. It is hidden from
+ * Output Terminal: a collection-only sink that receives crafted output. It is hidden from
  * terminal listings, anyone can open it, but only its owner can break it.
  */
 public class NetworkShareTerminalBlock extends BaseEntityBlock implements CollectionOnlyStorage {

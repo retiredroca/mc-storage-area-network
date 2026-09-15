@@ -8,11 +8,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
-/** Simple collection view for a Network Share Terminal: no search box and no source dropdown. */
+/** Simple collection view for an Output Terminal: no search box and no source dropdown. */
 public class NetworkShareTerminalScreen extends AbstractContainerScreen<NetworkShareTerminalMenu> {
     private static final ResourceLocation BG =
             ResourceLocation.withDefaultNamespace("textures/gui/container/generic_54.png");
-    private static final int ROWS = 3;
+    private static final int ROWS = 6;
 
     public NetworkShareTerminalScreen(NetworkShareTerminalMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);

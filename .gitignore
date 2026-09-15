@@ -23,6 +23,9 @@ bin/
 .DS_Store
 Thumbs.db
 
+# local deploy script (machine-specific Prism paths + WinSCP sessions)
+deploy.sh
+
 # local dev session script (untracked)
 oc.sh
 

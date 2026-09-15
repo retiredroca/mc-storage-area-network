@@ -15,7 +15,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 
-/** Renders the Network Share Terminal as a white-tinted ender chest that opens like a chest. */
+/** Renders the Output Terminal as a white-tinted ender chest that opens like a chest. */
 public class NetworkShareTerminalRenderer<T extends AbstractNetworkShareTerminalBlockEntity>
         implements BlockEntityRenderer<T> {
     private static final ResourceLocation TEXTURE =

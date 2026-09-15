@@ -9,7 +9,7 @@ or pick only the mods you want:
 
 | Mod | What it adds |
 |-----|--------------|
-| **Storage Network** | **Storage Terminal** — browse, search, take and deposit from every nearby container from one interface. Plus the **Network Share Terminal** for collecting crafted output. |
+| **Storage Network** | **Storage Terminal** — browse, search, take and deposit from every nearby container from one interface. Plus the **Output Terminal** for collecting crafted output. |
 | **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
 | **MC Storage Area Network** | The shared library/API that scans storage and powers the two mods above. **Required by both**; other mods can hook into it. |
 
@@ -28,7 +28,7 @@ or pick only the mods you want:
 - **Processor Terminals** — Smelting, Blasting, Smoking and Brewing terminals pull inputs and fuel from the network, process automatically, and push results back. Smelting/Blasting/Smoking earn experience you can collect with **crouch + right-click**.
 - **"Shulkers first" toggle** — a per-machine checkbox that fills shulker boxes in the network before other containers.
 - **Sources dropdown** — scope any terminal to *All Storage*, your *Inventory*, or a single container.
-- **Smart output routing** — crafted items go to a **Network Share Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
+- **Smart output routing** — crafted items go to an **Output Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Range tiers** — upgrade terminals to scan from **1×1 up to 11×11 chunks** (capped by the server's view/simulation distance).
 - **Shulker flattening** — shulker-box contents (and boxes inside boxes) appear as ordinary items, ready to craft with.
 - **Ownership & privacy** — a terminal only shows global (worldgen) storage plus storage placed by the terminal's owner.
@@ -42,7 +42,7 @@ one searchable index.
 - Shift-click items in your inventory to deposit them back into the network.
 - Use the source dropdown to view everything, just your inventory, or one container.
 
-## Network Share Terminal
+## Output Terminal
 
 A collection-only sink that **receives crafted output** and holds it for you.
 
@@ -75,7 +75,7 @@ All of this is configurable on the server.
 1. Craft a **Storage Terminal** (8 copper ingots around a chest) and place it near your storage.
 2. Craft a **Crafting Terminal** (8 copper ingots around a crafting table) to craft from the network.
 3. Craft the processor terminals you need (8 copper ingots around a Furnace / Blast Furnace / Smoker / Brewing Stand).
-4. Add a **Network Share Terminal** (4 chests around a Storage Terminal) to collect crafted output automatically.
+4. Add an **Output Terminal** (4 chests around a Storage Terminal) to collect crafted output automatically.
 5. Upgrade any terminal with range tiers to cover more chunks.
 
 ## Recipes
@@ -83,7 +83,7 @@ All of this is configurable on the server.
 | Result | Recipe |
 |--------|--------|
 | **Storage Terminal** | 3×3: 8× Copper Ingot around a Chest |
-| **Network Share Terminal** | 3×3: 4× Chest around a Storage Terminal |
+| **Output Terminal** | 3×3: 4× Chest around a Storage Terminal |
 | **Crafting Terminal** | 3×3: 8× Copper Ingot around a Crafting Table |
 | **Smelting Terminal** | 3×3: 8× Copper Ingot around a Furnace |
 | **Blasting Terminal** | 3×3: 8× Copper Ingot around a Blast Furnace |

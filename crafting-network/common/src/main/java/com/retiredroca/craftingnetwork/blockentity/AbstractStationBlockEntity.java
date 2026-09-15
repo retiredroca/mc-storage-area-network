@@ -409,7 +409,7 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         if (shulkersFirst) {
             remaining = insertIntoShulkers(remaining);
         }
-        // Collection-only sinks (Network Share Terminal) receive output next.
+        // Collection-only sinks (Output Terminal) receive output next.
         for (ScannedStorage storage : pumpHandlers()) {
             if (remaining.isEmpty()) break;
             if (storage.collectionOnly()) {

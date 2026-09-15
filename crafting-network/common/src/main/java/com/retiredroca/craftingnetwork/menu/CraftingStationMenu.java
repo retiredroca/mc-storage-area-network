@@ -693,7 +693,7 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
                 return;
             }
         }
-        // Collection-only sinks (Network Share Terminal) receive crafted output first.
+        // Collection-only sinks (Output Terminal) receive crafted output first.
         for (ScannedStorage storage : station.getScannedStorages()) {
             if (remaining.isEmpty()) {
                 return;

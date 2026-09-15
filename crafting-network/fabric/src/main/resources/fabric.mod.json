@@ -3,7 +3,7 @@
   "id": "${mod_id}",
   "version": "${version}",
   "name": "${mod_name}",
-  "description": "An upgradable Crafting Station for Minecraft. Like the Storage Terminal, it scans nearby chunks for storage containers; place a crafting blueprint in its 3x3 grid and it crafts using items drawn from those containers and your inventory. Upgrade the station to increase its scan radius.",
+  "description": "An upgradable Crafting Terminal for Minecraft. Like the Storage Terminal, it scans nearby chunks for storage containers; place a crafting blueprint in its 3x3 grid and it crafts using items drawn from those containers and your inventory. Upgrade the terminal to increase its scan radius.",
   "authors": ["${mod_authors}"],
   "license": "${mod_license}",
   "environment": "*",

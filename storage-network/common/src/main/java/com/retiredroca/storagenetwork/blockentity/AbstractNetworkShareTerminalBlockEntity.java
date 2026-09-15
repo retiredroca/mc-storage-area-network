@@ -25,11 +25,12 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Loader-neutral Network Share Terminal: a collection-only sink that receives crafted output. It is
+ * Loader-neutral Output Terminal: a collection-only sink that receives crafted output. It is
  * hidden from terminal listings but crafted results are routed into it first.
  */
 public abstract class AbstractNetworkShareTerminalBlockEntity extends BlockEntity implements Container, MenuProvider {
-    public static final int SIZE = 27;
+    /** Double-chest capacity (6 rows x 9 columns). */
+    public static final int SIZE = 54;
     private static final String TAG_ITEMS = "Items";
 
     private final NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);

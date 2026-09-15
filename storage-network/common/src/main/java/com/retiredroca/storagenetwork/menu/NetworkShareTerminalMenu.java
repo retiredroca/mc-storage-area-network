@@ -14,7 +14,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 public class NetworkShareTerminalMenu extends AbstractContainerMenu {
-    private static final int ROWS = 3;
+    private static final int ROWS = 6;
     private static final int COLS = 9;
     private static final int SIZE = ROWS * COLS;
     private static final int PLAYER_START = SIZE;
@@ -52,7 +52,7 @@ public class NetworkShareTerminalMenu extends AbstractContainerMenu {
                 addSlot(new Slot(container, col + row * COLS, 8 + col * 18, 18 + row * 18));
             }
         }
-        int startY = 84;
+        int startY = 18 + ROWS * 18 + 14;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, startY + row * 18));

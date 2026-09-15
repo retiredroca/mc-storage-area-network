@@ -70,7 +70,7 @@ public final class Registration {
         tag.putInt("tier", tier);
         BlockEntity.addEntityType(tag, getTerminalBEType());
         stack.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(tag));
-        stack.set(DataComponents.CUSTOM_NAME, Component.literal(TIER_NAMES[tier] + " Storage Terminal"));
+        stack.set(DataComponents.CUSTOM_NAME, Component.literal("Storage Terminal " + TIER_NAMES[tier]));
         return stack;
     }
 
