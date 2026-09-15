@@ -23,6 +23,7 @@ fi
 
 project_id="${CURSEFORGE_PROJECT_ID:-1690770}"
 upload_url="https://minecraft.curseforge.com/api/projects/${project_id}/upload-file"
+# The changelog: the last few commits plus a link to the full release notes.
 changelog="$(cat dist/changelog.md 2>/dev/null || echo '')"
 
 case "$parent" in

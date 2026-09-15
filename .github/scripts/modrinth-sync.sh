@@ -30,7 +30,9 @@ data="$(jq -nc \
   --arg project_id "$project" \
   --arg name "$version_name" \
   --arg version_number "$version_number" \
+  --arg changelog "$(cat dist/changelog.md 2>/dev/null || true)" \
   '{project_id: $project_id, name: $name, version_number: $version_number,
+    changelog: $changelog,
     version_type: "release", status: "listed", featured: false,
     loaders: ["fabric", "neoforge"], game_versions: ["1.21.1"], dependencies: []}')"
 

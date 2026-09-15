@@ -23,10 +23,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Platform changelogs show the last few commits plus a link to the full changelog
+    # (the generated GitHub release notes).
+    env:
+      CHANGELOG_LINK: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@v5
         with:
-          # Full history + tags so the changelog can diff against the previous release.
+          # History + tags so the changelog can list recent commits and diff the release notes.
           fetch-depth: 0
 
       # Read the selected Minecraft version's pins first (bash only), so setup-java can pick the
@@ -136,18 +140,15 @@ jobs:
           fi
           echo "Release jar set OK ($count files)"
 
+      # The platform changelog: the last 3 commits, then a link to the full release notes.
       - name: Generate changelog
         run: |
-          prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
-          if [ -n "$prev" ]; then range="$prev..HEAD"; else range="HEAD"; fi
+          set -euo pipefail
           {
-            echo "Changes since ${prev:-the beginning}:"
-            echo
-            git log "$range" --no-merges --pretty=format:'- %s (`%h`)'
+            git log -3 --no-merges --pretty=format:'- %s (`%h`)'
             echo
             echo
-            echo "Loader-specific builds (Fabric / NeoForge single-loader jars) are published on GitHub:"
-            echo "https://github.com/${{ github.repository }}/releases/latest"
+            echo "Full changelog: ${CHANGELOG_LINK}"
           } > dist/changelog.md
           cat dist/changelog.md
 
