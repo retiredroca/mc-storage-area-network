@@ -90,9 +90,17 @@ public class NetworkShareTerminalBlock extends BaseEntityBlock implements Collec
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
-        if (level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity share) {
-            // Crouch + right-click toggles whether this sink is listed in the network.
+        if (level instanceof ServerLevel serverLevel
+                && level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity share) {
+            // Crouch + right-click toggles whether this sink is listed in the network. Only the owner
+            // (or their scoreboard team, when sharing is on) may toggle it.
             if (player.isSecondaryUseActive()) {
+                ContainerOwnership.Entry viewer = new ContainerOwnership.Entry(player.getUUID(),
+                        player.getGameProfile().getName());
+                if (!ContainerOwnership.canSee(serverLevel, ContainerOwnership.ownerOf(serverLevel, pos), viewer)) {
+                    player.displayClientMessage(Component.translatable("block.storage_network.terminal_locked"), true);
+                    return InteractionResult.CONSUME;
+                }
                 boolean exposed = share.toggleExposedToNetwork();
                 player.displayClientMessage(Component.translatable(exposed
                         ? "message.storage_network.output_exposed"
