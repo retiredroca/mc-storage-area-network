@@ -70,10 +70,33 @@ release still carries the full set of jars (including the current, unchanged API
 everything. The API uses `1.0.<yymmddhh>` (date-based patch); the gameplay mods and bundles use
 `1.0.0.<yymmddhh>`.
 
-### Release configuration (maintainers)
+### Releasing
 
-Releases run through the reusable workflow under `.github/workflows/` (`release-all.yml` plus the
-per-mod callers). Configure these on the repository:
+Releases can run **locally** (build + GitHub release, optionally CurseForge/Modrinth) or on
+**GitHub** (build + publish) as a fallback.
+
+**Locally** (recommended)
+
+```bash
+python tools/secrets.py init       # once: store CURSEFORGE_API_KEY / MODRINTH_TOKEN in an encrypted vault
+
+# build + sign + commit the version bump + signed tag + GitHub release (+ platforms)
+python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
+python tools/release.py --mod all --dry-run      # preview; no changes
+```
+
+`--mod` is `api` / `storage` / `crafting` / `routing` / `all`. The tag prefix (`api-v…`,
+`storage-v…`, `crafting-v…`, `routing-v…`, or `v…` for `all`) drives the publish-only workflow.
+Creating the release locally triggers that workflow automatically — unless the local run already
+published to the platforms (it marks the release so CI skips it). Add `--unsigned` to skip GPG.
+
+**On GitHub (fallback)**
+
+Run **Release All** (or a per-mod workflow) from the Actions tab, push a matching tag, or comment
+`/release-all`. That path bumps versions, builds and publishes from source — CI cannot sign with
+your key, so its tags are unsigned.
+
+### Repository configuration (maintainers)
 
 | Kind | Name | Purpose |
 |------|------|---------|
@@ -84,11 +107,26 @@ per-mod callers). Configure these on the repository:
 | Variable | `MODRINTH_STORAGE_ID` / `MODRINTH_CRAFTING_ID` / `MODRINTH_ROUTING_ID` | gameplay mod projects |
 
 **Token scopes** — CurseForge: a standard upload key. Modrinth PAT: `VERSION_CREATE` (upload) and
-`VERSION_WRITE` (archive superseded versions); `VERSION_DELETE` is not used by the workflow.
+`VERSION_WRITE` (archive superseded versions); `VERSION_DELETE` is not used.
 
 The CurseForge/Modrinth changelog is the last few commits plus a link to the full changelog on the
 GitHub release. A Modrinth project only becomes publicly visible once **Approved**; versions can be
 uploaded while it is still *Processing*.
+
+### Commit & tag signing (GPG)
+
+Commits and tags are signed with the maintainer's GPG key (on Windows, point Git at Gpg4win's gpg
+rather than Git for Windows' bundled copy, which can fight over the keybox):
+
+```bash
+git config --global gpg.program "C:/Program Files/GnuPG/bin/gpg.exe"
+git config --global user.signingkey <fingerprint>
+git config --global commit.gpgsign true
+git config --global tag.gpgSign true
+```
+
+Upload the public key to GitHub (Settings → SSH and GPG keys) so commits show **Verified**.
+`tools/release.py` creates the tag with `git tag -s`; pass `--unsigned` to skip signing.
 
 ## Requirements
 

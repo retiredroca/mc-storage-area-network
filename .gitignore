@@ -34,3 +34,11 @@ oc.sh
 
 # local dev session transcript (untracked)
 session.json
+
+# local release secrets (GPG-encrypted vault + any decrypted copy)
+.release-env
+.release-env.gpg
+
+# python bytecode
+__pycache__/
+*.pyc

@@ -1,0 +1,33 @@
+name: Publish Release to Platforms
+
+# Publishes an existing GitHub release's jars to CurseForge/Modrinth (no build). Normally triggered
+# by tools/release.py creating the release locally. Releases created by the build-mode workflow are
+# skipped (author is github-actions[bot]); releases the local tool already published are skipped too
+# (marker in the body).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to (re)publish'
+        required: true
+      minecraft:
+        description: 'Minecraft version (folder under versions/)'
+        default: '1.21.1'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.release.author.login != 'github-actions[bot]' &&
+       !contains(github.event.release.body, 'mc-san:published'))
+    uses: ./.github/workflows/release-mod.yml
+    with:
+      mode: publish
+      release_tag: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+      minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
+    secrets: inherit

@@ -1,0 +1,513 @@
+#!/usr/bin/env python3
+"""Local release driver.
+
+Builds the release jars, commits the version bump, creates the GitHub tag + release, and
+(optionally) uploads to CurseForge/Modrinth — so a release can be done without GitHub Actions.
+
+Typical use:
+
+    python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
+    python tools/release.py --mod all --dry-run
+
+By default only the GitHub release happens; CurseForge/Modrinth are opt-in (--curseforge /
+--modrinth) and read CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment (use secrets.py run
+to supply them from the encrypted vault). The tag prefix routes the publish-only CI workflow:
+`v…` = all, `api-v…`, `storage-v…`, `crafting-v…`, `routing-v…`.
+"""
+
+import argparse
+import datetime
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+VERSIONS = ROOT / "versions.properties"
+STATE = ROOT / "release-state.properties"
+DIST = ROOT / "dist"
+UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
+
+PREFIXES = {"api": "api-v", "storage": "storage-v", "crafting": "crafting-v", "routing": "routing-v", "all": "v"}
+COMPONENTS = ("api", "storage", "crafting", "routing")
+COMP_JAR = {"storage": "storage-network", "crafting": "crafting-network", "routing": "network-routing"}
+ALLOWED_JAR = re.compile(
+    r"^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-network-routing"
+    r"|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing)\.[0-9].*\.jar$"
+)
+
+
+def log(msg):
+    print(f"release: {msg}")
+
+
+def die(msg):
+    sys.exit(f"release: error: {msg}")
+
+
+# --- process helpers ----------------------------------------------------------------
+
+
+def run(cmd, dry=False, **kw):
+    printable = " ".join(str(c) for c in cmd)
+    if dry:
+        print(f"  [dry-run] {printable}")
+        return subprocess.CompletedProcess(cmd, 0, b"", b"")
+    log(printable)
+    return subprocess.run(cmd, cwd=ROOT, check=True, **kw)
+
+
+def capture(cmd):
+    return subprocess.run(cmd, cwd=ROOT, check=True, capture_output=True, text=True).stdout
+
+
+def gradlew():
+    if os.name == "nt":
+        return ["bash", str(ROOT / "gradlew")]
+    return [str(ROOT / "gradlew")]
+
+
+# --- versions.properties ------------------------------------------------------------
+
+
+def read_props(path):
+    props = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, _, value = line.partition("=")
+            props[key.strip()] = value.strip()
+    return props
+
+
+def set_prop(text, key, value):
+    pattern = re.compile(rf"(?m)^{re.escape(key)}=.*$")
+    if not pattern.search(text):
+        die(f"versions.properties has no '{key}=' line")
+    return pattern.sub(f"{key}={value}", text)
+
+
+def bump(mod, stamp):
+    text = VERSIONS.read_text(encoding="utf-8")
+    changed = {c: False for c in COMPONENTS}
+    targets = COMPONENTS if mod == "all" else (mod,)
+    for comp in targets:
+        if comp not in COMPONENTS:
+            die(f"unknown mod '{mod}'")
+        value = f"1.0.{stamp}" if comp == "api" else f"1.0.0.{stamp}"
+        text = set_prop(text, comp, value)
+        changed[comp] = True
+    VERSIONS.write_text(text, encoding="utf-8")
+    log(f"bumped {', '.join(targets)} to stamp {stamp}")
+    return changed
+
+
+# --- build --------------------------------------------------------------------------
+
+
+def build(mc, dry):
+    run(gradlew() + ["--no-daemon", f"-Pmc={mc}", "clean", "releaseJars", "publishRepo"], dry=dry)
+
+
+def collect(dry):
+    if not dry:
+        if DIST.exists():
+            shutil.rmtree(DIST)
+        DIST.mkdir()
+        release = ROOT / "build" / "release"
+        jars = sorted(release.glob("*.jar"))
+        if not jars:
+            die(f"no jars in {release}; did the build run?")
+        for jar in jars:
+            shutil.copy2(jar, DIST)
+    verify(dry)
+
+
+def verify(dry):
+    if dry:
+        return
+    jars = sorted(p.name for p in DIST.glob("*.jar"))
+    bad = [j for j in jars if not ALLOWED_JAR.match(j)]
+    if bad:
+        die(f"unexpected files in dist/: {bad}")
+    if len(jars) != 24:
+        die(f"expected 24 release jars, found {len(jars)}")
+    log(f"release jar set OK ({len(jars)} files)")
+
+
+def changelog(tag, dry):
+    if dry:
+        return
+    lines = capture(["git", "log", "-3", "--no-merges", "--pretty=format:- %s (`%h`)"])
+    link = f"https://github.com/{repo_slug()}/releases/tag/{tag}"
+    (DIST / "changelog.md").write_text(f"{lines}\n\nFull changelog: {link}\n", encoding="utf-8")
+    log("wrote dist/changelog.md")
+
+
+def bundle_versions():
+    out = {}
+    for key in ("all", "storage", "crafting", "routing"):
+        matches = sorted(DIST.glob(f"universal-bundle-{key}.*.jar"))
+        if not matches:
+            die(f"missing universal-bundle-{key}.*.jar in dist/")
+        out[key] = matches[0].name[len(f"universal-bundle-{key}."):-len(".jar")]
+    return out
+
+
+# --- git ----------------------------------------------------------------------------
+
+
+def repo_slug():
+    url = capture(["git", "remote", "get-url", "origin"]).strip()
+    m = re.search(r"github\.com[:/](?P<slug>[^/]+/[^/.]+?)(?:\.git)?$", url)
+    if not m:
+        die(f"cannot parse origin URL: {url}")
+    return m.group("slug")
+
+
+def current_branch():
+    return capture(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+
+
+def ensure_clean(allow_dirty):
+    if allow_dirty:
+        return
+    if capture(["git", "status", "--porcelain"]).strip():
+        die("working tree is dirty; commit/stash first or pass --allow-dirty")
+
+
+def commit(paths, message, dry, sign=True):
+    run(["git", "add", "--"] + [str(p) for p in paths], dry=dry)
+    if not dry and capture(["git", "diff", "--cached", "--name-only"]).strip() == "":
+        log("nothing staged; skipping commit")
+        return False
+    cmd = ["git"]
+    if not sign:
+        cmd += ["-c", "commit.gpgsign=false"]
+    cmd += ["commit", "-m", message]
+    run(cmd, dry=dry)
+    return True
+
+
+def tag_release(tag, message, sign, dry):
+    """Create the release tag locally (signed unless --unsigned) so it carries a GPG signature."""
+    if not dry and capture(["git", "tag", "--list", tag]).strip():
+        die(f"tag {tag} already exists; delete it or release with --tag")
+    cmd = ["git"]
+    if sign:
+        cmd += ["tag", "-s", tag, "-m", message]
+    else:
+        cmd += ["-c", "tag.gpgSign=false", "tag", tag, "-m", message]
+    run(cmd, dry=dry)
+
+
+# --- GitHub API ---------------------------------------------------------------------
+
+
+def github_token():
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        return token
+    out = subprocess.run(
+        ["git", "credential", "fill"],
+        input=b"protocol=https\nhost=github.com\n\n",
+        capture_output=True,
+    ).stdout.decode()
+    for line in out.splitlines():
+        if line.startswith("password="):
+            return line[len("password="):]
+    die("no GITHUB_TOKEN and no stored github.com credential")
+
+
+def gh_request(method, url, token, data=None, content_type="application/vnd.github+json"):
+    body = json.dumps(data).encode() if data is not None else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Authorization", f"token {token}")
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("User-Agent", UA)
+    if body is not None:
+        req.add_header("Content-Type", content_type)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            payload = resp.read().decode()
+            return resp.status, (json.loads(payload) if payload else None)
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode()
+
+
+def github_release(token, tag, target, body, dry):
+    url = f"https://api.github.com/repos/{repo_slug()}/releases"
+    if dry:
+        print(f"  [dry-run] POST {url} tag={tag} target={target} generate_release_notes=true")
+        return None
+    status, resp = gh_request("POST", url, token, {
+        "tag_name": tag,
+        "target_commitish": target,
+        "name": f"MC Storage Area Network {tag}",
+        "body": body,
+        "draft": False,
+        "prerelease": False,
+        "generate_release_notes": True,
+    })
+    if status not in (200, 201):
+        die(f"GitHub release create failed ({status}): {resp}")
+    return resp
+
+
+def upload_assets(token, release_id, dry):
+    for jar in sorted(DIST.glob("*.jar")):
+        url = f"https://uploads.github.com/repos/{repo_slug()}/releases/{release_id}/assets?name={jar.name}"
+        if dry:
+            print(f"  [dry-run] upload {jar.name}")
+            continue
+        req = urllib.request.Request(url, data=jar.read_bytes(), method="POST")
+        req.add_header("Authorization", f"token {token}")
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("User-Agent", UA)
+        req.add_header("Content-Type", "application/octet-stream")
+        try:
+            with urllib.request.urlopen(req) as resp:
+                log(f"uploaded {jar.name} ({resp.status})")
+        except urllib.error.HTTPError as exc:
+            die(f"asset upload failed for {jar.name} ({exc.code}): {exc.read().decode()}")
+
+
+# --- CurseForge ---------------------------------------------------------------------
+
+
+def cf_headers(token):
+    return {"X-Api-Token": token, "Accept": "application/json", "User-Agent": UA}
+
+
+def cf_game_version_ids(token, mc, dry):
+    url = "https://minecraft.curseforge.com/api/game/versions"
+    if dry:
+        print(f"  [dry-run] GET {url}")
+        return []
+    req = urllib.request.Request(url, headers=cf_headers(token))
+    with urllib.request.urlopen(req) as resp:
+        rows = json.load(resp)
+    wanted = {mc: True, "Fabric": True, "NeoForge": True}
+    ids = [r["id"] for r in rows if r.get("name") in wanted]
+    log(f"CurseForge game version ids for {mc}: {ids}")
+    return ids
+
+
+def cf_upload(token, project_id, file_path, metadata, dry, attempt_retries=5):
+    url = f"https://minecraft.curseforge.com/api/projects/{project_id}/upload-file"
+    if dry:
+        print(f"  [dry-run] POST {url} <- {file_path.name}")
+        return None
+    for attempt in range(1, attempt_retries + 1):
+        proc = subprocess.run(
+            ["curl", "-fsS", "-X", "POST", url, "-H", f"X-Api-Token: {token}",
+             "-F", f"metadata={json.dumps(metadata)};type=application/json",
+             "-F", f"file=@{file_path}"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        if proc.returncode == 0:
+            try:
+                return json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                die(f"CurseForge returned non-JSON: {proc.stdout[:200]}")
+        log(f"CurseForge upload attempt {attempt} failed: {proc.stderr.strip()[:160]}")
+        import time
+        time.sleep(15)
+    die(f"CurseForge upload gave up on {file_path.name}")
+
+
+def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
+    version_ids = cf_game_version_ids(token, mc, dry)
+    common = {"releaseType": "release", "gameVersions": version_ids,
+              "changelog": (DIST / "changelog.md").read_text(encoding="utf-8") if (DIST / "changelog.md").exists() else "",
+              "changelogType": "markdown"}
+    parent_key = f"cf.api.file.{mc}"
+
+    if changed["api"]:
+        api_jar = DIST / f"universal_mc_san_api.{versions['api']}.jar"
+        result = cf_upload(token, project_id, api_jar, {**common, "displayName": api_jar.name}, dry)
+        file_id = (result or {}).get("id")
+        if file_id:
+            set_state(parent_key, str(file_id))
+            log(f"{parent_key}={file_id}")
+            for comp in ("storage", "crafting", "routing"):
+                jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
+                if jar.exists():
+                    cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
+    else:
+        parent = read_props(STATE).get(parent_key) if STATE.exists() else None
+        if parent:
+            for comp in ("storage", "crafting", "routing"):
+                if not changed[comp]:
+                    continue
+                jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
+                if jar.exists():
+                    cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
+
+    # Bundles (bundle-all always; the rest when their content changed).
+    bundle_jobs = [f"universal-bundle-all.{bundles['all']}.jar"]
+    if changed["api"] or changed["storage"]:
+        bundle_jobs.append(f"universal-bundle-storage.{bundles['storage']}.jar")
+    if changed["api"] or changed["crafting"]:
+        bundle_jobs.append(f"universal-bundle-crafting.{bundles['crafting']}.jar")
+    if changed["api"] or changed["storage"] or changed["routing"]:
+        bundle_jobs.append(f"universal-bundle-routing.{bundles['routing']}.jar")
+    for filename in bundle_jobs:
+        jar = DIST / filename
+        if jar.exists():
+            cf_upload(token, project_id, jar, {**common, "displayName": jar.name}, dry)
+
+
+# --- Modrinth -----------------------------------------------------------------------
+
+
+def modrinth_sync(token, project, state_key, version_number, version_name, mc, primary, extras, dry):
+    data = {
+        "project_id": project,
+        "name": version_name,
+        "version_number": version_number,
+        "changelog": (DIST / "changelog.md").read_text(encoding="utf-8") if (DIST / "changelog.md").exists() else "",
+        "version_type": "release",
+        "status": "listed",
+        "featured": False,
+        "environment": "client_and_server",
+        "loaders": ["fabric", "neoforge"],
+        "game_versions": [mc],
+        "dependencies": [],
+    }
+    previous = read_props(STATE).get(state_key) if STATE.exists() else None
+    if dry:
+        print(f"  [dry-run] modrinth POST /v2/version project={project} v={version_number} files={[primary.name] + [e.name for e in extras]}")
+        return
+    cmd = ["curl", "-fsS", "-X", "POST", "https://api.modrinth.com/v2/version",
+           "-H", f"Authorization: {token}",
+           "-F", f"data={json.dumps(data)};type=application/json",
+           "-F", f"file=@{primary}"]
+    for extra in extras:
+        cmd += ["-F", f"file=@{extra}"]
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+    if proc.returncode != 0:
+        log(f"modrinth: upload failed: {proc.stderr.strip()[:200]}")
+        return
+    new_id = json.loads(proc.stdout).get("id")
+    if not new_id:
+        log(f"modrinth: no id in response: {proc.stdout[:200]}")
+        return
+    set_state(state_key, new_id)
+    log(f"modrinth: created {new_id} ({version_number})")
+    if previous and previous != new_id:
+        req = urllib.request.Request(
+            f"https://api.modrinth.com/v2/version/{previous}",
+            data=b'{"requested_status":"archived"}', method="PATCH")
+        req.add_header("Authorization", token)
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", UA)
+        try:
+            urllib.request.urlopen(req)
+            log(f"modrinth: archived {previous}")
+        except urllib.error.HTTPError as exc:
+            log(f"modrinth: could not archive {previous} ({exc.code})")
+
+
+# --- release-state.properties -------------------------------------------------------
+
+
+def set_state(key, value):
+    lines = STATE.read_text(encoding="utf-8").splitlines() if STATE.exists() else []
+    pattern = re.compile(rf"^{re.escape(key)}=.*$")
+    for i, line in enumerate(lines):
+        if pattern.match(line):
+            lines[i] = f"{key}={value}"
+            break
+    else:
+        lines.append(f"{key}={value}")
+    STATE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# --- orchestration ------------------------------------------------------------------
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Build and publish a release locally.")
+    ap.add_argument("--mod", required=True, choices=list(PREFIXES), help="which component is changing")
+    ap.add_argument("--mc", default="1.21.1")
+    ap.add_argument("--tag", default=None)
+    ap.add_argument("--curseforge", action="store_true", help="also upload to CurseForge")
+    ap.add_argument("--modrinth", action="store_true", help="also upload to Modrinth")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--unsigned", action="store_true", help="do not GPG-sign the commit and tag")
+    ap.add_argument("--allow-dirty", action="store_true")
+    ap.add_argument("--no-push", action="store_true")
+    ap.add_argument("--skip-build", action="store_true", help="reuse the existing dist/")
+    args = ap.parse_args()
+
+    dry = args.dry_run
+    ensure_clean(args.allow_dirty)
+
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d%H")
+    changed = bump(args.mod, stamp)
+    versions = read_props(VERSIONS)
+
+    if args.tag:
+        tag = args.tag
+    else:
+        prefix = PREFIXES[args.mod]
+        core = versions["api"] if args.mod == "api" else (versions[args.mod] if args.mod != "all" else f"1.0.0.{stamp}")
+        tag = f"{prefix}{core}"
+    log(f"tag: {tag}")
+
+    if not args.skip_build:
+        build(args.mc, dry)
+        collect(dry)
+    else:
+        verify(dry)
+    changelog(tag, dry)
+
+    sign = not args.unsigned
+
+    # Commit the bump (so the tag points at the bumped versions), then sign+push the tag.
+    if commit([VERSIONS, ROOT / "repo"], f"Release {tag}: bump {args.mod} version", dry, sign):
+        if not args.no_push:
+            run(["git", "push", "origin", current_branch()], dry=dry)
+    tag_release(tag, f"Release {tag}", sign, dry)
+    if not args.no_push:
+        run(["git", "push", "origin", tag], dry=dry)
+
+    # GitHub release against the tag we just pushed.
+    token = github_token()
+    target = capture(["git", "rev-parse", "HEAD"]).strip()
+    marker = "<!-- mc-san:published -->" if (args.curseforge or args.modrinth) else ""
+    release = github_release(token, tag, target, marker, dry)
+    if release:
+        upload_assets(token, release["id"], dry)
+
+    bundles = bundle_versions()
+
+    if args.curseforge:
+        cf = os.environ.get("CURSEFORGE_API_KEY")
+        if not cf:
+            die("--curseforge needs CURSEFORGE_API_KEY (use tools/secrets.py run)")
+        cf_publish(cf, os.environ.get("CURSEFORGE_PROJECT_ID", "1690770"), args.mc, changed, versions, bundles, dry)
+
+    if args.modrinth:
+        mr = os.environ.get("MODRINTH_TOKEN")
+        if not mr:
+            die("--modrinth needs MODRINTH_TOKEN (use tools/secrets.py run)")
+        modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
+                      f"mr.api.version.{args.mc}", versions["api"], f"SAN API {versions['api']}", args.mc,
+                      DIST / f"universal_mc_san_api.{versions['api']}.jar",
+                      [DIST / f"universal-bundle-all.{bundles['all']}.jar"], dry)
+
+    if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
+        run(["git", "push", "origin", current_branch()], dry=dry)
+
+    log("done")
+
+
+if __name__ == "__main__":
+    main()

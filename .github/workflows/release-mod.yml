@@ -3,16 +3,22 @@ name: Release Mod (reusable)
 on:
   workflow_call:
     inputs:
-      mod:
-        description: 'Which mod triggered this release: api | storage | crafting | routing | all'
-        required: true
+      mode:
+        description: 'build = bump + build + GitHub release + publish; publish = download an existing GitHub release and publish it'
+        required: false
         type: string
+        default: 'build'
+      mod:
+        description: 'Which mod triggered this release (build mode): api | storage | crafting | routing | all'
+        required: false
+        type: string
+        default: ''
       release_tag:
         description: 'Git tag / version for this release'
         required: true
         type: string
       minecraft:
-        description: 'Minecraft version to build (folder under versions/)'
+        description: 'Minecraft version (folder under versions/)'
         required: false
         type: string
         default: '1.21.1'
@@ -30,11 +36,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # History + tags so the changelog can list recent commits and diff the release notes.
+          # build mode: the triggering commit. publish mode: the released tag (so versions.properties
+          # and the changelog match the jars we're about to publish).
+          ref: ${{ inputs.mode == 'publish' && inputs.release_tag || github.sha }}
+          # History + tags so the changelog can list recent commits and diff versions.properties.
           fetch-depth: 0
 
-      # Read the selected Minecraft version's pins first (bash only), so setup-java can pick the
-      # right JDK: 21 for 1.21.x, 25 for 26.1+.
+      # Read the selected Minecraft version's pins (bash only); the Java version feeds the CF
+      # metadata and, in build mode, the setup-java step.
       - name: Resolve version pins
         run: |
           set -euo pipefail
@@ -49,15 +58,16 @@ jobs:
             echo "MC_VERSION=$mc"
             echo "JAVA_VERSION=${java_ver:-21}"
           } >> "$GITHUB_ENV"
-          echo "Building Minecraft ${mc} with Java ${java_ver:-21}"
+          echo "Minecraft ${mc} (Java ${java_ver:-21})"
 
       - uses: actions/setup-java@v5
+        if: ${{ inputs.mode == 'build' }}
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      # The committed gradle.properties point at a local Windows JDK; drop that on CI
-      # and let the toolchain / JAVA_HOME take over.
+      # Drop the committed local Windows JDK path (build mode) and make the provider scripts
+      # executable (both modes).
       - name: Prepare
         run: |
           find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
@@ -67,6 +77,7 @@ jobs:
       # Only the component(s) in the trigger get a new version. Everything else keeps
       # its version (and is still compiled, so bundles always have a local jar).
       - name: Bump component versions
+        if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
           mod='${{ inputs.mod }}'
@@ -109,15 +120,29 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build
+        if: ${{ inputs.mode == 'build' }}
         run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" clean releaseJars publishRepo
 
       - name: Collect release jars
+        if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
           # Clear any pre-existing dist/ so a reused/self-hosted workspace can't leak a stale jar.
           rm -rf dist
           mkdir -p dist
           cp build/release/*.jar dist/
+          ls -la dist
+
+      # publish mode: the jars come from the GitHub release the local (or a previous) run made.
+      - name: Download release assets
+        if: ${{ inputs.mode == 'publish' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          gh release download '${{ inputs.release_tag }}' --dir dist --pattern '*.jar' --clobber
           ls -la dist
 
       # Safety net: only the expected release jars may be published. Anything else (for example a
@@ -139,6 +164,44 @@ jobs:
             exit 1
           fi
           echo "Release jar set OK ($count files)"
+
+      # publish mode: read the versions from the released commit and infer which components changed
+      # by diffing versions.properties against the previous tag (build mode set these when bumping).
+      - name: Resolve released versions + changed components
+        if: ${{ inputs.mode == 'publish' }}
+        run: |
+          set -euo pipefail
+          tag='${{ inputs.release_tag }}'
+          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2)
+          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2)
+          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2)
+          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2)
+
+          prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
+          api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
+          if [ -z "$prev" ]; then
+            echo "No previous tag; treating every component as changed."
+            api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true
+          else
+            echo "Diffing versions.properties: ${prev}..${tag}"
+            diff=$(git diff "$prev" "$tag" -- versions.properties || true)
+            echo "$diff"
+            if echo "$diff" | grep -qE '^[-+]api='; then api_changed=true; fi
+            if echo "$diff" | grep -qE '^[-+]storage='; then storage_changed=true; fi
+            if echo "$diff" | grep -qE '^[-+]crafting='; then crafting_changed=true; fi
+            if echo "$diff" | grep -qE '^[-+]routing='; then routing_changed=true; fi
+          fi
+
+          {
+            echo "API_VERSION=$api"
+            echo "STORAGE_VERSION=$storage"
+            echo "CRAFTING_VERSION=$crafting"
+            echo "ROUTING_VERSION=$routing"
+            echo "API_CHANGED=$api_changed"
+            echo "STORAGE_CHANGED=$storage_changed"
+            echo "CRAFTING_CHANGED=$crafting_changed"
+            echo "ROUTING_CHANGED=$routing_changed"
+          } >> "$GITHUB_ENV"
 
       # The platform changelog: the last 3 commits, then a link to the full release notes.
       - name: Generate changelog
@@ -167,12 +230,14 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
+        if: ${{ inputs.mode == 'build' }}
         with:
           name: release-jars
           path: dist/*.jar
 
       # --- GitHub release: every jar, including the unchanged API at its current version ------
       - name: Publish GitHub release
+        if: ${{ inputs.mode == 'build' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -405,5 +470,5 @@ jobs:
           git checkout -B main origin/main
           git stash pop
           git add versions.properties release-state.properties
-          git commit -m "Release ${{ inputs.release_tag }}: bump ${{ inputs.mod }} version"
+          git commit -m "Release ${{ inputs.release_tag }}: update release state"
           git push origin main
