@@ -93,7 +93,7 @@ publishing {
     publications {
         register('mavenJava', MavenPublication) {
             from components.java
-            artifactId = "${mod_id}-neoforge"
+            artifactId = "${mod_id}-neoforge-${targetMc}"
         }
     }
     repositories {

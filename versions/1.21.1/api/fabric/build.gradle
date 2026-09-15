@@ -89,7 +89,7 @@ publishing {
                 builtBy sourcesJar
                 classifier = 'sources'
             }
-            artifactId = "${mod_id}-fabric"
+            artifactId = "${mod_id}-fabric-${targetMc}"
         }
     }
     repositories {

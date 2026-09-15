@@ -56,8 +56,10 @@ def neoName = [api: 'mc_storage_area_network-neoforge.jar',
                crafting: 'crafting-network-neoforge.jar']
 
 def staticTokens = [
-        '@@AUTHORS@@': 'Retired Roca',
-        '@@LICENSE@@': 'Apache-2.0',
+        '@@AUTHORS@@'          : 'Retired Roca',
+        '@@LICENSE@@'          : 'Apache-2.0',
+        '@@MC_VERSION@@'       : mc,
+        '@@MC_VERSION_RANGE@@' : mc,
 ]
 def apiTokens = staticTokens + ['@@VERSION@@': apiVersion]
 def versionTokens = {
@@ -132,7 +134,7 @@ tasks.register('apiUniversalJar', Jar) {
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    from('bundle') {
+    from('bundler/bundle') {
         filter { String line ->
             def out = line
             apiTokens.each { token, value -> out = out.replace(token, value) }
@@ -194,17 +196,17 @@ def allBundleVersion = bundleVersionFor(allMods)
 def storageBundleVersion = bundleVersionFor(storageMods)
 def craftingBundleVersion = bundleVersionFor(craftingMods)
 
-registerBundle('bundleAllJar', 'bundle-all', 'universal-bundle-all', allBundleVersion, allMods, allMods)
-registerBundle('bundleStorageJar', 'bundle-storage', 'universal-bundle-storage', storageBundleVersion, storageMods, storageMods)
-registerBundle('bundleCraftingJar', 'bundle-crafting', 'universal-bundle-crafting', craftingBundleVersion, craftingMods, craftingMods)
+registerBundle('bundleAllJar', 'bundler/bundle-all', 'universal-bundle-all', allBundleVersion, allMods, allMods)
+registerBundle('bundleStorageJar', 'bundler/bundle-storage', 'universal-bundle-storage', storageBundleVersion, storageMods, storageMods)
+registerBundle('bundleCraftingJar', 'bundler/bundle-crafting', 'universal-bundle-crafting', craftingBundleVersion, craftingMods, craftingMods)
 
-registerBundle('fabricBundleAllJar', 'bundle-all-fabric', 'fabric-bundle-all', allBundleVersion, allMods, [])
-registerBundle('fabricBundleStorageJar', 'bundle-storage-fabric', 'fabric-bundle-storage', storageBundleVersion, storageMods, [])
-registerBundle('fabricBundleCraftingJar', 'bundle-crafting-fabric', 'fabric-bundle-crafting', craftingBundleVersion, craftingMods, [])
+registerBundle('fabricBundleAllJar', 'bundler/bundle-all-fabric', 'fabric-bundle-all', allBundleVersion, allMods, [])
+registerBundle('fabricBundleStorageJar', 'bundler/bundle-storage-fabric', 'fabric-bundle-storage', storageBundleVersion, storageMods, [])
+registerBundle('fabricBundleCraftingJar', 'bundler/bundle-crafting-fabric', 'fabric-bundle-crafting', craftingBundleVersion, craftingMods, [])
 
-registerBundle('neoforgeBundleAllJar', 'bundle-all-neoforge', 'neoforge-bundle-all', allBundleVersion, [], allMods)
-registerBundle('neoforgeBundleStorageJar', 'bundle-storage-neoforge', 'neoforge-bundle-storage', storageBundleVersion, [], storageMods)
-registerBundle('neoforgeBundleCraftingJar', 'bundle-crafting-neoforge', 'neoforge-bundle-crafting', craftingBundleVersion, [], craftingMods)
+registerBundle('neoforgeBundleAllJar', 'bundler/bundle-all-neoforge', 'neoforge-bundle-all', allBundleVersion, [], allMods)
+registerBundle('neoforgeBundleStorageJar', 'bundler/bundle-storage-neoforge', 'neoforge-bundle-storage', storageBundleVersion, [], storageMods)
+registerBundle('neoforgeBundleCraftingJar', 'bundler/bundle-crafting-neoforge', 'neoforge-bundle-crafting', craftingBundleVersion, [], craftingMods)
 
 /**
  * Collects every release jar under build/release/ with its final published name: the bundle
@@ -266,7 +268,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             artifact(tasks.named('apiUniversalJar'))
-            artifactId = 'mc-storage-area-network'
+            artifactId = "mc-storage-area-network-${mc}"
         }
     }
     repositories {

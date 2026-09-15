@@ -84,7 +84,7 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
     // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
-    modImplementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:${api_version}"
+    modImplementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-${targetMc}:${api_version}"
 }
 
 processResources {

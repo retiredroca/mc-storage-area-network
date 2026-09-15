@@ -162,7 +162,7 @@ dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
 
     // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
-    implementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:${api_version}"
+    implementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-${targetMc}:${api_version}"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

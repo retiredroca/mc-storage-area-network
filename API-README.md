@@ -52,18 +52,19 @@ repositories {
 
 ```groovy
 // Fabric
-modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.+'
+modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:1.0.+'
 
 // NeoForge
-implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.+'
+implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:1.0.+'
 ```
 
-The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the API source
-changes — releasing the gameplay mods does not bump it. `1.0.+` tracks the latest `1.0.x` build.
-Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
+The artifact id ends with the **Minecraft version** (`-1.21.1`), so one Maven repository serves every
+supported version. The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the
+API source changes — releasing the gameplay mods does not bump it. `1.0.+` tracks the latest `1.0.x`
+build. Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
 
 ```
-com.retiredroca.mcstorageareanetwork:mc-storage-area-network:1.0.<yymmddhh>:universal
+com.retiredroca.mcstorageareanetwork:mc-storage-area-network-1.21.1:1.0.<yymmddhh>
 ```
 
 > Compile against the **per-loader** artifact for your mod. The `com.retiredroca.mcstorageareanetwork.api`

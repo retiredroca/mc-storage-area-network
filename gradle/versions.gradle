@@ -22,3 +22,16 @@ ext.craftingVersion = componentVersions.getProperty('crafting')
 // Version stamps are fixed-width YYMMDDHH, so lexical max == most recent.
 ext.stampOf = { String v -> v.tokenize('.').last() as String }
 ext.newestStamp = { List<String> versions -> versions.collect { stampOf(it) }.max() }
+
+// Multi-version: loader builds live under versions/<mc>/, so each finds its own per-version
+// pins (MC/loader/toolchain) by walking up for version.properties. Exposes the MC version so
+// maven artifact ids and dependencies can be scoped to it.
+def versionPropsFile = {
+    def d = projectDir
+    while (d != null && !new File(d, 'version.properties').exists()) {
+        d = d.parentFile
+    }
+    d == null ? null : new File(d, 'version.properties')
+}()
+ext.versionPropsFile = versionPropsFile
+ext.targetMc = versionPropsFile?.parentFile?.name

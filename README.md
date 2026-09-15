@@ -85,8 +85,8 @@ repositories {
 }
 dependencies {
     // Compile against the per-loader artifact for your mod. (1.0.+ tracks the 1.0.x series.)
-    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric:1.0.+' // Fabric
-    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge:1.0.+' // NeoForge
+    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:1.0.+' // Fabric
+    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:1.0.+' // NeoForge
 }
 ```
 
