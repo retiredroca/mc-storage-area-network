@@ -11,6 +11,11 @@ on:
         description: 'Git tag / version for this release'
         required: true
         type: string
+      minecraft:
+        description: 'Minecraft version to build (folder under versions/)'
+        required: false
+        type: string
+        default: '1.21.1'
 
 permissions:
   contents: write
@@ -24,10 +29,28 @@ jobs:
           # Full history + tags so the changelog can diff against the previous release.
           fetch-depth: 0
 
+      # Read the selected Minecraft version's pins first (bash only), so setup-java can pick the
+      # right JDK: 21 for 1.21.x, 25 for 26.1+.
+      - name: Resolve version pins
+        run: |
+          set -euo pipefail
+          mc='${{ inputs.minecraft }}'
+          props="versions/${mc}/version.properties"
+          if [ ! -f "$props" ]; then
+            echo "No such Minecraft version: $props" >&2
+            exit 1
+          fi
+          java_ver=$(grep -E '^java_version=' "$props" | head -1 | cut -d= -f2)
+          {
+            echo "MC_VERSION=$mc"
+            echo "JAVA_VERSION=${java_ver:-21}"
+          } >> "$GITHUB_ENV"
+          echo "Building Minecraft ${mc} with Java ${java_ver:-21}"
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
 
       # The committed gradle.properties point at a local Windows JDK; drop that on CI
       # and let the toolchain / JAVA_HOME take over.
@@ -76,7 +99,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build
-        run: ./gradlew --no-daemon clean releaseJars publishRepo
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" clean releaseJars publishRepo
 
       - name: Collect release jars
         run: |
@@ -147,11 +170,11 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
           version-type: release
-          game-versions: 1.21.1
+          game-versions: ${{ env.MC_VERSION }}
           loaders: |
             fabric
             neoforge
-          java: 21
+          java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
           fail-mode: warn
@@ -161,12 +184,16 @@ jobs:
         run: |
           set -euo pipefail
           file_id=$(echo '${{ steps.cf_api.outputs.curseforge-files }}' | jq -r '.[0].id // empty')
+          key="cf.api.file.${MC_VERSION}"
           if [ -z "$file_id" ]; then
-            echo "Could not read the CurseForge file id; cf.api.file left unchanged."
+            echo "Could not read the CurseForge file id; ${key} left unchanged."
             echo '${{ steps.cf_api.outputs.curseforge-files }}'
+          elif grep -qE "^${key}=" release-state.properties; then
+            sed -i -E "s|^${key}=.*|${key}=${file_id}|" release-state.properties
+            echo "${key}=${file_id}"
           else
-            sed -i -E "s/^cf.api.file=.*/cf.api.file=$file_id/" release-state.properties
-            echo "cf.api.file=$file_id"
+            printf '%s=%s\n' "$key" "$file_id" >> release-state.properties
+            echo "${key}=${file_id}"
           fi
 
       # API unchanged: attach the updated mod(s) under the existing SAN API entry instead of
@@ -177,7 +204,7 @@ jobs:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_API_KEY }}
         run: |
           set -euo pipefail
-          parent=$(grep -E '^cf.api.file=' release-state.properties | head -1 | cut -d= -f2)
+          parent=$(grep -E "^cf\.api\.file\.${MC_VERSION}=" release-state.properties | head -1 | cut -d= -f2)
           files=()
           if [ "$STORAGE_CHANGED" = true ]; then
             files+=("dist/universal-storage-network.${STORAGE_VERSION}.jar")
@@ -201,11 +228,11 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
           version-type: release
-          game-versions: 1.21.1
+          game-versions: ${{ env.MC_VERSION }}
           loaders: |
             fabric
             neoforge
-          java: 21
+          java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
           fail-mode: warn
@@ -223,11 +250,11 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
           version-type: release
-          game-versions: 1.21.1
+          game-versions: ${{ env.MC_VERSION }}
           loaders: |
             fabric
             neoforge
-          java: 21
+          java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
           fail-mode: warn
@@ -245,11 +272,11 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
           version-type: release
-          game-versions: 1.21.1
+          game-versions: ${{ env.MC_VERSION }}
           loaders: |
             fabric
             neoforge
-          java: 21
+          java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
           fail-mode: warn
@@ -262,7 +289,7 @@ jobs:
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
-            mr.api.version "$API_VERSION" "SAN API $API_VERSION" \
+            mr.api.version.${MC_VERSION} "$API_VERSION" "SAN API $API_VERSION" \
             "dist/universal_mc_san_api.${API_VERSION}.jar" \
             "dist/universal-bundle-all.${BUNDLE_ALL_VERSION}.jar"
 
@@ -273,7 +300,7 @@ jobs:
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
-            mr.storage.version "$STORAGE_VERSION" "Storage Network $STORAGE_VERSION" \
+            mr.storage.version.${MC_VERSION} "$STORAGE_VERSION" "Storage Network $STORAGE_VERSION" \
             "dist/universal-storage-network.${STORAGE_VERSION}.jar" \
             "dist/universal-bundle-storage.${BUNDLE_STORAGE_VERSION}.jar"
 
@@ -284,7 +311,7 @@ jobs:
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
-            mr.crafting.version "$CRAFTING_VERSION" "Crafting Network $CRAFTING_VERSION" \
+            mr.crafting.version.${MC_VERSION} "$CRAFTING_VERSION" "Crafting Network $CRAFTING_VERSION" \
             "dist/universal-crafting-network.${CRAFTING_VERSION}.jar" \
             "dist/universal-bundle-crafting.${BUNDLE_CRAFTING_VERSION}.jar"
 
