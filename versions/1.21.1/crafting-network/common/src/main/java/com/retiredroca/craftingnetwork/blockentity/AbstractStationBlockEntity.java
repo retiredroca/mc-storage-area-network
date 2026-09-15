@@ -541,11 +541,9 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         }
         if (fuel.isEmpty() && !input.isEmpty() && burnTime == 0) {
             ItemStack f = selectFuel();
-            // Pull a whole stack so the fuel stays visible in the fuel slot and is consumed one item
-            // per burn (like a furnace), instead of being pulled and consumed within a single tick.
-            int got = f.isEmpty() ? 0 : pullFromNetwork(f, f.getMaxStackSize());
+            int got = f.isEmpty() ? 0 : pullFromNetwork(f, 1);
             if (got > 0) {
-                fuel = f.copyWithCount(got);
+                fuel = f.copy();
             } else {
                 // Out of fuel: there is nothing to burn with, so return the held ingredient to the
                 // network rather than letting it get stuck in the machine.
@@ -891,6 +889,11 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
         int progressPct = type.baseCookTicks() <= 0 ? 0
                 : Math.min(100, (int) (type.isBrewing() ? (brewProgress * 100.0f / type.baseCookTicks())
                         : (cookProgress * 100.0f / type.baseCookTicks())));
+        // Vanilla-style "lit" fraction: the burning flame for cooking, the blaze-powder charge for
+        // brewing. Drives the vanilla progress animations.
+        int litPct = type.isBrewing()
+                ? Math.min(100, fuelCharge * 100 / 20)
+                : (burnTimeTotal > 0 ? Math.min(100, burnTime * 100 / burnTimeTotal) : 0);
         if (type.isBrewing()) {
             List<com.retiredroca.craftingnetwork.station.StationSlot> slots = new ArrayList<>(5);
             for (int i = 0; i < 3; i++) {
@@ -902,14 +905,14 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             slots.add(new com.retiredroca.craftingnetwork.station.StationSlot(
                     "gui.crafting_network.slot_fuel", fuelCharge > 0 ? new ItemStack(Items.BLAZE_POWDER) : ItemStack.EMPTY));
             StationStatus status = getStatus();
-            return new StationState(status, slots, progressPct, brewTarget, craftablePotions, shulkersFirst, inventoryFirst);
+            return new StationState(status, slots, progressPct, litPct, brewTarget, craftablePotions, shulkersFirst, inventoryFirst);
         }
         List<com.retiredroca.craftingnetwork.station.StationSlot> slots = List.of(
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_input", input.copy()),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_fuel", fuel.copy()),
                 new com.retiredroca.craftingnetwork.station.StationSlot("gui.crafting_network.slot_result", result.copy()));
         StationStatus status = getStatus();
-        return new StationState(status, slots, progressPct, "", List.of(), shulkersFirst, inventoryFirst);
+        return new StationState(status, slots, progressPct, litPct, "", List.of(), shulkersFirst, inventoryFirst);
     }
 
     public boolean stillValid(Player player) {

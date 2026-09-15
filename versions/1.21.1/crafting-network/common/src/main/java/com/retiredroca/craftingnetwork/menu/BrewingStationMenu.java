@@ -106,7 +106,7 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
             return station.getState();
         }
         return lastSentState != null ? lastSentState
-                : new StationState(StationStatus.IDLE, List.of(), 0, "", List.of(), false, false);
+                : new StationState(StationStatus.IDLE, List.of(), 0, 0, "", List.of(), false, false);
     }
 
     @Override

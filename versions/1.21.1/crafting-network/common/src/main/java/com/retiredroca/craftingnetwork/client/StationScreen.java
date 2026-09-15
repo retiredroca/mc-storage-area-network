@@ -27,6 +27,7 @@ import net.minecraft.client.gui.screens.recipebook.SmokingRecipeBookComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
@@ -49,6 +50,27 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
             "textures/gui/container/brewing_stand.png");
     private static final ResourceLocation RECIPE_BOOK_TEX = ResourceLocation.withDefaultNamespace(
             "textures/gui/recipe_book.png");
+    // Vanilla progress-animation sprites (the burning flame, the cook arrow, and the brewing stand's
+    // fuel bar / brew arrow / bubbles).
+    private static final ResourceLocation LIT_PROGRESS_FURNACE = ResourceLocation.withDefaultNamespace(
+            "container/furnace/lit_progress");
+    private static final ResourceLocation BURN_PROGRESS_FURNACE = ResourceLocation.withDefaultNamespace(
+            "container/furnace/burn_progress");
+    private static final ResourceLocation LIT_PROGRESS_BLAST = ResourceLocation.withDefaultNamespace(
+            "container/blast_furnace/lit_progress");
+    private static final ResourceLocation BURN_PROGRESS_BLAST = ResourceLocation.withDefaultNamespace(
+            "container/blast_furnace/burn_progress");
+    private static final ResourceLocation LIT_PROGRESS_SMOKER = ResourceLocation.withDefaultNamespace(
+            "container/smoker/lit_progress");
+    private static final ResourceLocation BURN_PROGRESS_SMOKER = ResourceLocation.withDefaultNamespace(
+            "container/smoker/burn_progress");
+    private static final ResourceLocation BREW_FUEL_SPRITE = ResourceLocation.withDefaultNamespace(
+            "container/brewing_stand/fuel_length");
+    private static final ResourceLocation BREW_PROGRESS_SPRITE = ResourceLocation.withDefaultNamespace(
+            "container/brewing_stand/brew_progress");
+    private static final ResourceLocation BUBBLES_SPRITE = ResourceLocation.withDefaultNamespace(
+            "container/brewing_stand/bubbles");
+    private static final int[] BUBBLE_LENGTHS = { 29, 24, 20, 16, 11, 6, 0 };
     private static final ResourceLocation BREW_SLOT_CRAFTABLE = ResourceLocation.withDefaultNamespace(
             "recipe_book/slot_craftable");
     private static final ResourceLocation BREW_SLOT_UNCRAFTABLE = ResourceLocation.withDefaultNamespace(
@@ -462,31 +484,46 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
         int x = this.leftPos;
         int y = this.topPos;
 
-        if (!isBrewing()) {
-            ResourceLocation bg = switch (type) {
-                case BLASTING -> BLAST_FURNACE_BG;
-                case SMOKING -> SMOKER_BG;
-                default -> FURNACE_BG;
-            };
-            if (state.status() == StationStatus.RUNNING && state.progress() > 0) {
-                int arrowProgress = state.progress() * 24 / 100;
-                guiGraphics.blit(bg, x + 79, y + 17, 176, 14, arrowProgress, 17);
+        if (isBrewing()) {
+            // Vanilla brewing stand animation: fuel bar, brew arrow and bubbles.
+            int fuel = Math.min(20, state.litProgress() * 20 / 100);
+            int fuelLen = Mth.clamp((18 * fuel + 20 - 1) / 20, 0, 18);
+            if (fuelLen > 0) {
+                guiGraphics.blitSprite(BREW_FUEL_SPRITE, 18, 4, 0, 0, x + 60, y + 44, fuelLen, 4);
             }
-            if (state.status() == StationStatus.RUNNING) {
-                int flameProgress = 14 - (state.progress() * 14 / 100);
-                if (flameProgress < 0) {
-                    flameProgress = 0;
+            int base = Math.max(1, type.baseCookTicks());
+            int ticksRemaining = (100 - state.progress()) * base / 100;
+            if (ticksRemaining > 0) {
+                int arrow = (int) (28.0F * (1.0F - (float) ticksRemaining / (float) base));
+                if (arrow > 0) {
+                    guiGraphics.blitSprite(BREW_PROGRESS_SPRITE, 9, 28, 0, 0, x + 97, y + 16, 9, arrow);
                 }
-                guiGraphics.blit(bg, x + 81, y + 36 + flameProgress, 176, flameProgress, 14, 14 - flameProgress);
+                int bubbles = BUBBLE_LENGTHS[ticksRemaining / 2 % 7];
+                if (bubbles > 0) {
+                    guiGraphics.blitSprite(BUBBLES_SPRITE, 12, 29, 0, 29 - bubbles, x + 63, y + 14 + 29 - bubbles, 12, bubbles);
+                }
             }
-        } else if (state.progress() > 0) {
-            // Small bar below the bottle row so it does not overlap the slots.
-            int barW = 60;
-            int barX = x + 58;
-            int barY = y + 78;
-            int fill = barW * state.progress() / 100;
-            guiGraphics.fill(barX, barY, barX + barW, barY + 4, 0xFF303030);
-            guiGraphics.fill(barX, barY, barX + Math.min(barW, fill), barY + 4, 0xFF70C570);
+        } else {
+            // Vanilla furnace / blast furnace / smoker animation: the burning flame (shown for as long
+            // as the current fuel lasts) and the cook-progress arrow.
+            ResourceLocation litSprite = switch (type) {
+                case BLASTING -> LIT_PROGRESS_BLAST;
+                case SMOKING -> LIT_PROGRESS_SMOKER;
+                default -> LIT_PROGRESS_FURNACE;
+            };
+            ResourceLocation burnSprite = switch (type) {
+                case BLASTING -> BURN_PROGRESS_BLAST;
+                case SMOKING -> BURN_PROGRESS_SMOKER;
+                default -> BURN_PROGRESS_FURNACE;
+            };
+            if (state.litProgress() > 0) {
+                int lit = Mth.ceil(state.litProgress() / 100.0F * 13.0F) + 1;
+                guiGraphics.blitSprite(litSprite, 14, 14, 0, 14 - lit, x + 56, y + 36 + 14 - lit, 14, lit);
+            }
+            int burn = Mth.ceil(state.progress() / 100.0F * 24.0F);
+            if (burn > 0) {
+                guiGraphics.blitSprite(burnSprite, 24, 16, 0, 0, x + 79, y + 34, burn, 16);
+            }
         }
 
         this.menu.slots.stream()

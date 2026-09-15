@@ -13,8 +13,8 @@ import net.minecraft.world.item.ItemStack;
  * slot icons, a 0..100 progress percentage, the brewing target potion id (empty otherwise), and
  * the set of potion ids that can currently be brewed from the scanned network (brewing only).
  */
-public record StationState(StationStatus status, List<StationSlot> slots, int progress, String target,
-        List<String> craftable, boolean shulkersFirst, boolean inventoryFirst) {
+public record StationState(StationStatus status, List<StationSlot> slots, int progress, int litProgress,
+        String target, List<String> craftable, boolean shulkersFirst, boolean inventoryFirst) {
     public static final StreamCodec<RegistryFriendlyByteBuf, StationState> STREAM_CODEC = StreamCodec.of(
             StationState::encode,
             StationState::decode);
@@ -25,6 +25,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
                 .apply(ByteBufCodecs.list())
                 .encode(buf, state.slots());
         buf.writeVarInt(state.progress());
+        buf.writeVarInt(state.litProgress());
         buf.writeUtf(state.target());
         buf.writeVarInt(state.craftable().size());
         for (String id : state.craftable()) {
@@ -41,6 +42,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
                         .apply(ByteBufCodecs.list())
                         .decode(buf));
         int progress = buf.readVarInt();
+        int litProgress = buf.readVarInt();
         String target = buf.readUtf(Short.MAX_VALUE);
         int craftableCount = buf.readVarInt();
         List<String> craftable = new ArrayList<>(craftableCount);
@@ -49,7 +51,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
         }
         boolean shulkersFirst = buf.readBoolean();
         boolean inventoryFirst = buf.readBoolean();
-        return new StationState(status, slots, progress, target, craftable, shulkersFirst, inventoryFirst);
+        return new StationState(status, slots, progress, litProgress, target, craftable, shulkersFirst, inventoryFirst);
     }
 
     /**
@@ -61,7 +63,7 @@ public record StationState(StationStatus status, List<StationSlot> slots, int pr
         if (other == null) {
             return false;
         }
-        if (status != other.status || progress != other.progress) {
+        if (status != other.status || progress != other.progress || litProgress != other.litProgress) {
             return false;
         }
         if (shulkersFirst != other.shulkersFirst || inventoryFirst != other.inventoryFirst) {
