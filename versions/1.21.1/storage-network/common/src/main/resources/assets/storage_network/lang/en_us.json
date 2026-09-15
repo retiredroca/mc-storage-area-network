@@ -4,6 +4,8 @@
   "container.storage_network.storage_terminal": "Storage Terminal",
   "block.storage_network.network_share_terminal": "Output Terminal",
   "block.storage_network.terminal_locked": "This terminal belongs to another player",
+  "message.storage_network.output_exposed": "Output Terminal is now visible in the network",
+  "message.storage_network.output_hidden": "Output Terminal is hidden from the network",
   "gui.storage_network.search": "Search...",
   "gui.storage_network.chest_all": "All chests",
   "gui.storage_network.chest_count": "%s chests",

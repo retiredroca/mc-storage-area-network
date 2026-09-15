@@ -8,6 +8,7 @@ import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBl
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -89,10 +90,19 @@ public class NetworkShareTerminalBlock extends BaseEntityBlock implements Collec
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
-        if (level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity share
-                && player instanceof ServerPlayer serverPlayer) {
-            share.startOpen(serverPlayer);
-            StorageNetworkCommon.platform().openShareTerminal(serverPlayer, share);
+        if (level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity share) {
+            // Crouch + right-click toggles whether this sink is listed in the network.
+            if (player.isSecondaryUseActive()) {
+                boolean exposed = share.toggleExposedToNetwork();
+                player.displayClientMessage(Component.translatable(exposed
+                        ? "message.storage_network.output_exposed"
+                        : "message.storage_network.output_hidden"), true);
+                return InteractionResult.CONSUME;
+            }
+            if (player instanceof ServerPlayer serverPlayer) {
+                share.startOpen(serverPlayer);
+                StorageNetworkCommon.platform().openShareTerminal(serverPlayer, share);
+            }
         }
         return InteractionResult.CONSUME;
     }

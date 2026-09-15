@@ -47,6 +47,7 @@ one searchable index.
 A collection-only sink that **receives crafted output** and holds it for you.
 
 - Its contents are hidden from normal terminal listings.
+- **Crouch + right-click** to toggle whether it is shown in the network (its contents then appear in the Storage Terminal grid).
 - Anyone can open and deposit into it; only the owner can break it.
 - Rendered as a tinted ender chest.
 

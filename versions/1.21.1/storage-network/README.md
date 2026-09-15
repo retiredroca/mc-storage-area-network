@@ -32,6 +32,7 @@ Browse, search, sort, take and deposit from one screen.
 A companion block that **receives crafted output** from Crafting Network terminals and holds it for you.
 
 - Collection-only: its contents are hidden from normal terminal listings.
+- **Crouch + right-click** it to toggle whether it is shown in the network (then its contents appear in the Storage Terminal grid).
 - Anyone can open it and deposit items; only the owner can break it.
 - Rendered as a tinted ender chest.
 

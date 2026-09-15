@@ -32,14 +32,36 @@ public abstract class AbstractNetworkShareTerminalBlockEntity extends BlockEntit
     /** Double-chest capacity (6 rows x 9 columns). */
     public static final int SIZE = 54;
     private static final String TAG_ITEMS = "Items";
+    private static final String TAG_EXPOSED = "Exposed";
 
     private final NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);
 
     private boolean lidOpen = false;
     private long lidChangeTime = 0;
+    /**
+     * When true, this collection-only sink is no longer hidden from the Storage Terminal's network
+     * listing (toggled by crouch + right-click). It still receives crafted output first.
+     */
+    private boolean exposedToNetwork = false;
 
     protected AbstractNetworkShareTerminalBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+    }
+
+    public boolean isExposedToNetwork() {
+        return exposedToNetwork;
+    }
+
+    public void setExposedToNetwork(boolean exposed) {
+        this.exposedToNetwork = exposed;
+        setChanged();
+    }
+
+    /** Flips whether this sink is listed in the network and returns the new value. */
+    public boolean toggleExposedToNetwork() {
+        exposedToNetwork = !exposedToNetwork;
+        setChanged();
+        return exposedToNetwork;
     }
 
     public void startOpen(Player player) {
@@ -189,6 +211,7 @@ public abstract class AbstractNetworkShareTerminalBlockEntity extends BlockEntit
             list.add(stack.saveOptional(registries));
         }
         tag.put(TAG_ITEMS, list);
+        tag.putBoolean(TAG_EXPOSED, exposedToNetwork);
     }
 
     @Override
@@ -199,5 +222,6 @@ public abstract class AbstractNetworkShareTerminalBlockEntity extends BlockEntit
         for (int i = 0; i < Math.min(list.size(), SIZE); i++) {
             items.set(i, ItemStack.parseOptional(registries, list.getCompound(i)));
         }
+        exposedToNetwork = tag.getBoolean(TAG_EXPOSED);
     }
 }

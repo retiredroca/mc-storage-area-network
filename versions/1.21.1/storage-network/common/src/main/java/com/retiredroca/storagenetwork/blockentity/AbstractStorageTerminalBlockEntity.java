@@ -128,12 +128,21 @@ public abstract class AbstractStorageTerminalBlockEntity extends BlockEntity imp
             int radius = getChunkRadius();
             storages = new ArrayList<>();
             for (ScannedStorage storage : ItemNetworkServices.scanner().scan(serverLevel, worldPosition, radius)) {
-                if (!storage.collectionOnly()) {
+                if (!storage.collectionOnly() || isExposedSink(serverLevel, storage.pos())) {
                     storages.add(storage);
                 }
             }
             ItemSourceRegistry.refreshAll(serverLevel, worldPosition, radius);
         }
+    }
+
+    /**
+     * A collection-only sink (Output Terminal) is normally hidden from the network listing, but its
+     * owner can expose it with crouch + right-click so its contents show up here too.
+     */
+    private static boolean isExposedSink(ServerLevel level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity sink
+                && sink.isExposedToNetwork();
     }
 
     public List<ScannedStorage> getStorages() {
