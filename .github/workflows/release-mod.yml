@@ -267,6 +267,9 @@ jobs:
           version-type: release
 
       # --- CurseForge -------------------------------------------------------------------------
+      # Every mc-publish step resolves "files" even when it only publishes to CurseForge; with it
+      # unset the action falls back to its default glob (build/libs/*.jar), which only exists after
+      # a build and so breaks publish mode. Point it at dist/ explicitly on each step.
       # A new API version creates the "SAN API" entry (API primary, storage/crafting additional).
       - name: CurseForge - new SAN API entry
         id: cf_api
@@ -275,6 +278,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/*.jar
           curseforge-files: |
             dist/universal_mc_san_api.${{ env.API_VERSION }}.jar
             dist/universal-storage-network.${{ env.STORAGE_VERSION }}.jar
@@ -340,6 +344,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/*.jar
           curseforge-files: dist/universal-bundle-all.${{ env.BUNDLE_ALL_VERSION }}.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
@@ -362,6 +367,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/*.jar
           curseforge-files: dist/universal-bundle-storage.${{ env.BUNDLE_STORAGE_VERSION }}.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
@@ -384,6 +390,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/*.jar
           curseforge-files: dist/universal-bundle-crafting.${{ env.BUNDLE_CRAFTING_VERSION }}.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
@@ -406,6 +413,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          files: dist/*.jar
           curseforge-files: dist/universal-bundle-routing.${{ env.BUNDLE_ROUTING_VERSION }}.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
