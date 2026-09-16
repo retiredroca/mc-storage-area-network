@@ -64,11 +64,14 @@ Universal jars are published to **CurseForge / Modrinth**; the loader-specific (
 
 ### Releases & versions
 
-Each mod is versioned independently, and a release only gets a **new version for the component that
-actually changed** — releasing Storage Network does not bump the API, and vice versa. Every GitHub
-release still carries the full set of jars (including the current, unchanged API) so one page has
-everything. Versions are `<major>.<minor>.<patch>.<yymmddhh>`: the trailing stamp is bumped
-automatically, the patch is manual. The API is `1.0.<patch>.<yymmddhh>`; the gameplay mods and
+Each mod is versioned independently, and a release only re-versions the **component you name** —
+releasing Storage Network does not bump the API, and vice versa. Nothing infers this from the files
+you touched, so when one change spans the API and one or more hosts (for example moving shared code
+into the API) release with `all` / **Release All**: a narrow release leaves the other components at
+their old versions, and those mix into the bundle jars. Every GitHub release still carries the full
+set of jars (including the current, unchanged API) so one page has everything. Versions are
+`<major>.<minor>.<patch>.<yymmddhh>`: the trailing stamp is bumped automatically, the patch is
+manual. The API is `1.0.<patch>.<yymmddhh>`; the gameplay mods and
 bundles are `1.0.0.<yymmddhh>`. Releases are tagged `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`).
 
 ### Releasing
@@ -86,12 +89,13 @@ python tools/secrets.py run -- python tools/release.py --mod routing --curseforg
 python tools/release.py --mod all --dry-run      # preview; no changes
 ```
 
-`--mod` is `api` / `storage` / `crafting` / `routing` / `all`. The tag is a single series
-`v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run publishes the API to `repo/` first
-(hosts require an API version **floor**, so the artifact must be resolvable before they compile),
-builds, commits/tags, creates the release, and optionally uploads to the platforms. Creating the
-release triggers the publish-only workflow — unless the local run already published (it marks the
-release so CI skips it). Add `--unsigned` to skip GPG.
+`--mod` is `api` / `storage` / `crafting` / `routing` / `all`; pass `all` (or run **Release All**)
+whenever several components changed together, so no old version ends up inside a bundle. The tag is a
+single series `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run publishes the API to
+`repo/` first (hosts require an API version **floor**, so the artifact must be resolvable before they
+compile), builds, commits/tags, creates the release, and optionally uploads to the platforms.
+Creating the release triggers the publish-only workflow — unless the local run already published (it
+marks the release so CI skips it). Add `--unsigned` to skip GPG.
 
 **On GitHub (fallback)**
 

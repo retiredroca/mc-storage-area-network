@@ -34,3 +34,7 @@
 - Blocks from this mod set implement `com.retiredroca.mcstorageareanetwork.api.NetworkBlock`.
 - Keep versions in the `1.0.<patch>.<yymmddhh>` scheme (`tools/versioning.py`); release tags are
   `v1.0.<patch>.<stamp>`.
+- Version bumps are **declarative**: only the component named by `--mod` / the dispatch `mod` is
+  re-versioned; nothing infers it from the files touched. When a change spans the API and one or
+  more hosts (e.g. moving shared code into the API), release with `all` / **Release All** so the
+  bundles cannot mix new and old component versions.

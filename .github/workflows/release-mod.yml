@@ -9,7 +9,7 @@ on:
         type: string
         default: 'build'
       mod:
-        description: 'Which mod triggered this release (build mode): api | storage | crafting | routing | all'
+        description: 'Components to re-version (build mode): api | storage | crafting | routing | all. Only the named component gets a new version and nothing infers it from the files changed, so use "all" whenever a change spans the API and one or more hosts - a narrow release leaves the other components at their old versions and mixes them into the bundles.'
         required: false
         type: string
         default: ''
