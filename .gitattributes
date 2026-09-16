@@ -1,3 +1,10 @@
 # This repository also hosts a published Maven repository under repo/.
 # Store everything byte-for-byte so Gradle-generated checksums stay valid.
 * -text
+
+# Exception: the release bookkeeping files must stay LF. A CRLF checkout gives CI a trailing \r
+# in the version values, which lands inside mc-publish's file paths and breaks the CurseForge
+# and Modrinth steps (the glob "dist/....26091603\r.jar" never matches). tools/release.py also
+# writes them with newline="\n".
+versions.properties text eol=lf
+release-state.properties text eol=lf

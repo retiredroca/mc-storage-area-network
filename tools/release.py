@@ -90,7 +90,8 @@ def read_props(path):
 
 
 def set_prop(text, key, value):
-    pattern = re.compile(rf"(?m)^{re.escape(key)}=.*$")
+    # [^\r\n]* rather than .* so a CRLF file gets a clean LF-terminated replacement.
+    pattern = re.compile(rf"(?m)^{re.escape(key)}=[^\r\n]*")
     if not pattern.search(text):
         die(f"versions.properties has no '{key}=' line")
     return pattern.sub(f"{key}={value}", text)
@@ -106,7 +107,9 @@ def bump(mod, stamp):
             die(f"unknown mod '{mod}'")
         text = set_prop(text, comp, versioning.bump(current[comp], stamp))
         changed[comp] = True
-    VERSIONS.write_text(text, encoding="utf-8")
+    # newline="\n": without it Windows text mode writes CRLF, and CI then reads the version
+    # values with a trailing \r (which breaks mc-publish's file paths).
+    VERSIONS.write_text(text, encoding="utf-8", newline="\n")
     log(f"bumped {', '.join(targets)} to stamp {stamp}")
     return changed
 
@@ -445,7 +448,7 @@ def set_state(key, value):
             break
     else:
         lines.append(f"{key}={value}")
-    STATE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    STATE.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 # --- orchestration ------------------------------------------------------------------

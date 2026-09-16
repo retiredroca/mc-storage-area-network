@@ -80,10 +80,12 @@ jobs:
           mod='${{ inputs.mod }}'
           stamp=$(python3 tools/versioning.py stamp)
 
-          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2)
-          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2)
-          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2)
-          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2)
+          # strip CR so a CRLF versions.properties cannot leak a trailing \r into the version
+          # strings (mc-publish then looks for "dist/....26091603\r.jar" and finds nothing).
+          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
 
           api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
           case "$mod" in
@@ -198,10 +200,12 @@ jobs:
         run: |
           set -euo pipefail
           tag='${{ inputs.release_tag }}'
-          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2)
-          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2)
-          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2)
-          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2)
+          # strip CR: build mode funnels these through tools/versioning.py, publish mode does not,
+          # and a trailing \r in the version makes mc-publish's file globs match nothing.
+          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
 
           prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
           api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
