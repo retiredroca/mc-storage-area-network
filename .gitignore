@@ -29,6 +29,9 @@ deploy.sh
 # local reference notes (untracked)
 universal-jar-loading.txt
 
+# local release guide (untracked)
+release-guide.txt
+
 # local dev session script (untracked)
 oc.sh
 

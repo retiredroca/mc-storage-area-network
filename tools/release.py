@@ -68,8 +68,12 @@ def capture(cmd):
 
 
 def gradlew():
+    # On Windows run the wrapper through cmd.exe: a bare "bash <win-path>" resolves to WSL's bash
+    # (or a bash that strips the backslashes) and fails with "No such file or directory".
     if os.name == "nt":
-        return ["bash", str(ROOT / "gradlew")]
+        bat = ROOT / "gradlew.bat"
+        if bat.exists():
+            return ["cmd", "/c", str(bat)]
     return [str(ROOT / "gradlew")]
 
 
@@ -125,9 +129,15 @@ def build(mc, dry):
 
 def collect(dry):
     if not dry:
-        if DIST.exists():
-            shutil.rmtree(DIST)
-        DIST.mkdir()
+        # Clear stale artifacts, but keep the tracked dist/.gitkeep.
+        DIST.mkdir(exist_ok=True)
+        for path in DIST.iterdir():
+            if path.name == ".gitkeep":
+                continue
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
         release = ROOT / "build" / "release"
         jars = sorted(release.glob("*.jar"))
         if not jars:
