@@ -47,6 +47,9 @@ public interface StorageNetworkPlatform {
     /** C2S: set the deposit target (all or a specific container/child). */
     void sendSelect(BlockPos pos, boolean all, BlockPos targetPos, String childName);
 
+    /** C2S: toggle the container's block type in/out of the network. */
+    void sendToggleExclude(BlockPos pos, BlockPos containerPos);
+
     boolean isServerModded();
 
     Path configDir();

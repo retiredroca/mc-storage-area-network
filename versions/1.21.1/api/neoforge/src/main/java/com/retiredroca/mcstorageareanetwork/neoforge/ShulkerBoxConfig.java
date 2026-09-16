@@ -2,9 +2,14 @@ package com.retiredroca.mcstorageareanetwork.neoforge;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModContainer;
@@ -24,12 +29,14 @@ public final class ShulkerBoxConfig {
     public static final ModConfigSpec.BooleanValue SAME_TYPE_FIRST;
     public static final ModConfigSpec.BooleanValue OWNERSHIP;
     public static final ModConfigSpec.BooleanValue TEAM_SHARING;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> EXCLUDED_CONTAINERS;
 
     private static int flattenDepth = 1;
     private static boolean boxRowHidden = false;
     private static boolean sameTypeFirst = true;
     private static boolean ownershipEnabled = true;
     private static boolean teamSharing = true;
+    private static final Set<ResourceLocation> excludedContainers = new LinkedHashSet<>();
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -61,6 +68,14 @@ public final class ShulkerBoxConfig {
         TEAM_SHARING = builder
                 .comment("When true, storage placed by players on the same scoreboard team is shared.")
                 .define("teamSharing", true);
+
+        EXCLUDED_CONTAINERS = builder
+                .comment("Container block types to exclude from the network (block registry names).",
+                        "Their contents are ignored everywhere (listing, extraction, crafting, routing).",
+                        "Chests, trapped chests and barrels can never be excluded.",
+                        "Example: \"minecraft:hopper\".")
+                .defineListAllowEmpty("excludedContainers", List.of(),
+                        o -> o instanceof String s && ResourceLocation.tryParse(s) != null);
 
         SERVER_SPEC = builder.build();
     }
@@ -105,7 +120,37 @@ public final class ShulkerBoxConfig {
         sameTypeFirst = SAME_TYPE_FIRST.get();
         ownershipEnabled = OWNERSHIP.get();
         teamSharing = TEAM_SHARING.get();
+        excludedContainers.clear();
+        for (String raw : EXCLUDED_CONTAINERS.get()) {
+            ResourceLocation id = ResourceLocation.tryParse(raw);
+            if (id != null && !NetworkSettings.isProtectedContainer(id)) {
+                excludedContainers.add(id);
+            }
+        }
         NetworkSettings.configure(ownershipEnabled, teamSharing);
+        NetworkSettings.configureExcludedContainers(excludedContainers);
+    }
+
+    /** Persist a change to the excluded-container list (used by the in-game toggle). */
+    public static void setContainerExcluded(ResourceLocation blockId, boolean excluded) {
+        if (blockId == null || NetworkSettings.isProtectedContainer(blockId)) {
+            return;
+        }
+        List<String> current = new ArrayList<>(EXCLUDED_CONTAINERS.get());
+        boolean changed = excluded ? current.add(blockId.toString()) : current.remove(blockId.toString());
+        if (!changed) {
+            return;
+        }
+        EXCLUDED_CONTAINERS.set(current);
+        SERVER_SPEC.save();
+        excludedContainers.clear();
+        for (String raw : current) {
+            ResourceLocation id = ResourceLocation.tryParse(raw);
+            if (id != null) {
+                excludedContainers.add(id);
+            }
+        }
+        NetworkSettings.configureExcludedContainers(excludedContainers);
     }
 
     public static int getFlattenDepth() {

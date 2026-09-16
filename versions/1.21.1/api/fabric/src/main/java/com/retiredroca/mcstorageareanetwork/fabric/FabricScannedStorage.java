@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
 import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
 import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /** Fabric implementation of {@link ScannedStorage} backed by a transfer {@link Storage}. */
@@ -17,17 +18,25 @@ public final class FabricScannedStorage implements ScannedStorage {
     private final BlockPos pos;
     private final String label;
     private final Storage<ItemVariant> storage;
+    private final ResourceLocation blockId;
     private final boolean collectionOnly;
 
-    public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage) {
-        this(pos, label, storage, false);
+    public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage, ResourceLocation blockId) {
+        this(pos, label, storage, blockId, false);
     }
 
-    public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage, boolean collectionOnly) {
+    public FabricScannedStorage(BlockPos pos, String label, Storage<ItemVariant> storage, ResourceLocation blockId,
+            boolean collectionOnly) {
         this.pos = pos;
         this.label = label;
         this.storage = storage;
+        this.blockId = blockId;
         this.collectionOnly = collectionOnly;
+    }
+
+    @Override
+    public ResourceLocation blockId() {
+        return blockId;
     }
 
     @Override

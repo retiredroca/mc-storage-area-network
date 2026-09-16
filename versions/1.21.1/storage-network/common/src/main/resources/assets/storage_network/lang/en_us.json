@@ -19,5 +19,9 @@
   "sort.storage_network.tag": "Tag",
   "sort.storage_network.mod": "Mod",
   "sort.storage_network.equipment": "Equip",
+  "message.storage_network.container_excluded": "Container type excluded from the network",
+  "message.storage_network.container_included": "Container type returned to the network",
+  "message.storage_network.container_protected": "This container type always stays in the network",
+  "message.storage_network.container_not_allowed": "You cannot change this container's network exclusion",
   "disconnect.storage_network.server_requires.reason": "This server requires Storage Network. Please install it and reconnect."
 }

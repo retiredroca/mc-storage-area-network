@@ -3,6 +3,7 @@ package com.retiredroca.storagenetwork.block;
 import com.mojang.serialization.MapCodec;
 import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
+import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
 import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBlockEntity;
 
@@ -33,7 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * Output Terminal: a collection-only sink that receives crafted output. It is hidden from
  * terminal listings, anyone can open it, but only its owner can break it.
  */
-public class NetworkShareTerminalBlock extends BaseEntityBlock implements CollectionOnlyStorage {
+public class NetworkShareTerminalBlock extends BaseEntityBlock implements CollectionOnlyStorage, NetworkBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public NetworkShareTerminalBlock(Properties properties) {

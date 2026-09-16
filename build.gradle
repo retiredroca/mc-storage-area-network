@@ -339,13 +339,19 @@ tasks.register('pruneRepo') {
         groupRoot.eachDir { groupDir ->
             groupDir.eachDir { artifactDir ->
                 def versionDirs = artifactDir.listFiles().findAll { it.isDirectory() }
-                if (versionDirs.size() <= keep) {
+                if (versionDirs.isEmpty()) {
                     return
                 }
                 versionDirs.sort { a, b -> compareVersions(a.name, b.name) }
-                def dropCount = versionDirs.size() - keep
-                versionDirs[0..<dropCount].each { it.deleteDir() }
-                def kept = versionDirs[dropCount..-1].collect { it.name }
+                if (versionDirs.size() > keep) {
+                    def dropCount = versionDirs.size() - keep
+                    versionDirs[0..<dropCount].each { it.deleteDir() }
+                    versionDirs = versionDirs[dropCount..-1]
+                }
+                // Always refresh metadata from the directories that actually exist, so removing a
+                // version out-of-band (e.g. migrating the version scheme) can't leave stale entries
+                // that break dynamic/range resolution.
+                def kept = versionDirs.collect { it.name }
                 writeMetadata(artifactDir, "com.retiredroca.${groupDir.name}", artifactDir.name, kept)
                 logger.lifecycle("pruneRepo: ${artifactDir.name} kept ${kept.join(', ')}")
             }

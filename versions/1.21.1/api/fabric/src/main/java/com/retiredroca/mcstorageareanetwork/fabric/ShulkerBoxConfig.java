@@ -2,9 +2,12 @@ package com.retiredroca.mcstorageareanetwork.fabric;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -12,6 +15,7 @@ import com.google.gson.JsonParser;
 import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
@@ -27,6 +31,7 @@ public final class ShulkerBoxConfig {
     private static boolean sameTypeFirst = true;
     private static boolean ownershipEnabled = true;
     private static boolean teamSharing = true;
+    private static final Set<ResourceLocation> excludedContainers = new LinkedHashSet<>();
 
     private ShulkerBoxConfig() {}
 
@@ -57,6 +62,15 @@ public final class ShulkerBoxConfig {
                 if (obj.has("teamSharing")) {
                     teamSharing = obj.get("teamSharing").getAsBoolean();
                 }
+                if (obj.has("excludedContainers") && obj.get("excludedContainers").isJsonArray()) {
+                    excludedContainers.clear();
+                    for (JsonElement entry : obj.getAsJsonArray("excludedContainers")) {
+                        ResourceLocation id = ResourceLocation.tryParse(entry.getAsString());
+                        if (id != null && !NetworkSettings.isProtectedContainer(id)) {
+                            excludedContainers.add(id);
+                        }
+                    }
+                }
                 if (version < CONFIG_VERSION) {
                     boxRowHidden = false;
                     writeDefault(configPath);
@@ -70,6 +84,7 @@ public final class ShulkerBoxConfig {
 
     private static void apply() {
         NetworkSettings.configure(ownershipEnabled, teamSharing);
+        NetworkSettings.configureExcludedContainers(excludedContainers);
     }
 
     private static void writeDefault(Path configPath) {
@@ -80,6 +95,9 @@ public final class ShulkerBoxConfig {
         obj.addProperty("sameTypeFirst", sameTypeFirst);
         obj.addProperty("ownershipEnabled", ownershipEnabled);
         obj.addProperty("teamSharing", teamSharing);
+        JsonArray excluded = new JsonArray();
+        excludedContainers.forEach(id -> excluded.add(id.toString()));
+        obj.add("excludedContainers", excluded);
         try {
             Files.createDirectories(configPath.getParent());
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -87,6 +105,19 @@ public final class ShulkerBoxConfig {
         } catch (Exception e) {
             McStorageAreaNetwork.LOGGER.error("Failed to write default mc_storage_area_network config", e);
         }
+    }
+
+    /** Persist a change to the excluded-container list (used by the in-game toggle). */
+    public static void setContainerExcluded(ResourceLocation blockId, boolean excluded) {
+        if (blockId == null || NetworkSettings.isProtectedContainer(blockId)) {
+            return;
+        }
+        boolean changed = excluded ? excludedContainers.add(blockId) : excludedContainers.remove(blockId);
+        if (!changed) {
+            return;
+        }
+        NetworkSettings.configureExcludedContainers(excludedContainers);
+        writeDefault(FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME));
     }
 
     public static int getFlattenDepth() {

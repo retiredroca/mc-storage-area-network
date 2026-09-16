@@ -2,6 +2,7 @@ package com.retiredroca.networkrouting.block;
 
 import com.mojang.serialization.MapCodec;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
+import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.blockentity.AbstractRoutingTerminalBlockEntity;
 
@@ -31,7 +32,7 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 /** Loader-neutral Routing Terminal block. The loader supplies the block entity via the platform. */
-public class RoutingTerminalBlock extends BaseEntityBlock {
+public class RoutingTerminalBlock extends BaseEntityBlock implements NetworkBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public RoutingTerminalBlock(Properties properties) {

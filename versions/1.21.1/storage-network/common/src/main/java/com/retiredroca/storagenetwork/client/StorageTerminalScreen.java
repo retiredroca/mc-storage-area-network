@@ -268,6 +268,13 @@ public class StorageTerminalScreen extends AbstractContainerScreen<StorageTermin
                 List<SourceRow> rows = visibleRows();
                 if (absolute >= 0 && absolute < rows.size()) {
                     SourceRow chosen = rows.get(absolute);
+                    // Crouch-click a container row to toggle its block type in/out of the network.
+                    if (hasShiftDown() && chosen.chestIndex >= 0 && chosen.childIndex < 0) {
+                        BlockPos containerPos = menu.getServerChests().get(chosen.chestIndex).pos();
+                        StorageNetworkCommon.platform().sendToggleExclude(menu.getPos(), containerPos);
+                        chestOpen = false;
+                        return true;
+                    }
                     if (chosen.chestIndex < 0) {
                         selectedChest = -1;
                         selectedChild = -1;

@@ -27,6 +27,7 @@ public class McStorageAreaNetwork implements ModInitializer {
     public void onInitialize() {
         ShulkerBoxConfig.load();
         ItemNetworkServices.setScanner(new FabricItemScanner());
+        ItemNetworkServices.setConfigService(ShulkerBoxConfig::setContainerExcluded);
         ItemSourceRegistry.register(new ShulkerItemSource());
         ItemSourceRegistry.addHiddenItemFilter(ShulkerBoxConfig::isRawShulkerBoxHidden);
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, entity) -> {

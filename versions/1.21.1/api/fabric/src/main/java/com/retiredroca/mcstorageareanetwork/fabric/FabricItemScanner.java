@@ -6,16 +6,20 @@ import java.util.List;
 import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.ItemScanner;
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 /** Fabric {@link ItemScanner} using the transfer API lookups. Only ticking chunks are read. */
@@ -42,8 +46,13 @@ public final class FabricItemScanner implements ItemScanner {
                     Storage<ItemVariant> storage = ItemStorage.SIDED.find(level, pos, null);
                     if (storage != null
                             && ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
-                        boolean collectionOnly = level.getBlockState(pos).getBlock() instanceof CollectionOnlyStorage;
-                        out.add(new FabricScannedStorage(pos, labelOf(blockEntity), storage, collectionOnly));
+                        BlockState state = level.getBlockState(pos);
+                        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+                        if (NetworkSettings.isContainerExcluded(blockId)) {
+                            continue;
+                        }
+                        boolean collectionOnly = state.getBlock() instanceof CollectionOnlyStorage;
+                        out.add(new FabricScannedStorage(pos, labelOf(blockEntity), storage, blockId, collectionOnly));
                     }
                 }
             }

@@ -6,6 +6,7 @@ package com.retiredroca.mcstorageareanetwork.api;
  */
 public final class ItemNetworkServices {
     private static volatile ItemScanner scanner;
+    private static volatile NetworkConfigService configService;
 
     private ItemNetworkServices() {}
 
@@ -17,6 +18,18 @@ public final class ItemNetworkServices {
         ItemScanner current = scanner;
         if (current == null) {
             throw new IllegalStateException("MC Storage Area Network API platform has not been initialized");
+        }
+        return current;
+    }
+
+    public static void setConfigService(NetworkConfigService service) {
+        ItemNetworkServices.configService = service;
+    }
+
+    public static NetworkConfigService configService() {
+        NetworkConfigService current = configService;
+        if (current == null) {
+            throw new IllegalStateException("MC Storage Area Network API config service has not been initialized");
         }
         return current;
     }

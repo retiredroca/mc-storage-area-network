@@ -3,6 +3,7 @@ package com.retiredroca.mcstorageareanetwork.api;
 import java.util.List;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -11,6 +12,11 @@ import net.minecraft.world.item.ItemStack;
  */
 public interface ScannedStorage {
     BlockPos pos();
+
+    /** Registry id of the block backing this storage (e.g. {@code minecraft:chest}), or null. */
+    default ResourceLocation blockId() {
+        return null;
+    }
 
     String label();
 

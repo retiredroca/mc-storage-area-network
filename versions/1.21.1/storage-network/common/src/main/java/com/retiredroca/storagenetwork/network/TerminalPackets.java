@@ -21,6 +21,8 @@ public final class TerminalPackets {
             StorageNetworkCommon.MODID, "terminal_extract");
     public static final ResourceLocation TERMINAL_SELECT = ResourceLocation.fromNamespaceAndPath(
             StorageNetworkCommon.MODID, "terminal_select");
+    public static final ResourceLocation TERMINAL_EXCLUDE = ResourceLocation.fromNamespaceAndPath(
+            StorageNetworkCommon.MODID, "terminal_exclude");
     public static final ResourceLocation SERVER_PRESENCE = ResourceLocation.fromNamespaceAndPath(
             StorageNetworkCommon.MODID, "server_presence");
 
@@ -103,6 +105,20 @@ public final class TerminalPackets {
                 BlockPos.STREAM_CODEC, TerminalSelectPayload::targetPos,
                 ByteBufCodecs.STRING_UTF8, TerminalSelectPayload::childName,
                 TerminalSelectPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** C2S: toggle the container at {@code containerPos} (its block type) in/out of the network. */
+    public record TerminalExcludePayload(BlockPos pos, BlockPos containerPos) implements CustomPacketPayload {
+        public static final Type<TerminalExcludePayload> TYPE = new Type<>(TERMINAL_EXCLUDE);
+        public static final StreamCodec<RegistryFriendlyByteBuf, TerminalExcludePayload> STREAM_CODEC = StreamCodec.composite(
+                BlockPos.STREAM_CODEC, TerminalExcludePayload::pos,
+                BlockPos.STREAM_CODEC, TerminalExcludePayload::containerPos,
+                TerminalExcludePayload::new);
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

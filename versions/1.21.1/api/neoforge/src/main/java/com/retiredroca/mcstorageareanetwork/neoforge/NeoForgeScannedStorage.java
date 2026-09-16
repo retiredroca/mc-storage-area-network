@@ -6,6 +6,7 @@ import java.util.List;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
@@ -15,17 +16,25 @@ public final class NeoForgeScannedStorage implements ScannedStorage {
     private final BlockPos pos;
     private final String label;
     private final IItemHandler handler;
+    private final ResourceLocation blockId;
     private final boolean collectionOnly;
 
-    public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler) {
-        this(pos, label, handler, false);
+    public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler, ResourceLocation blockId) {
+        this(pos, label, handler, blockId, false);
     }
 
-    public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler, boolean collectionOnly) {
+    public NeoForgeScannedStorage(BlockPos pos, String label, IItemHandler handler, ResourceLocation blockId,
+            boolean collectionOnly) {
         this.pos = pos;
         this.label = label;
         this.handler = handler;
+        this.blockId = blockId;
         this.collectionOnly = collectionOnly;
+    }
+
+    @Override
+    public ResourceLocation blockId() {
+        return blockId;
     }
 
     @Override

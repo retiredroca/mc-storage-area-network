@@ -1,9 +1,11 @@
 package com.retiredroca.storagenetwork.neoforge;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkExclusions;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
 import com.retiredroca.storagenetwork.menu.StorageTerminalMenu;
 import com.retiredroca.storagenetwork.network.TerminalPackets.ServerPresencePayload;
+import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalExcludePayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalExtractPayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSelectPayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSyncPayload;
@@ -38,6 +40,7 @@ public final class Networking {
         registrar.playToClient(TerminalSyncPayload.TYPE, TerminalSyncPayload.STREAM_CODEC, Networking::handleSync);
         registrar.playToServer(TerminalExtractPayload.TYPE, TerminalExtractPayload.STREAM_CODEC, Networking::handleExtract);
         registrar.playToServer(TerminalSelectPayload.TYPE, TerminalSelectPayload.STREAM_CODEC, Networking::handleSelect);
+        registrar.playToServer(TerminalExcludePayload.TYPE, TerminalExcludePayload.STREAM_CODEC, Networking::handleExclude);
     }
 
     private static void handlePresence(ServerPresencePayload payload, IPayloadContext context) {
@@ -94,6 +97,21 @@ public final class Networking {
                 if (player.containerMenu instanceof StorageTerminalMenu menu
                         && menu.getPos().equals(payload.pos())) {
                     menu.setDepositTarget(payload.all() ? null : payload.targetPos(), payload.childName());
+                }
+            }
+        });
+    }
+
+    private static void handleExclude(TerminalExcludePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.flow().isServerbound() && context.player() instanceof ServerPlayer player) {
+                if (player.containerMenu instanceof StorageTerminalMenu menu
+                        && menu.getPos().equals(payload.pos())) {
+                    NetworkExclusions.Result result = NetworkExclusions.toggle(player, payload.containerPos());
+                    player.displayClientMessage(StorageNetworkCommon.exclusionMessage(result), true);
+                    if (player.level().getBlockEntity(payload.pos()) instanceof AbstractStorageTerminalBlockEntity terminal) {
+                        PacketDistributor.sendToPlayer(player, terminal.buildSync());
+                    }
                 }
             }
         });

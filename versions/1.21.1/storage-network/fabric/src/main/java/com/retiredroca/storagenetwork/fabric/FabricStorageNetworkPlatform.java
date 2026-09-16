@@ -7,6 +7,7 @@ import com.retiredroca.storagenetwork.block.NetworkShareTerminalBlock;
 import com.retiredroca.storagenetwork.block.StorageTerminalBlock;
 import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBlockEntity;
 import com.retiredroca.storagenetwork.blockentity.AbstractStorageTerminalBlockEntity;
+import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalExcludePayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalExtractPayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSelectPayload;
 import com.retiredroca.storagenetwork.network.TerminalPackets.TerminalSyncPayload;
@@ -91,6 +92,11 @@ public final class FabricStorageNetworkPlatform implements StorageNetworkPlatfor
     @Override
     public void sendSelect(BlockPos pos, boolean all, BlockPos targetPos, String childName) {
         ClientPlayNetworking.send(new TerminalSelectPayload(pos, all, targetPos, childName));
+    }
+
+    @Override
+    public void sendToggleExclude(BlockPos pos, BlockPos containerPos) {
+        ClientPlayNetworking.send(new TerminalExcludePayload(pos, containerPos));
     }
 
     @Override

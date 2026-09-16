@@ -33,6 +33,7 @@ public class McStorageAreaNetwork {
         ShulkerBoxConfig.register(modContainer);
         modEventBus.addListener(ShulkerBoxConfig::onConfigLoad);
         ItemNetworkServices.setScanner(new NeoForgeItemScanner());
+        ItemNetworkServices.setConfigService(ShulkerBoxConfig::setContainerExcluded);
         ItemSourceRegistry.register(new ShulkerItemSource());
         ItemSourceRegistry.addHiddenItemFilter(ShulkerBoxConfig::isRawShulkerBoxHidden);
         modEventBus.addListener(McStorageAreaNetwork::onInterModProcess);

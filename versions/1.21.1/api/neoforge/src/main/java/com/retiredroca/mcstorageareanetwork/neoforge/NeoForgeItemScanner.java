@@ -6,14 +6,18 @@ import java.util.List;
 import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.ItemScanner;
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -39,12 +43,18 @@ public final class NeoForgeItemScanner implements ItemScanner {
                     if (pos.getY() < minY || pos.getY() >= maxY) {
                         continue;
                     }
+                    BlockState state = level.getBlockState(pos);
+                    ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+                    if (NetworkSettings.isContainerExcluded(blockId)) {
+                        continue;
+                    }
                     for (Direction side : Direction.values()) {
                         IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
                         if (handler != null) {
                             if (ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
-                                boolean collectionOnly = level.getBlockState(pos).getBlock() instanceof CollectionOnlyStorage;
-                                out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler, collectionOnly));
+                                boolean collectionOnly = state.getBlock() instanceof CollectionOnlyStorage;
+                                out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler, blockId,
+                                        collectionOnly));
                             }
                             break;
                         }

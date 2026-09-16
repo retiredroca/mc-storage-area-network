@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
 import com.retiredroca.craftingnetwork.blockentity.AbstractCraftingStationBlockEntity;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
+import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -29,7 +30,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
-public class CraftingStationBlock extends BaseEntityBlock {
+public class CraftingStationBlock extends BaseEntityBlock implements NetworkBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public CraftingStationBlock(Properties properties) {
