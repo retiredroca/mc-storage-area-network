@@ -32,6 +32,9 @@ universal-jar-loading.txt
 # local release guide (untracked)
 release-guide.txt
 
+# local implementation plan (untracked)
+REMOTE-ACCESS-TERMINAL-PLAN.md
+
 # local dev session script (untracked)
 oc.sh
 
