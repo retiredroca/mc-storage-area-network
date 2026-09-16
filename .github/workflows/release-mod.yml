@@ -161,6 +161,15 @@ jobs:
           mkdir -p dist
           gh release download '${{ inputs.release_tag }}' --dir dist --pattern '*.jar' --clobber
           ls -la dist
+          # mc-publish defaults its `files` glob to build/libs/*.jar (see its action.yml). A real
+          # build leaves jars there, which is why the CurseForge steps worked before; publish mode
+          # never builds, so stage the downloaded release jars there too and log both globs.
+          mkdir -p build/libs
+          cp dist/*.jar build/libs/
+          echo "--- publish-mode input diagnostics ---"
+          echo "pwd:              $(pwd)"
+          echo "dist/*.jar:       $(ls -1 dist/*.jar 2>/dev/null | wc -l)"
+          echo "build/libs/*.jar: $(ls -1 build/libs/*.jar 2>/dev/null | wc -l)"
 
       # Safety net: only the expected release jars may be published. Anything else (for example a
       # leftover jar with an old name) fails the run instead of being uploaded.
@@ -267,9 +276,10 @@ jobs:
           version-type: release
 
       # --- CurseForge -------------------------------------------------------------------------
-      # Every mc-publish step resolves "files" even when it only publishes to CurseForge; with it
-      # unset the action falls back to its default glob (build/libs/*.jar), which only exists after
-      # a build and so breaks publish mode. Point it at dist/ explicitly on each step.
+      # mc-publish resolves its default `files` glob (build/libs/*.jar) for every step, even the
+      # CurseForge-only ones. A build used to leave jars there, so publish mode stages the
+      # downloaded release jars into build/libs/ (see "Download release assets") rather than
+      # overriding `files` on each CurseForge step.
       # A new API version creates the "SAN API" entry (API primary, storage/crafting additional).
       - name: CurseForge - new SAN API entry
         id: cf_api
@@ -278,7 +288,6 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/*.jar
           curseforge-files: |
             dist/universal_mc_san_api.${{ env.API_VERSION }}.jar
             dist/universal-storage-network.${{ env.STORAGE_VERSION }}.jar
@@ -344,7 +353,6 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/*.jar
           curseforge-files: dist/universal-bundle-all.${{ env.BUNDLE_ALL_VERSION }}.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
@@ -367,7 +375,6 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/*.jar
           curseforge-files: dist/universal-bundle-storage.${{ env.BUNDLE_STORAGE_VERSION }}.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
@@ -390,7 +397,6 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/*.jar
           curseforge-files: dist/universal-bundle-crafting.${{ env.BUNDLE_CRAFTING_VERSION }}.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
@@ -413,7 +419,6 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          files: dist/*.jar
           curseforge-files: dist/universal-bundle-routing.${{ env.BUNDLE_ROUTING_VERSION }}.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
