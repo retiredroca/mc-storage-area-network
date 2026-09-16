@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
 import com.retiredroca.mcstorageareanetwork.api.NetworkHost;
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.ScannedStorage;
 import com.retiredroca.networkrouting.config.RoutingSettings;
 import com.retiredroca.networkrouting.menu.RoutingMenu;
@@ -169,7 +170,7 @@ public abstract class AbstractRoutingTerminalBlockEntity extends BlockEntity imp
         List<ContainerInfo> containers = new ArrayList<>();
         if (level instanceof ServerLevel serverLevel) {
             for (ScannedStorage storage : storages) {
-                if (storage.collectionOnly()) {
+                if (storage.collectionOnly() || !NetworkSettings.isStorageContainer(storage.blockId())) {
                     continue;
                 }
                 List<String> tokens = RoutingLabels.get(serverLevel, storage.pos());

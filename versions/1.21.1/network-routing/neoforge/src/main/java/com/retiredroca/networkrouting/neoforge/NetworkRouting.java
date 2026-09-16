@@ -1,5 +1,6 @@
 package com.retiredroca.networkrouting.neoforge;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.block.TerminalProtection;
@@ -7,6 +8,7 @@ import com.retiredroca.networkrouting.routing.NetworkRoutingRule;
 import com.retiredroca.networkrouting.routing.RoutingLabels;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,7 +18,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -48,8 +49,9 @@ public class NetworkRouting {
             return;
         }
         BlockPos pos = event.getPos();
-        // Only real containers: leave every other block interaction untouched.
-        if (event.getLevel().getCapability(Capabilities.ItemHandler.BLOCK, pos, null) == null) {
+        // Only primary storage (chest/double chest, trapped chest, barrel); leave other blocks alone.
+        if (!NetworkSettings.isStorageContainer(
+                BuiltInRegistries.BLOCK.getKey(event.getLevel().getBlockState(pos).getBlock()))) {
             return;
         }
         event.setUseBlock(TriState.FALSE);

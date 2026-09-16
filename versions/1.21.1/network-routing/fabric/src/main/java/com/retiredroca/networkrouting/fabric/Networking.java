@@ -1,5 +1,6 @@
 package com.retiredroca.networkrouting.fabric;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.networkrouting.blockentity.AbstractRoutingTerminalBlockEntity;
 import com.retiredroca.networkrouting.menu.RoutingMenu;
 import com.retiredroca.networkrouting.network.RoutingPackets.ActionPayload;
@@ -16,6 +17,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -65,6 +67,10 @@ public final class Networking {
                 return;
             }
             if (!(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            if (!NetworkSettings.isStorageContainer(
+                    BuiltInRegistries.BLOCK.getKey(level.getBlockState(payload.container()).getBlock()))) {
                 return;
             }
             RoutingLabels.set(level, payload.container(), payload.tokens());

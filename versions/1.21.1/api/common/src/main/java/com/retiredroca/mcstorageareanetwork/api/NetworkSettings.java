@@ -1,8 +1,10 @@
 package com.retiredroca.mcstorageareanetwork.api;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.DyeColor;
 
 /**
  * Server-side policy flags for the item network. Set by the loader config on load/reload; read by
@@ -13,11 +15,23 @@ public final class NetworkSettings {
     private static volatile boolean teamSharing = true;
     private static volatile Set<ResourceLocation> excludedContainers = Set.of();
 
-    /** Container block types that always stay in the network, even if listed as excluded. */
-    private static final Set<ResourceLocation> PROTECTED_CONTAINERS = Set.of(
-            ResourceLocation.withDefaultNamespace("chest"),
-            ResourceLocation.withDefaultNamespace("trapped_chest"),
-            ResourceLocation.withDefaultNamespace("barrel"));
+    /**
+     * Primary storage: chest (and double chest), trapped chest, barrel and every shulker box.
+     * Protected from exclusion and the only blocks the routing linker may label.
+     */
+    private static final Set<ResourceLocation> PRIMARY_STORAGE = buildPrimaryStorage();
+
+    private static Set<ResourceLocation> buildPrimaryStorage() {
+        Set<ResourceLocation> ids = new HashSet<>();
+        ids.add(ResourceLocation.withDefaultNamespace("chest"));
+        ids.add(ResourceLocation.withDefaultNamespace("trapped_chest"));
+        ids.add(ResourceLocation.withDefaultNamespace("barrel"));
+        ids.add(ResourceLocation.withDefaultNamespace("shulker_box"));
+        for (DyeColor color : DyeColor.values()) {
+            ids.add(ResourceLocation.withDefaultNamespace(color.getName() + "_shulker_box"));
+        }
+        return Set.copyOf(ids);
+    }
 
     private NetworkSettings() {}
 
@@ -46,9 +60,14 @@ public final class NetworkSettings {
         return blockId != null && !isProtectedContainer(blockId) && excludedContainers.contains(blockId);
     }
 
+    /** True for the primary storage blocks: chest, trapped chest, barrel and any shulker box. */
+    public static boolean isStorageContainer(ResourceLocation blockId) {
+        return blockId != null && PRIMARY_STORAGE.contains(blockId);
+    }
+
     /** Chests, trapped chests and barrels always stay in the network. */
     public static boolean isProtectedContainer(ResourceLocation blockId) {
-        return blockId != null && PROTECTED_CONTAINERS.contains(blockId);
+        return isStorageContainer(blockId);
     }
 
     /** The current excluded set (immutable). */

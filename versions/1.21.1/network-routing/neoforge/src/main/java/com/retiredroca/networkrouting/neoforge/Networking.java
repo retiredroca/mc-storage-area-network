@@ -1,5 +1,6 @@
 package com.retiredroca.networkrouting.neoforge;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.blockentity.AbstractRoutingTerminalBlockEntity;
 import com.retiredroca.networkrouting.menu.RoutingMenu;
@@ -13,6 +14,7 @@ import com.retiredroca.networkrouting.routing.RoutingSyncHelper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
@@ -89,6 +91,10 @@ public final class Networking {
                 return;
             }
             if (!(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            if (!NetworkSettings.isStorageContainer(
+                    BuiltInRegistries.BLOCK.getKey(level.getBlockState(payload.container()).getBlock()))) {
                 return;
             }
             RoutingLabels.set(level, payload.container(), payload.tokens());

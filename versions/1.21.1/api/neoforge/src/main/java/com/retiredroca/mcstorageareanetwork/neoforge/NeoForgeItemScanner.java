@@ -48,16 +48,22 @@ public final class NeoForgeItemScanner implements ItemScanner {
                     if (NetworkSettings.isContainerExcluded(blockId)) {
                         continue;
                     }
-                    for (Direction side : Direction.values()) {
-                        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-                        if (handler != null) {
-                            if (ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
-                                boolean collectionOnly = state.getBlock() instanceof CollectionOnlyStorage;
-                                out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler, blockId,
-                                        collectionOnly));
+                    // Prefer the unsided handler (full inventory). Some vanilla containers expose a
+                    // side-subset when queried with a direction (e.g. a brewing stand's DOWN face omits
+                    // the blaze-powder fuel slot), so fall back to per-side handlers only if unsided fails.
+                    IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+                    if (handler == null) {
+                        for (Direction side : Direction.values()) {
+                            handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                            if (handler != null) {
+                                break;
                             }
-                            break;
                         }
+                    }
+                    if (handler != null
+                            && ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), host)) {
+                        boolean collectionOnly = state.getBlock() instanceof CollectionOnlyStorage;
+                        out.add(new NeoForgeScannedStorage(pos, labelOf(blockEntity), handler, blockId, collectionOnly));
                     }
                 }
             }

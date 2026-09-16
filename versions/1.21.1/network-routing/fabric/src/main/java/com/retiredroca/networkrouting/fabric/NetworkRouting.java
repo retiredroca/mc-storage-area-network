@@ -1,5 +1,6 @@
 package com.retiredroca.networkrouting.fabric;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.block.TerminalProtection;
@@ -9,8 +10,8 @@ import com.retiredroca.networkrouting.routing.RoutingLabels;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,8 +36,8 @@ public class NetworkRouting implements ModInitializer {
                 return InteractionResult.PASS;
             }
             BlockPos pos = hitResult.getBlockPos();
-            // Only real containers: leave every other block interaction untouched.
-            if (ItemStorage.SIDED.find(level, pos, null) == null) {
+            // Only primary storage (chest/double chest, trapped chest, barrel); leave other blocks alone.
+            if (!NetworkSettings.isStorageContainer(BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()))) {
                 return InteractionResult.PASS;
             }
             if (level.isClientSide) {
