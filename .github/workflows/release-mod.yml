@@ -165,13 +165,9 @@ jobs:
           ls -la dist
           # mc-publish defaults its `files` glob to build/libs/*.jar (see its action.yml). A real
           # build leaves jars there, which is why the CurseForge steps worked before; publish mode
-          # never builds, so stage the downloaded release jars there too and log both globs.
+          # never builds, so stage the downloaded release jars there too.
           mkdir -p build/libs
           cp dist/*.jar build/libs/
-          echo "--- publish-mode input diagnostics ---"
-          echo "pwd:              $(pwd)"
-          echo "dist/*.jar:       $(ls -1 dist/*.jar 2>/dev/null | wc -l)"
-          echo "build/libs/*.jar: $(ls -1 build/libs/*.jar 2>/dev/null | wc -l)"
 
       # Safety net: only the expected release jars may be published. Anything else (for example a
       # leftover jar with an old name) fails the run instead of being uploaded.

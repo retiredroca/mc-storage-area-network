@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """Local release driver.
 
-Builds the release jars, commits the version bump, creates the GitHub tag + release, and
-(optionally) uploads to CurseForge/Modrinth — so a release can be done without GitHub Actions.
+Builds the release jars, commits the version bump, creates the GitHub tag + release, and then asks
+CI to publish that release to CurseForge/Modrinth.
 
 Typical use:
 
-    python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
+    python tools/release.py --mod all                 # build here, CI publishes it
     python tools/release.py --mod all --dry-run
+    python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
 
-By default only the GitHub release happens; CurseForge/Modrinth are opt-in (--curseforge /
---modrinth) and read CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment (use secrets.py run
-to supply them from the encrypted vault). The tag is a single series `v<api 3 parts>.<stamp>`
-(e.g. `v1.0.2.26091512`) and drives the publish-only CI workflow.
+By default the GitHub release happens and then the publish-only workflow
+(.github/workflows/publish-release.yml) is dispatched to upload the jars to CurseForge/Modrinth;
+--no-ci-publish skips that. Passing --curseforge / --modrinth uploads from this machine instead
+(reading CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment - use secrets.py run to supply
+them from the encrypted vault) and marks the release, so a CI run would skip it. The tag is a
+single series `v<api 3 parts>.<stamp>` (e.g. `v1.0.2.26091512`).
 """
 
 import argparse
@@ -299,8 +302,29 @@ def upload_assets(token, release_id, dry):
             die(f"asset upload failed for {jar.name} ({exc.code}): {exc.read().decode()}")
 
 
-# --- CurseForge ---------------------------------------------------------------------
+def dispatch_publish_ci(token, tag, mc, dry):
+    """Ask the publish-only workflow to upload this release to CurseForge/Modrinth.
 
+    GitHub has never fired `release: published` for this repository, so the local release starts
+    the workflow explicitly. Best-effort: by now the release is public, so a failure warns and
+    prints the manual fallback instead of aborting the whole run.
+    """
+    workflow = "publish-release.yml"
+    url = f"https://api.github.com/repos/{repo_slug()}/actions/workflows/{workflow}/dispatches"
+    page = f"https://github.com/{repo_slug()}/actions/workflows/{workflow}"
+    ref = current_branch()
+    if dry:
+        print(f"  [dry-run] POST {url} ref={ref} tag={tag} minecraft={mc}")
+        return
+    status, resp = gh_request("POST", url, token, {"ref": ref, "inputs": {"tag": tag, "minecraft": mc}})
+    if status in (200, 204):
+        log(f"CI will publish {tag} to CurseForge/Modrinth: {page}")
+    else:
+        log(f"could not start the publish workflow ({status}): {resp}")
+        log(f"  publish by hand instead: {page} -> Run workflow -> tag {tag}")
+
+
+# --- CurseForge ---------------------------------------------------------------------
 
 def cf_headers(token):
     return {"X-Api-Token": token, "Accept": "application/json", "User-Agent": UA}
@@ -462,6 +486,8 @@ def main():
     ap.add_argument("--tag", default=None)
     ap.add_argument("--curseforge", action="store_true", help="also upload to CurseForge")
     ap.add_argument("--modrinth", action="store_true", help="also upload to Modrinth")
+    ap.add_argument("--no-ci-publish", action="store_true",
+                    help="do not ask CI to publish the release to CurseForge/Modrinth")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--unsigned", action="store_true", help="do not GPG-sign the commit and tag")
     ap.add_argument("--allow-dirty", action="store_true")
@@ -507,6 +533,11 @@ def main():
     release = github_release(token, tag, target, marker, dry)
     if release:
         upload_assets(token, release["id"], dry)
+
+    # CurseForge/Modrinth are published by CI by default. A local upload (--curseforge /
+    # --modrinth) also marks the release body, so a stray CI run would skip it anyway.
+    if not (args.no_ci_publish or args.curseforge or args.modrinth):
+        dispatch_publish_ci(token, tag, args.mc, dry)
 
     bundles = bundle_versions()
 
