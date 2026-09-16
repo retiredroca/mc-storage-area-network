@@ -21,7 +21,7 @@ The mod id is `mc_storage_area_network`. Package: `com.retiredroca.mcstoragearea
 Download the **universal** jar:
 
 ```
-universal_mc_san_api.1.0.<yymmddhh>.jar
+universal_mc_san_api.1.0.<patch>.<yymmddhh>.jar
 ```
 
 It is a thin container that bundles the Fabric and NeoForge builds; each loader loads only its own
@@ -51,20 +51,22 @@ repositories {
 ### Dependency
 
 ```groovy
-// Fabric
-modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:1.0.+'
+// Fabric — use a floor range: newest 1.0.x, but never older than the API you built against.
+modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:[1.0.2,1.1)'
 
 // NeoForge
-implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:1.0.+'
+implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:[1.0.2,1.1)'
 ```
 
 The artifact id ends with the **Minecraft version** (`-1.21.1`), so one Maven repository serves every
-supported version. The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the
-API source changes — releasing the gameplay mods does not bump it. `1.0.+` tracks the latest `1.0.x`
-build. Sources jars are published alongside (`-sources.jar`). The universal install jar is published as:
+supported version. The API version is `1.0.<patch>.<yymmddhh>` — the trailing stamp is bumped on
+every API release, the **patch** is the compatibility floor — and it only advances when the API source
+changes (releasing the gameplay mods does not bump it). Depend on `[<patch>,1.1)` so an older API
+cannot silently satisfy your mod. Sources jars are published alongside (`-sources.jar`). The universal
+install jar is published as:
 
 ```
-com.retiredroca.mcstorageareanetwork:mc-storage-area-network-1.21.1:1.0.<yymmddhh>
+com.retiredroca.mcstorageareanetwork:mc-storage-area-network-1.21.1:[1.0.2,1.1)
 ```
 
 > Compile against the **per-loader** artifact for your mod. The `com.retiredroca.mcstorageareanetwork.api`
@@ -219,4 +221,4 @@ workflow (only for the component that changed), never by the clock at build time
 | Fabric | Loader 0.16.14+ / Fabric API |
 | NeoForge | 21.1.235+ |
 | Java | 21 |
-| API version | `1.0.<yymmddhh>` (date-based patch) |
+| API version | `1.0.<patch>.<yymmddhh>` (patch = compatibility floor) |

@@ -1,16 +1,13 @@
 name: Release All
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       minecraft:
         description: 'Minecraft version to build (folder under versions/)'
         default: '1.21.1'
       tag:
-        description: 'Release tag/name (e.g. routing-v1.0.0). Must be unique - reusing an existing tag updates that release. Leave blank to auto-generate v<run id>.'
+        description: 'Optional release tag override (must be unique). Leave blank to auto-generate v<api>.<yymmddhh>.'
         default: ''
   issue_comment:
     types: [created]
@@ -26,6 +23,6 @@ jobs:
     uses: ./.github/workflows/release-mod.yml
     with:
       mod: all
-      release_tag: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || format('v{0}', github.run_id) }}
+      release_tag: ${{ github.event.inputs.tag }}
       minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
     secrets: inherit

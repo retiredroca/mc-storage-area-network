@@ -67,8 +67,9 @@ Universal jars are published to **CurseForge / Modrinth**; the loader-specific (
 Each mod is versioned independently, and a release only gets a **new version for the component that
 actually changed** — releasing Storage Network does not bump the API, and vice versa. Every GitHub
 release still carries the full set of jars (including the current, unchanged API) so one page has
-everything. The API uses `1.0.<yymmddhh>` (date-based patch); the gameplay mods and bundles use
-`1.0.0.<yymmddhh>`.
+everything. Versions are `<major>.<minor>.<patch>.<yymmddhh>`: the trailing stamp is bumped
+automatically, the patch is manual. The API is `1.0.<patch>.<yymmddhh>`; the gameplay mods and
+bundles are `1.0.0.<yymmddhh>`. Releases are tagged `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`).
 
 ### Releasing
 
@@ -85,16 +86,18 @@ python tools/secrets.py run -- python tools/release.py --mod routing --curseforg
 python tools/release.py --mod all --dry-run      # preview; no changes
 ```
 
-`--mod` is `api` / `storage` / `crafting` / `routing` / `all`. The tag prefix (`api-v…`,
-`storage-v…`, `crafting-v…`, `routing-v…`, or `v…` for `all`) drives the publish-only workflow.
-Creating the release locally triggers that workflow automatically — unless the local run already
-published to the platforms (it marks the release so CI skips it). Add `--unsigned` to skip GPG.
+`--mod` is `api` / `storage` / `crafting` / `routing` / `all`. The tag is a single series
+`v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run publishes the API to `repo/` first
+(hosts require an API version **floor**, so the artifact must be resolvable before they compile),
+builds, commits/tags, creates the release, and optionally uploads to the platforms. Creating the
+release triggers the publish-only workflow — unless the local run already published (it marks the
+release so CI skips it). Add `--unsigned` to skip GPG.
 
 **On GitHub (fallback)**
 
-Run **Release All** (or a per-mod workflow) from the Actions tab, push a matching tag, or comment
-`/release-all`. That path bumps versions, builds and publishes from source — CI cannot sign with
-your key, so its tags are unsigned.
+Run **Release All** (or a per-mod workflow) from the Actions tab, or comment `/release-all`. That
+path bumps versions, publishes the API, builds and publishes from source; the tag is computed the
+same way (`v1.0.2.<stamp>`). CI cannot sign with your key, so its tags are unsigned.
 
 ### Repository configuration (maintainers)
 
@@ -146,14 +149,16 @@ repositories {
     maven { url = 'https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/repo' }
 }
 dependencies {
-    // Compile against the per-loader artifact for your mod. (1.0.+ tracks the 1.0.x series.)
-    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:1.0.+' // Fabric
-    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:1.0.+' // NeoForge
+    // Use a floor range: it resolves the newest 1.0.x but refuses anything older than the API
+    // the host was built against.
+    modImplementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-1.21.1:[1.0.2,1.1)' // Fabric
+    // implementation 'com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-1.21.1:[1.0.2,1.1)' // NeoForge
 }
 ```
 
-The API version is `1.0.<yymmddhh>` (a date-based patch) and only advances when the API itself
-changes, so depending on `1.0.x` picks up the latest build without chasing an exact number.
+The API's version is `1.0.<patch>.<yymmddhh>` and only advances when the API itself changes; the
+**patch** is the compatibility floor. Depend on `[<patch>,1.1)` (Fabric metadata `~1.0.2`) so an
+older API can never silently satisfy your mod. The hosts in this repo use the same floor.
 
 Register an item source:
 

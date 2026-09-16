@@ -11,12 +11,11 @@ Typical use:
 
 By default only the GitHub release happens; CurseForge/Modrinth are opt-in (--curseforge /
 --modrinth) and read CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment (use secrets.py run
-to supply them from the encrypted vault). The tag prefix routes the publish-only CI workflow:
-`v…` = all, `api-v…`, `storage-v…`, `crafting-v…`, `routing-v…`.
+to supply them from the encrypted vault). The tag is a single series `v<api 3 parts>.<stamp>`
+(e.g. `v1.0.2.26091512`) and drives the publish-only CI workflow.
 """
 
 import argparse
-import datetime
 import json
 import os
 import re
@@ -25,8 +24,9 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
-import uuid
 from pathlib import Path
+
+import versioning
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = ROOT / "versions.properties"
@@ -34,7 +34,7 @@ STATE = ROOT / "release-state.properties"
 DIST = ROOT / "dist"
 UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
 
-PREFIXES = {"api": "api-v", "storage": "storage-v", "crafting": "crafting-v", "routing": "routing-v", "all": "v"}
+MODS = ("api", "storage", "crafting", "routing", "all")
 COMPONENTS = ("api", "storage", "crafting", "routing")
 COMP_JAR = {"storage": "storage-network", "crafting": "crafting-network", "routing": "network-routing"}
 ALLOWED_JAR = re.compile(
@@ -94,13 +94,13 @@ def set_prop(text, key, value):
 
 def bump(mod, stamp):
     text = VERSIONS.read_text(encoding="utf-8")
+    current = read_props(VERSIONS)
     changed = {c: False for c in COMPONENTS}
     targets = COMPONENTS if mod == "all" else (mod,)
     for comp in targets:
         if comp not in COMPONENTS:
             die(f"unknown mod '{mod}'")
-        value = f"1.0.{stamp}" if comp == "api" else f"1.0.0.{stamp}"
-        text = set_prop(text, comp, value)
+        text = set_prop(text, comp, versioning.bump(current[comp], stamp))
         changed[comp] = True
     VERSIONS.write_text(text, encoding="utf-8")
     log(f"bumped {', '.join(targets)} to stamp {stamp}")
@@ -111,7 +111,16 @@ def bump(mod, stamp):
 
 
 def build(mc, dry):
-    run(gradlew() + ["--no-daemon", f"-Pmc={mc}", "clean", "releaseJars", "publishRepo"], dry=dry)
+    g = gradlew()
+    # Bootstrap: the API artifacts must be in repo/ before the hosts compile, because hosts
+    # require an API version floor ([<api>,1.1)).
+    run(g + ["--no-daemon", "-p", f"versions/{mc}/api/fabric",
+             "publishMavenJavaPublicationToRepoRepository"], dry=dry)
+    run(g + ["--no-daemon", "-p", f"versions/{mc}/api/neoforge",
+             "publishMavenJavaPublicationToRepoRepository"], dry=dry)
+    # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
+    run(g + ["--no-daemon", f"-Pmc={mc}", "--refresh-dependencies", "clean", "releaseJars", "publishRepo"],
+        dry=dry)
 
 
 def collect(dry):
@@ -434,7 +443,8 @@ def set_state(key, value):
 
 def main():
     ap = argparse.ArgumentParser(description="Build and publish a release locally.")
-    ap.add_argument("--mod", required=True, choices=list(PREFIXES), help="which component is changing")
+    ap.add_argument("--mod", required=True, choices=list(MODS),
+                    help="which component is changing (tag is always v<api>.<stamp>)")
     ap.add_argument("--mc", default="1.21.1")
     ap.add_argument("--tag", default=None)
     ap.add_argument("--curseforge", action="store_true", help="also upload to CurseForge")
@@ -449,16 +459,14 @@ def main():
     dry = args.dry_run
     ensure_clean(args.allow_dirty)
 
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d%H")
+    stamp = versioning.utc_stamp()
     changed = bump(args.mod, stamp)
     versions = read_props(VERSIONS)
 
-    if args.tag:
-        tag = args.tag
-    else:
-        prefix = PREFIXES[args.mod]
-        core = versions["api"] if args.mod == "api" else (versions[args.mod] if args.mod != "all" else f"1.0.0.{stamp}")
-        tag = f"{prefix}{core}"
+    # When the API changes, point the hosts at the new version floor.
+    floor_paths = versioning.apply_floor(args.mc, versions["api"]) if changed["api"] else []
+
+    tag = args.tag or versioning.tag(versions["api"], stamp)
     log(f"tag: {tag}")
 
     if not args.skip_build:
@@ -470,8 +478,9 @@ def main():
 
     sign = not args.unsigned
 
-    # Commit the bump (so the tag points at the bumped versions), then sign+push the tag.
-    if commit([VERSIONS, ROOT / "repo"], f"Release {tag}: bump {args.mod} version", dry, sign):
+    # Commit the bump + host floor (so the tag points at the bumped versions), then sign+push the tag.
+    bump_paths = [VERSIONS, ROOT / "repo"] + [Path(p) for p in floor_paths]
+    if commit(bump_paths, f"Release {tag}: bump {args.mod} version", dry, sign):
         if not args.no_push:
             run(["git", "push", "origin", current_branch()], dry=dry)
     tag_release(tag, f"Release {tag}", sign, dry)

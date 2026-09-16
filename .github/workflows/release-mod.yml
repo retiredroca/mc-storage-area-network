@@ -14,9 +14,10 @@ on:
         type: string
         default: ''
       release_tag:
-        description: 'Git tag / version for this release'
-        required: true
+        description: 'Tag for this release (publish mode: required; build mode: blank to auto-compute v<api>.<stamp>)'
+        required: false
         type: string
+        default: ''
       minecraft:
         description: 'Minecraft version (folder under versions/)'
         required: false
@@ -29,10 +30,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Platform changelogs show the last few commits plus a link to the full changelog
-    # (the generated GitHub release notes).
-    env:
-      CHANGELOG_LINK: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -74,30 +71,30 @@ jobs:
           chmod +x ./gradlew
           chmod +x .github/scripts/*.sh
 
-      # Only the component(s) in the trigger get a new version. Everything else keeps
-      # its version (and is still compiled, so bundles always have a local jar).
+      # Only the component(s) in the trigger get a new version (the trailing yymmddhh stamp is
+      # replaced; the patch is manual). Everything else keeps its version.
       - name: Bump component versions
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
           mod='${{ inputs.mod }}'
-          stamp=$(date -u +%y%m%d%H)
+          stamp=$(python3 tools/versioning.py stamp)
 
           api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2)
           storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2)
           crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2)
           routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2)
 
-          api_changed=false
-          storage_changed=false
-          crafting_changed=false
-          routing_changed=false
+          api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
           case "$mod" in
-            api)      api="1.0.$stamp"; api_changed=true ;;
-            storage)  storage="1.0.0.$stamp"; storage_changed=true ;;
-            crafting) crafting="1.0.0.$stamp"; crafting_changed=true ;;
-            routing)  routing="1.0.0.$stamp"; routing_changed=true ;;
-            all)      api="1.0.$stamp"; storage="1.0.0.$stamp"; crafting="1.0.0.$stamp"; routing="1.0.0.$stamp"
+            api)      api=$(python3 tools/versioning.py bump "$api" "$stamp"); api_changed=true ;;
+            storage)  storage=$(python3 tools/versioning.py bump "$storage" "$stamp"); storage_changed=true ;;
+            crafting) crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp"); crafting_changed=true ;;
+            routing)  routing=$(python3 tools/versioning.py bump "$routing" "$stamp"); routing_changed=true ;;
+            all)      api=$(python3 tools/versioning.py bump "$api" "$stamp")
+                      storage=$(python3 tools/versioning.py bump "$storage" "$stamp")
+                      crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp")
+                      routing=$(python3 tools/versioning.py bump "$routing" "$stamp")
                       api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true ;;
             *) echo "Unknown mod: $mod" >&2; exit 1 ;;
           esac
@@ -108,6 +105,16 @@ jobs:
           sed -i -E "s/^routing=.*/routing=$routing/" versions.properties
           cat versions.properties
 
+          # Point the hosts at the (possibly new) API version floor.
+          python3 tools/versioning.py floor --api "$api" --mc "${MC_VERSION}"
+
+          # Release tag: v<api major.minor.patch>.<stamp> (an explicit input wins).
+          tag='${{ inputs.release_tag }}'
+          if [ -z "$tag" ]; then
+            tag=$(python3 tools/versioning.py tag --api "$api" --stamp "$stamp")
+          fi
+          echo "Release tag: $tag"
+
           {
             echo "API_VERSION=$api"
             echo "STORAGE_VERSION=$storage"
@@ -117,11 +124,21 @@ jobs:
             echo "STORAGE_CHANGED=$storage_changed"
             echo "CRAFTING_CHANGED=$crafting_changed"
             echo "ROUTING_CHANGED=$routing_changed"
+            echo "RELEASE_TAG=$tag"
           } >> "$GITHUB_ENV"
+
+      # The hosts require an API version floor, so the API artifact must be resolvable before
+      # they compile — publish it first.
+      - name: Publish API (bootstrap)
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/fabric" publishMavenJavaPublicationToRepoRepository
+          ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/neoforge" publishMavenJavaPublicationToRepoRepository
 
       - name: Build
         if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" clean releaseJars publishRepo
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" --refresh-dependencies clean releaseJars publishRepo
 
       - name: Collect release jars
         if: ${{ inputs.mode == 'build' }}
@@ -201,6 +218,7 @@ jobs:
             echo "STORAGE_CHANGED=$storage_changed"
             echo "CRAFTING_CHANGED=$crafting_changed"
             echo "ROUTING_CHANGED=$routing_changed"
+            echo "RELEASE_TAG=$tag"
           } >> "$GITHUB_ENV"
 
       # The platform changelog: the last 3 commits, then a link to the full release notes.
@@ -211,7 +229,7 @@ jobs:
             git log -3 --no-merges --pretty=format:'- %s (`%h`)'
             echo
             echo
-            echo "Full changelog: ${CHANGELOG_LINK}"
+            echo "Full changelog: https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}"
           } > dist/changelog.md
           cat dist/changelog.md
 
@@ -241,11 +259,11 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: ${{ inputs.release_tag }}
+          github-tag: ${{ env.RELEASE_TAG }}
           github-generate-changelog: true
           files: dist/*.jar
-          name: MC Storage Area Network ${{ inputs.release_tag }}
-          version: ${{ inputs.release_tag }}
+          name: MC Storage Area Network ${{ env.RELEASE_TAG }}
+          version: ${{ env.RELEASE_TAG }}
           version-type: release
 
       # --- CurseForge -------------------------------------------------------------------------
@@ -470,5 +488,5 @@ jobs:
           git checkout -B main origin/main
           git stash pop
           git add versions.properties release-state.properties
-          git commit -m "Release ${{ inputs.release_tag }}: update release state"
+          git commit -m "Release ${{ env.RELEASE_TAG }}: update release state"
           git push origin main
