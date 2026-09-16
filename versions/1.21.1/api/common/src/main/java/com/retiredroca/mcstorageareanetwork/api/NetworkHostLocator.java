@@ -1,12 +1,10 @@
-package com.retiredroca.networkrouting.routing;
-
-import com.retiredroca.mcstorageareanetwork.api.NetworkHost;
+package com.retiredroca.mcstorageareanetwork.api;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 
-/** Finds the nearest {@link NetworkHost} (Storage Terminal) around a position. */
+/** Finds the nearest {@link NetworkHost} (e.g. a Storage Terminal) around a position. */
 public final class NetworkHostLocator {
     private NetworkHostLocator() {}
 
@@ -21,9 +19,9 @@ public final class NetworkHostLocator {
                 if (chunk == null) {
                     continue;
                 }
-                for (var be : chunk.getBlockEntities().values()) {
-                    if (be instanceof NetworkHost host) {
-                        double dist = be.getBlockPos().distSqr(origin);
+                for (var blockEntity : chunk.getBlockEntities().values()) {
+                    if (blockEntity instanceof NetworkHost host) {
+                        double dist = blockEntity.getBlockPos().distSqr(origin);
                         if (dist < bestDist) {
                             bestDist = dist;
                             best = host;

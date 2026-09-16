@@ -10,6 +10,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -83,8 +84,7 @@ public final class NetworkExclusions {
     }
 
     /** Toggles the block type at {@code pos} in/out of the network, enforcing ownership. */
-    public static Result toggle(ServerPlayer player, BlockPos pos) {
-        ServerLevel level = player.serverLevel();
+    public static Result toggle(ServerPlayer player, BlockPos pos) {        ServerLevel level = player.serverLevel();
         BlockState state = level.getBlockState(pos);
         ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         if (NetworkSettings.isProtectedContainer(blockId)) {
@@ -117,5 +117,15 @@ public final class NetworkExclusions {
         data.owners().put(blockId, viewer);
         data.setDirty();
         return Result.EXCLUDED;
+    }
+
+    public static Component message(Result result) {
+        String key = switch (result) {
+            case EXCLUDED -> "message.mc_storage_area_network.container_excluded";
+            case INCLUDED -> "message.mc_storage_area_network.container_included";
+            case PROTECTED -> "message.mc_storage_area_network.container_protected";
+            case NOT_ALLOWED -> "message.mc_storage_area_network.container_not_allowed";
+        };
+        return Component.translatable(key);
     }
 }

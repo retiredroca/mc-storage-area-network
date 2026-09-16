@@ -14,7 +14,7 @@ import com.retiredroca.networkrouting.menu.RoutingMenu;
 import com.retiredroca.networkrouting.network.RoutingPackets;
 import com.retiredroca.networkrouting.network.RoutingPackets.ContainerInfo;
 import com.retiredroca.networkrouting.network.RoutingPackets.RoutingSyncPayload;
-import com.retiredroca.networkrouting.routing.NetworkHostLocator;
+import com.retiredroca.mcstorageareanetwork.api.NetworkHostLocator;
 import com.retiredroca.networkrouting.routing.NetworkSorter;
 import com.retiredroca.networkrouting.routing.RoutingLabels;
 

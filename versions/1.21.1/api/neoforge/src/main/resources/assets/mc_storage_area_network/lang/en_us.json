@@ -1,5 +1,13 @@
 {
   "block.mc_storage_area_network.protected": "This block belongs to another player",
   "gui.mc_storage_area_network.confirm_break.title": "Break protected block?",
-  "gui.mc_storage_area_network.confirm_break.message": "This block belongs to another player. Break it anyway?"
+  "gui.mc_storage_area_network.confirm_break.message": "This block belongs to another player. Break it anyway?",
+  "message.mc_storage_area_network.container_excluded": "Container type excluded from the network",
+  "message.mc_storage_area_network.container_included": "Container type returned to the network",
+  "message.mc_storage_area_network.container_protected": "This container type always stays in the network",
+  "message.mc_storage_area_network.container_not_allowed": "You cannot change this container's network exclusion",
+  "message.mc_storage_area_network.crafter_linked": "Crafter linked to the network",
+  "message.mc_storage_area_network.crafter_unlinked": "Crafter unlinked from the network",
+  "message.mc_storage_area_network.crafter_no_pattern": "Set a valid recipe in the crafter first",
+  "message.mc_storage_area_network.crafter_not_allowed": "You cannot change this crafter's network link"
 }

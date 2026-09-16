@@ -5,25 +5,36 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 import com.retiredroca.mcstorageareanetwork.api.BreakProtection;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
+import com.retiredroca.mcstorageareanetwork.api.CrafterAutomation;
 import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ItemSource;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
+import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
+import com.retiredroca.mcstorageareanetwork.api.NetworkExclusions;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ConfirmBreakPayload;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ForceBreakPayload;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.CrafterBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.InterModProcessEvent;
 import net.neoforged.fml.loading.FMLLoader;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -51,6 +62,41 @@ public class McStorageAreaNetwork {
         modEventBus.addListener(McStorageAreaNetwork::onRegisterPayloads);
         NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onEntityPlace);
         NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onBreak);
+        NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onRightClickBlock);
+
+        // Drive linked crafters every tick (the automation throttles itself).
+        NeoForge.EVENT_BUS.addListener((LevelTickEvent.Post event) -> {
+            if (event.getLevel() instanceof ServerLevel level) {
+                CrafterAutomation.tick(level);
+            }
+        });
+    }
+
+    private static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        if (event.getHand() != InteractionHand.MAIN_HAND || !player.isSecondaryUseActive()
+                || !player.getMainHandItem().isEmpty()) {
+            return;
+        }
+        BlockPos pos = event.getPos();
+        BlockState state = event.getLevel().getBlockState(pos);
+        boolean crafter = state.getBlock() instanceof CrafterBlock;
+        boolean container = !crafter && !(state.getBlock() instanceof NetworkBlock)
+                && event.getLevel().getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null;
+        if (!crafter && !container) {
+            return;
+        }
+        event.setUseBlock(TriState.FALSE);
+        event.setUseItem(TriState.FALSE);
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            Component message = crafter
+                    ? CrafterAutomation.message(CrafterAutomation.toggle(serverPlayer, pos))
+                    : NetworkExclusions.message(NetworkExclusions.toggle(serverPlayer, pos));
+            serverPlayer.displayClientMessage(message, true);
+        }
     }
 
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
