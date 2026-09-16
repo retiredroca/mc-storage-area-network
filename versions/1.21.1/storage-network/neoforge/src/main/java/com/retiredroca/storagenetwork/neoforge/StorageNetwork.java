@@ -3,11 +3,8 @@ package com.retiredroca.storagenetwork.neoforge;
 import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 import com.retiredroca.mcstorageareanetwork.api.NetworkExclusions;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
-import com.retiredroca.storagenetwork.block.TerminalProtection;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -18,7 +15,6 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
 
 @Mod(StorageNetworkCommon.MODID)
 public class StorageNetwork {
@@ -29,15 +25,6 @@ public class StorageNetwork {
 
         Registration.register(modEventBus);
         Networking.register(modEventBus);
-
-        NeoForge.EVENT_BUS.addListener((BlockEvent.BreakEvent event) -> {
-            if (event.getLevel() instanceof ServerLevel level
-                    && !TerminalProtection.canBreak(level, event.getPos(), event.getPlayer())) {
-                event.setCanceled(true);
-                event.getPlayer().displayClientMessage(
-                        Component.translatable("block.storage_network.terminal_locked"), true);
-            }
-        });
 
         // Crouch + right-click a container (empty hand) toggles its block type in/out of the network.
         NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock event) -> {

@@ -3,12 +3,10 @@ package com.retiredroca.networkrouting.fabric;
 import com.retiredroca.mcstorageareanetwork.api.NetworkSettings;
 import com.retiredroca.mcstorageareanetwork.api.StorageRouter;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
-import com.retiredroca.networkrouting.block.TerminalProtection;
 import com.retiredroca.networkrouting.routing.NetworkRoutingRule;
 import com.retiredroca.networkrouting.routing.RoutingLabels;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -53,14 +51,6 @@ public class NetworkRouting implements ModInitializer {
                 }
             }
             return InteractionResult.SUCCESS;
-        });
-
-        PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, entity) -> {
-            if (level instanceof ServerLevel serverLevel && !TerminalProtection.canBreak(serverLevel, pos, player)) {
-                player.displayClientMessage(Component.translatable("block.network_routing.terminal_locked"), true);
-                return false;
-            }
-            return true;
         });
     }
 }

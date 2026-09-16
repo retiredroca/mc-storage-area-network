@@ -1,0 +1,5 @@
+{
+  "block.mc_storage_area_network.protected": "This block belongs to another player",
+  "gui.mc_storage_area_network.confirm_break.title": "Break protected block?",
+  "gui.mc_storage_area_network.confirm_break.message": "This block belongs to another player. Break it anyway?"
+}

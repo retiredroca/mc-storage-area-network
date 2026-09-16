@@ -13,6 +13,9 @@
   "entrypoints": {
     "main": [
       "com.retiredroca.mcstorageareanetwork.fabric.McStorageAreaNetwork"
+    ],
+    "client": [
+      "com.retiredroca.mcstorageareanetwork.fabric.McStorageAreaNetworkClient"
     ]
   },
   "depends": {

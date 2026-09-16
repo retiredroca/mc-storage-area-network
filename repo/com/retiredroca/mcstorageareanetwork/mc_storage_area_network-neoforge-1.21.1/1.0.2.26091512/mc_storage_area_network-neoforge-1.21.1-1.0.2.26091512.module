@@ -27,11 +27,11 @@
         {
           "name": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26091512.jar",
           "url": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26091512.jar",
-          "size": 45905,
-          "sha512": "57f29e36e06bd627950db578ab2d00e6c52611a098ce905959fe8759aba55eb0a1f03810485ba0b57d6ebdb047a991bd384a24510e2f6e2f500b3843abac097d",
-          "sha256": "04c0d8216eff6259b8226e45bdcbad1a9224f90fe07878a789f9a87df986c8c9",
-          "sha1": "decc23032b5a6e18005a45ddd55b666a756053bd",
-          "md5": "18285942a43cb929bf33bd4d05548789"
+          "size": 54817,
+          "sha512": "adba7d0cd94c5991225a1a8801a75e342fd82c90b6c8dffd9a44832fe147dcdee06716cc46bad562a11edf88316e39a9ba7191c47c4127f585b4db8aca7fdbf7",
+          "sha256": "a25aea924a285c83e82e3fac8f3b0e8acc9c8a6146364b5438bdea96bc11b67b",
+          "sha1": "4a9126f06efa263fd661b6001dbc1c2156bce273",
+          "md5": "b12c4fc701ff4cbbe2b3975e53ba8861"
         }
       ]
     },
@@ -48,11 +48,11 @@
         {
           "name": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26091512.jar",
           "url": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26091512.jar",
-          "size": 45905,
-          "sha512": "57f29e36e06bd627950db578ab2d00e6c52611a098ce905959fe8759aba55eb0a1f03810485ba0b57d6ebdb047a991bd384a24510e2f6e2f500b3843abac097d",
-          "sha256": "04c0d8216eff6259b8226e45bdcbad1a9224f90fe07878a789f9a87df986c8c9",
-          "sha1": "decc23032b5a6e18005a45ddd55b666a756053bd",
-          "md5": "18285942a43cb929bf33bd4d05548789"
+          "size": 54817,
+          "sha512": "adba7d0cd94c5991225a1a8801a75e342fd82c90b6c8dffd9a44832fe147dcdee06716cc46bad562a11edf88316e39a9ba7191c47c4127f585b4db8aca7fdbf7",
+          "sha256": "a25aea924a285c83e82e3fac8f3b0e8acc9c8a6146364b5438bdea96bc11b67b",
+          "sha1": "4a9126f06efa263fd661b6001dbc1c2156bce273",
+          "md5": "b12c4fc701ff4cbbe2b3975e53ba8861"
         }
       ]
     }
