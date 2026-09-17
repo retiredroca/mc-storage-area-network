@@ -42,6 +42,9 @@ public final class TerminalLinks {
         private String name;
         private SortMode sortMode = SortMode.NEAREST;
         private boolean chunkLoader;
+        private UUID chunkLoaderHolder;
+        private long chunkLoaderUntil;
+        private long chunkLoaderQueuedSince;
 
         public Link(ResourceKey<Level> dimension, BlockPos pos) {
             this.dimension = dimension;
@@ -87,6 +90,43 @@ public final class TerminalLinks {
 
         public void setChunkLoader(boolean chunkLoader) {
             this.chunkLoader = chunkLoader;
+        }
+
+        /** The player currently holding the chunk-loader lease, or {@code null} when it is free. */
+        public UUID chunkLoaderHolder() {
+            return chunkLoaderHolder;
+        }
+
+        public void setChunkLoaderHolder(UUID chunkLoaderHolder) {
+            this.chunkLoaderHolder = chunkLoaderHolder;
+        }
+
+        /** Epoch millis at which the lease expires, or 0 when it never expires. */
+        public long chunkLoaderUntil() {
+            return chunkLoaderUntil;
+        }
+
+        public void setChunkLoaderUntil(long chunkLoaderUntil) {
+            this.chunkLoaderUntil = chunkLoaderUntil;
+        }
+
+        /** Epoch millis at which the holder joined the waiting queue, or 0 when not queued. */
+        public long chunkLoaderQueuedSince() {
+            return chunkLoaderQueuedSince;
+        }
+
+        public void setChunkLoaderQueuedSince(long chunkLoaderQueuedSince) {
+            this.chunkLoaderQueuedSince = chunkLoaderQueuedSince;
+        }
+
+        /** True while this terminal holds a lease; see {@link #chunkLoaderHolder()}. */
+        public boolean holdsChunkLoader() {
+            return chunkLoader;
+        }
+
+        /** True while this terminal is waiting for a lease. */
+        public boolean isChunkLoaderQueued() {
+            return chunkLoaderQueuedSince > 0;
         }
     }
 
@@ -218,22 +258,60 @@ public final class TerminalLinks {
     public int chunkLoaderCount() {
         int count = 0;
         for (Link link : allLinks()) {
-            if (link.isChunkLoader()) {
+            if (link.holdsChunkLoader()) {
                 count++;
             }
         }
         return count;
     }
 
-    /** Number of chunk-loading terminals owned by {@code owner}. */
-    public int chunkLoaderCount(UUID owner) {
+    /**
+     * Number of chunk-loader leases held by {@code player}. Falls back to the link owner for records
+     * written before leases existed.
+     */
+    public int chunkLoaderCount(UUID player) {
+        if (player == null) {
+            return 0;
+        }
         int count = 0;
         for (Link link : allLinks()) {
-            if (link.isChunkLoader() && owner.equals(link.owner())) {
+            if (link.holdsChunkLoader() && player.equals(holderOf(link))) {
                 count++;
             }
         }
         return count;
+    }
+
+    /** The lease holder of {@code link}, falling back to its owner for records saved without one. */
+    public static UUID holderOf(Link link) {
+        return link.chunkLoaderHolder() != null ? link.chunkLoaderHolder() : link.owner();
+    }
+
+    /** Every terminal waiting for a chunk-loader lease, oldest request first. */
+    public List<Link> queuedLinks() {
+        List<Link> result = new ArrayList<>();
+        for (Link link : allLinks()) {
+            if (link.isChunkLoaderQueued()) {
+                result.add(link);
+            }
+        }
+        result.sort((a, b) -> Long.compare(a.chunkLoaderQueuedSince(), b.chunkLoaderQueuedSince()));
+        return result;
+    }
+
+    /** The 1-based queue position of {@code link}, or 0 when it is not queued. */
+    public int queuePosition(Link link) {
+        if (link == null || !link.isChunkLoaderQueued()) {
+            return 0;
+        }
+        int position = 1;
+        for (Link other : allLinks()) {
+            if (other != link && other.isChunkLoaderQueued()
+                    && other.chunkLoaderQueuedSince() < link.chunkLoaderQueuedSince()) {
+                position++;
+            }
+        }
+        return position;
     }
 
     public String getName(DyeColor color, ResourceKey<Level> dimension, BlockPos pos) {
@@ -294,8 +372,9 @@ public final class TerminalLinks {
      * Loads the store from {@code tag}.
      *
      * <p>Layout: a {@code colors} compound keyed by dye name, each holding a list of link compounds
-     * ({@code dimension}, {@code pos}, optional {@code owner}, {@code name}, {@code sort} and optional
-     * {@code chunkLoader}). Malformed entries are skipped.
+     * ({@code dimension}, {@code pos}, optional {@code owner}, {@code name}, {@code sort}, optional
+     * {@code chunkLoader} plus the lease fields {@code chunkLoaderHolder}/{@code chunkLoaderUntil}/
+     * {@code chunkLoaderQueued}). Malformed entries are skipped.
      */
     public void read(CompoundTag tag) {
         links.clear();
@@ -319,6 +398,19 @@ public final class TerminalLinks {
                     }
                     if (entry.contains("chunkLoader")) {
                         link.setChunkLoader(entry.getBoolean("chunkLoader"));
+                    }
+                    if (entry.contains("chunkLoaderHolder")) {
+                        link.setChunkLoaderHolder(UUID.fromString(entry.getString("chunkLoaderHolder")));
+                    }
+                    if (entry.contains("chunkLoaderUntil")) {
+                        link.setChunkLoaderUntil(entry.getLong("chunkLoaderUntil"));
+                    }
+                    if (entry.contains("chunkLoaderQueued")) {
+                        link.setChunkLoaderQueuedSince(entry.getLong("chunkLoaderQueued"));
+                    }
+                    if (link.isChunkLoader() && link.chunkLoaderHolder() == null) {
+                        // Records written before leases existed carry no holder; fall back to the owner.
+                        link.setChunkLoaderHolder(link.owner());
                     }
                     slots(color).add(link);
                 } catch (RuntimeException ignored) {
@@ -353,6 +445,15 @@ public final class TerminalLinks {
                 entry.putString("sort", link.sortMode().name());
                 if (link.isChunkLoader()) {
                     entry.putBoolean("chunkLoader", true);
+                }
+                if (link.chunkLoaderHolder() != null) {
+                    entry.putString("chunkLoaderHolder", link.chunkLoaderHolder().toString());
+                }
+                if (link.chunkLoaderUntil() > 0) {
+                    entry.putLong("chunkLoaderUntil", link.chunkLoaderUntil());
+                }
+                if (link.chunkLoaderQueuedSince() > 0) {
+                    entry.putLong("chunkLoaderQueued", link.chunkLoaderQueuedSince());
                 }
                 entries.add(entry);
             }

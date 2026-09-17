@@ -9,6 +9,8 @@ import com.retiredroca.remoteaccessterminal.command.RemoteAccessCommands;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 public class RemoteAccessTerminal implements ModInitializer {
     @Override
@@ -25,6 +27,10 @@ public class RemoteAccessTerminal implements ModInitializer {
             TerminalChunkLoader.reapplyAll(server);
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> TerminalRegistryPublisher.installServer(null));
+        // Lease expiry and queue promotion run once a second; holders are told what they hold on login.
+        ServerTickEvents.END_SERVER_TICK.register(TerminalChunkLoader::serverTick);
+        ServerPlayConnectionEvents.JOIN.register(
+                (handler, sender, server) -> TerminalChunkLoader.playerJoined(handler.getPlayer()));
         CommandRegistrationCallback.EVENT.register(
                 (dispatcher, registryAccess, environment) -> dispatcher.register(RemoteAccessCommands.build()));
 

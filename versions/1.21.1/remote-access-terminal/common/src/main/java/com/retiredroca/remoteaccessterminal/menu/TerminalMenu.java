@@ -35,6 +35,8 @@ public class TerminalMenu extends AbstractContainerMenu {
     private String name;
     private boolean open;
     private boolean chunkLoader;
+    private long chunkLoaderUntil;
+    private int chunkLoaderQueuePosition;
     private boolean canEdit;
     private SortMode sortMode = SortMode.NEAREST;
     private List<Destination> destinations = List.of();
@@ -99,6 +101,16 @@ public class TerminalMenu extends AbstractContainerMenu {
         return chunkLoader;
     }
 
+    /** Epoch millis at which the chunk-loader lease expires, or 0 when it never expires. */
+    public long getChunkLoaderUntil() {
+        return chunkLoaderUntil;
+    }
+
+    /** The player's position in the chunk-loader queue, or 0 when they are not queued. */
+    public int getChunkLoaderQueuePosition() {
+        return chunkLoaderQueuePosition;
+    }
+
     public boolean canEdit() {
         return canEdit;
     }
@@ -136,6 +148,8 @@ public class TerminalMenu extends AbstractContainerMenu {
         this.name = payload.name();
         this.open = payload.open();
         this.chunkLoader = payload.chunkLoader();
+        this.chunkLoaderUntil = payload.chunkLoaderUntil();
+        this.chunkLoaderQueuePosition = payload.chunkLoaderQueuePosition();
         this.canEdit = payload.canEdit();
         this.sortMode = SortMode.byId(payload.sortMode());
         this.destinations = payload.destinations();

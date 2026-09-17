@@ -152,7 +152,14 @@ public final class RemoteAccessCommands {
                                         .then(coordinates(RemoteAccessCommands::adminRemove))))
                         .then(Commands.literal("removeall")
                                 .then(Commands.argument("color", StringArgumentType.word()).suggests(COLOR_SUGGESTIONS)
-                                        .executes(RemoteAccessCommands::adminRemoveAll))));
+                                        .executes(RemoteAccessCommands::adminRemoveAll)))
+                        .then(Commands.literal("chunkloader")
+                                .then(Commands.literal("list")
+                                        .executes(RemoteAccessCommands::adminChunkLoaderList))
+                                .then(Commands.literal("clear")
+                                        .then(Commands.argument("color", StringArgumentType.word())
+                                                .suggests(COLOR_SUGGESTIONS)
+                                                .then(coordinates(RemoteAccessCommands::adminChunkLoaderClear))))));
     }
 
     private static RequiredArgumentBuilder<CommandSourceStack, Integer> coordinates(
@@ -543,10 +550,83 @@ public final class RemoteAccessCommands {
         return records.size();
     }
 
+    /** Lists every held lease and queued request, with holder and remaining time. */
+    private static int adminChunkLoaderList(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        TerminalLinks links = links(context);
+        List<TerminalLinks.Entry> entries = new ArrayList<>();
+        for (TerminalLinks.Entry entry : links.allEntries()) {
+            if (entry.link().holdsChunkLoader() || entry.link().isChunkLoaderQueued()) {
+                entries.add(entry);
+            }
+        }
+        if (entries.isEmpty()) {
+            source.sendSuccess(() -> Component.translatable(
+                    "message.remote_access_terminal.admin_chunkloader_empty"), false);
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable(
+                "message.remote_access_terminal.admin_chunkloader_header", entries.size()), false);
+        for (TerminalLinks.Entry entry : entries) {
+            TerminalLinks.Link link = entry.link();
+            Component state = chunkLoaderState(links, link);
+            Component line = Component.translatable("message.remote_access_terminal.admin_chunkloader_entry",
+                    entry.color().getName(), link.pos().getX(), link.pos().getY(), link.pos().getZ(),
+                    link.dimension().location().toString(), ownerLabel(source, TerminalLinks.holderOf(link)),
+                    state);
+            source.sendSuccess(() -> line, false);
+        }
+        return entries.size();
+    }
+
+    /** Releases a held lease or drops a queued request, promoting the next request in line. */
+    private static int adminChunkLoaderClear(CommandContext<CommandSourceStack> context) {
+        DyeColor color = parseColor(context);
+        if (failUnknownColor(context, color)) {
+            return 0;
+        }
+        BlockPos pos = blockPos(context);
+        TerminalLinks links = links(context);
+        TerminalLinks.Link link = findLink(context, color, pos);
+        if (link == null || (!link.holdsChunkLoader() && !link.isChunkLoaderQueued())) {
+            context.getSource().sendFailure(Component.translatable(
+                    "message.remote_access_terminal.admin_chunkloader_none", pos.getX(), pos.getY(), pos.getZ()));
+            return 0;
+        }
+        Component previous = chunkLoaderState(links, link);
+        ServerLevel level = linkLevel(context, link);
+        if (level != null) {
+            TerminalChunkLoader.clear(level, link);
+        } else {
+            link.setChunkLoader(false);
+            link.setChunkLoaderHolder(null);
+            link.setChunkLoaderUntil(0);
+            link.setChunkLoaderQueuedSince(0);
+        }
+        access(context).setDirty();
+        context.getSource().sendSuccess(() -> Component.translatable(
+                "message.remote_access_terminal.admin_chunkloader_cleared", color.getName(), pos.getX(), pos.getY(),
+                pos.getZ(), previous), true);
+        return 1;
+    }
+
+    /** Describes a link's chunk-loader state: time left, no expiry, or its queue position. */
+    private static Component chunkLoaderState(TerminalLinks links, TerminalLinks.Link link) {
+        if (!link.holdsChunkLoader()) {
+            return Component.translatable(
+                    "message.remote_access_terminal.admin_chunkloader_state_queued", links.queuePosition(link));
+        }
+        if (link.chunkLoaderUntil() <= 0) {
+            return Component.translatable(
+                    "message.remote_access_terminal.admin_chunkloader_state_unlimited");
+        }
+        return Component.translatable("message.remote_access_terminal.admin_chunkloader_state_active",
+                TerminalChunkLoader.remainingLabel(link.chunkLoaderUntil()));
+    }
+
     private static int adminDelete(CommandContext<CommandSourceStack> context) {
         return deleteRecords(context, false);
     }
-
     private static int adminDeleteAll(CommandContext<CommandSourceStack> context) {
         return deleteAllRecords(context, false);
     }
@@ -628,11 +708,13 @@ public final class RemoteAccessCommands {
 
     private static Component entry(CommandSourceStack source, DyeColor color, TerminalLinks.Link link,
             boolean ghost) {
+        TerminalLinks links = TerminalLinksAccess.get(source.getLevel()).links();
         boolean open = NetworkPermissions.isOpen(source.getLevel(), link.pos());
         Component stateOpen = Component.translatable(
                 open ? "gui.remote_access_terminal.open" : "gui.remote_access_terminal.private");
-        Component stateChunk = Component.translatable(
-                link.isChunkLoader() ? "gui.remote_access_terminal.on" : "gui.remote_access_terminal.off");
+        Component stateChunk = link.isChunkLoader() || link.isChunkLoaderQueued()
+                ? chunkLoaderState(links, link)
+                : Component.translatable("gui.remote_access_terminal.off");
         Component line = Component.translatable("message.remote_access_terminal.admin_entry", color.getName(),
                 link.pos().getX(), link.pos().getY(), link.pos().getZ(), link.dimension().location().toString(),
                 link.name() == null ? "-" : link.name(), ownerLabel(source, link.owner()), stateOpen, stateChunk);

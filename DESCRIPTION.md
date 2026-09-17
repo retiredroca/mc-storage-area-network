@@ -73,9 +73,11 @@ is a bonus when **Network Routing** is installed.
   running count), sort order, **Open / private**, the owner's **invite list**, unlink, and the
   chunk-loader toggle.
 - **Chunk loader** — switch a terminal into loader mode and it keeps its own chunk **ticking** plus
-  the eight neighbours loaded (3×3), so machines and processors keep running while you are away. Up
-  to **80 terminals** may do this at once, **one per player**; both limits are configurable (the
-  config file warns when they are raised).
+  the eight neighbours loaded (3×3), so machines and processors keep running while you are away. Each
+  lease lasts **60 minutes** by default and then frees the slot; up to **2 chunk loaders per player**
+  and **2 per server** may run at once, and a request made while they are full **waits in a queue**
+  (oldest first, with your position shown in the settings screen) until a slot frees up. Every limit
+  is configurable, and the config file warns when they are raised.
 - **`/remoteaccess`** — `invite`, `uninvite`, `list`, `name`, `global on|off`, `unlink`,
   `unlinkall`, `assign`, `goto` and `admin …`, for everything the UI does.
 - **Routing Linker trips** — with **Network Routing** installed, using the Routing Linker while you
@@ -185,9 +187,11 @@ place.
 | `mc_storage_area_network` | `teamSharing` | `true` | Scoreboard-team members share their placed storage. |
 | `storage_network` | `maxTier` | `5` | Highest upgrade tier allowed (0–5). |
 | `crafting_network` | `maxTier` | `5` | Highest upgrade tier allowed (0–5). |
-| `remote_access_terminal` | `maxTerminals` | `80` | Total terminals allowed across all colours; each colour shows its own running count. |
-| `remote_access_terminal` | `maxChunkloaderTerminals` | `80` | How many terminals may act as chunk loaders, in total. |
-| `remote_access_terminal` | `maxChunkloadersPerPlayer` | `1` | Chunk loaders allowed per player. |
+| `remote_access_terminal` | `maxTerminals` | `80` | Total terminals allowed across every colour and dimension; each colour shows its own running count. |
+| `remote_access_terminal` | `maxChunkloaderTerminals` | `2` | Chunk loaders allowed across the whole server. |
+| `remote_access_terminal` | `maxChunkloadersPerPlayer` | `2` | Chunk-loader leases one player may hold at once. |
+| `remote_access_terminal` | `chunkLoaderTimeoutMinutes` | `60` | How long a chunk-loader lease lasts before the slot is freed (0 = never expires). |
+| `remote_access_terminal` | `chunkLoaderQueue` | `true` | When true a request blocked by the caps waits in a queue instead of being refused. |
 | `remote_access_terminal` | `lazyChunkRing` | `1` | Neighbour chunks kept loaded (not ticked) around a chunk-loader terminal: 0 = off, 1 = 3×3. |
 | `remote_access_terminal` | `invitePermissionLevel` | `0` | Permission level needed for `/remoteaccess invite`, `uninvite` and `list`. |
 

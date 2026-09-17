@@ -15,6 +15,8 @@ public final class RemoteAccessTerminalConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_CROSS_DIMENSION;
     public static final ModConfigSpec.IntValue MAX_CHUNKLOADER_TERMINALS;
     public static final ModConfigSpec.IntValue MAX_CHUNKLOADERS_PER_PLAYER;
+    public static final ModConfigSpec.IntValue CHUNK_LOADER_TIMEOUT_MINUTES;
+    public static final ModConfigSpec.BooleanValue CHUNK_LOADER_QUEUE;
     public static final ModConfigSpec.IntValue LAZY_CHUNK_RING;
 
     static {
@@ -37,15 +39,27 @@ public final class RemoteAccessTerminalConfig {
                 .comment("Maximum number of chunk-loading terminals allowed at once, across every colour and",
                         "dimension. Each enabled terminal keeps its own chunk ticking (and its lazy ring loaded).",
                         "WARNING: setting this very high keeps a large number of chunks loaded and can cause",
-                        "severe server lag. Default 80.")
+                        "severe server lag. Default 2.")
                 .defineInRange("maxChunkloaderTerminals", TerminalSettings.DEFAULT_MAX_CHUNKLOADER_TERMINALS, 0,
                         TerminalSettings.MAX_CONFIGURABLE_CHUNKLOADER_TERMINALS);
         MAX_CHUNKLOADERS_PER_PLAYER = builder
-                .comment("Maximum number of chunk-loading terminals a single owner may enable.",
+                .comment("Maximum number of chunk-loader leases a single player may hold at once.",
                         "WARNING: raising this multiplies the chunks kept loaded per player and can cause",
-                        "server lag. Default 1.")
+                        "server lag. Default 2.")
                 .defineInRange("maxChunkloadersPerPlayer", TerminalSettings.DEFAULT_MAX_CHUNKLOADERS_PER_PLAYER, 0,
                         TerminalSettings.MAX_CONFIGURABLE_CHUNKLOADERS_PER_PLAYER);
+        CHUNK_LOADER_TIMEOUT_MINUTES = builder
+                .comment("How long a chunk-loader lease lasts, in minutes, before the slot is released",
+                        "automatically. 0 disables the timeout: a lease then lasts until it is switched off,",
+                        "the terminal is removed, or an operator clears it. Default 60.")
+                .defineInRange("chunkLoaderTimeoutMinutes",
+                        TerminalSettings.DEFAULT_CHUNKLOADER_TIMEOUT_MINUTES, 0,
+                        TerminalSettings.MAX_CONFIGURABLE_CHUNKLOADER_TIMEOUT_MINUTES);
+        CHUNK_LOADER_QUEUE = builder
+                .comment("When true a request blocked by the caps waits in a queue instead of being refused,",
+                        "and is promoted (oldest request first) as soon as a lease is released or expires.",
+                        "Each player may hold one queued request. Default true.")
+                .define("chunkLoaderQueue", TerminalSettings.DEFAULT_CHUNKLOADER_QUEUE);
         LAZY_CHUNK_RING = builder
                 .comment("Radius, in chunks, kept loaded (but not ticking) around an enabled terminal's own",
                         "chunk. The default 1 is the 3x3 footprint: the own chunk plus its 8 neighbours.",
@@ -77,6 +91,8 @@ public final class RemoteAccessTerminalConfig {
             TerminalSettings.setAllowCrossDimension(ALLOW_CROSS_DIMENSION.get());
             TerminalSettings.setMaxChunkloaderTerminals(MAX_CHUNKLOADER_TERMINALS.get());
             TerminalSettings.setMaxChunkloadersPerPlayer(MAX_CHUNKLOADERS_PER_PLAYER.get());
+            TerminalSettings.setChunkLoaderTimeoutMinutes(CHUNK_LOADER_TIMEOUT_MINUTES.get());
+            TerminalSettings.setChunkLoaderQueue(CHUNK_LOADER_QUEUE.get());
             TerminalSettings.setLazyChunkRing(LAZY_CHUNK_RING.get());
         }
     }

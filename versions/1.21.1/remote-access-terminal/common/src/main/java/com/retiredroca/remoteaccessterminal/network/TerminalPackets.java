@@ -54,7 +54,8 @@ public final class TerminalPackets {
 
     /** Full server-to-client snapshot of one terminal plus the menu's target. */
     public record TerminalSyncPayload(ResourceKey<Level> dimension, BlockPos pos, DyeColor color, String name,
-            boolean open, boolean chunkLoader, boolean canEdit, int sortMode, List<Destination> destinations,
+            boolean open, boolean chunkLoader, long chunkLoaderUntil, int chunkLoaderQueuePosition,
+            boolean canEdit, int sortMode, List<Destination> destinations,
             List<Integer> counts, int total, List<UUID> invites) implements CustomPacketPayload {
         public static final Type<TerminalSyncPayload> TYPE = new Type<>(SYNC);
         public static final StreamCodec<RegistryFriendlyByteBuf, TerminalSyncPayload> STREAM_CODEC =
@@ -67,6 +68,8 @@ public final class TerminalPackets {
             ByteBufCodecs.STRING_UTF8.encode(buf, payload.name() == null ? "" : payload.name());
             ByteBufCodecs.BOOL.encode(buf, payload.open());
             ByteBufCodecs.BOOL.encode(buf, payload.chunkLoader());
+            ByteBufCodecs.VAR_LONG.encode(buf, payload.chunkLoaderUntil());
+            ByteBufCodecs.VAR_INT.encode(buf, payload.chunkLoaderQueuePosition());
             ByteBufCodecs.BOOL.encode(buf, payload.canEdit());
             ByteBufCodecs.VAR_INT.encode(buf, payload.sortMode());
             Destination.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, payload.destinations());
@@ -82,6 +85,8 @@ public final class TerminalPackets {
             String name = ByteBufCodecs.STRING_UTF8.decode(buf);
             boolean open = ByteBufCodecs.BOOL.decode(buf);
             boolean chunkLoader = ByteBufCodecs.BOOL.decode(buf);
+            long chunkLoaderUntil = ByteBufCodecs.VAR_LONG.decode(buf);
+            int chunkLoaderQueuePosition = ByteBufCodecs.VAR_INT.decode(buf);
             boolean canEdit = ByteBufCodecs.BOOL.decode(buf);
             int sortMode = ByteBufCodecs.VAR_INT.decode(buf);
             List<Destination> destinations = Destination.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
@@ -89,7 +94,8 @@ public final class TerminalPackets {
             int total = ByteBufCodecs.VAR_INT.decode(buf);
             List<UUID> invites = UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
             return new TerminalSyncPayload(dimension, pos, color, name.isEmpty() ? null : name, open, chunkLoader,
-                    canEdit, sortMode, destinations, counts, total, invites);
+                    chunkLoaderUntil, chunkLoaderQueuePosition, canEdit, sortMode, destinations, counts, total,
+                    invites);
         }
 
         @Override

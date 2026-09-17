@@ -33,7 +33,7 @@ public final class TerminalSyncHelper {
         TerminalLinks links = TerminalLinksAccess.get(level).links();
         TerminalLinks.Link link = links.find(color, level.dimension(), pos);
         if (link == null) {
-            return new TerminalSyncPayload(level.dimension(), pos, color, null, false, false, false,
+            return new TerminalSyncPayload(level.dimension(), pos, color, null, false, false, 0, 0, false,
                     SortMode.NEAREST.ordinal(), List.of(), counts(links), links.totalCount(), List.of());
         }
         List<Destination> destinations = new ArrayList<>();
@@ -46,8 +46,9 @@ public final class TerminalSyncHelper {
         }
         destinations.sort(comparator(link, level.dimension()));
         Set<UUID> invites = link.owner() == null ? Set.of() : NetworkPermissions.invitesOf(level, link.owner());
+        long until = link.isChunkLoader() ? link.chunkLoaderUntil() : 0L;
         return new TerminalSyncPayload(level.dimension(), pos, color, link.name(),
-                NetworkPermissions.isOpen(level, pos), link.isChunkLoader(),
+                NetworkPermissions.isOpen(level, pos), link.isChunkLoader(), until, links.queuePosition(link),
                 TerminalPermissions.canEdit(level, color, pos, player), link.sortMode().ordinal(), destinations,
                 counts(links), links.totalCount(), List.copyOf(invites));
     }
@@ -63,7 +64,7 @@ public final class TerminalSyncHelper {
             destinations.add(new Destination(terminal.name() == null ? "" : terminal.name(),
                     DyeColor.byName(terminal.color(), DyeColor.WHITE), terminal.dimension(), terminal.pos()));
         }
-        return new TerminalSyncPayload(dimension, pos, DyeColor.WHITE, null, false, false, false,
+        return new TerminalSyncPayload(dimension, pos, DyeColor.WHITE, null, false, false, 0, 0, false,
                 SortMode.NEAREST.ordinal(), destinations, List.of(), 0, List.of());
     }
 

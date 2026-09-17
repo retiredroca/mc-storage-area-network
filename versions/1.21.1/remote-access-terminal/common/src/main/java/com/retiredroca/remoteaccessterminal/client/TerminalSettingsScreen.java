@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.retiredroca.remoteaccessterminal.RemoteAccessTerminalCommon;
+import com.retiredroca.remoteaccessterminal.TerminalChunkLoader;
 import com.retiredroca.remoteaccessterminal.config.TerminalSettings;
 import com.retiredroca.remoteaccessterminal.menu.TerminalMenu;
 
@@ -43,6 +44,10 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
     private int page;
     private int lastVersion = -1;
     private EditBox nameBox;
+    private Button chunkLoaderButton;
+    private long labelMinute;
+    private int labelQueue = -1;
+    private boolean labelActive;
 
     public TerminalSettingsScreen(TerminalMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -74,11 +79,12 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
 
         buildColorWidgets(x, y);
 
-        Button chunkLoaderButton = Button.builder(chunkLoaderLabel(),
-                button -> RemoteAccessTerminalCommon.platform().sendSetChunkLoader(!menu.isChunkLoader()))
-                .bounds(x + 8, y + 150, 150, 20).build();
-        chunkLoaderButton.active = menu.canEdit();
-        addRenderableWidget(chunkLoaderButton);
+        this.chunkLoaderButton = Button.builder(chunkLoaderLabel(),
+                button -> RemoteAccessTerminalCommon.platform().sendSetChunkLoader(chunkLoaderNextState()))
+                .bounds(x + 8, y + 150, 304, 20).build();
+        this.chunkLoaderButton.active = menu.canEdit();
+        addRenderableWidget(this.chunkLoaderButton);
+        refreshChunkLoaderLabel();
 
         addRenderableWidget(Button.builder(Component.translatable("gui.remote_access_terminal.sort",
                 Component.translatable(menu.getSortMode().displayKey())),
@@ -136,11 +142,43 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
         return builder.toString();
     }
 
+    /** Idle terminals switch on; a running lease or a queued request is switched off/cancelled. */
+    private boolean chunkLoaderNextState() {
+        return !menu.isChunkLoader() && menu.getChunkLoaderQueuePosition() <= 0;
+    }
+
+    /** Keeps the countdown on the chunk-loader button current without rebuilding every tick. */
+    private void refreshChunkLoaderLabel() {
+        if (chunkLoaderButton == null) {
+            return;
+        }
+        int queue = menu.getChunkLoaderQueuePosition();
+        long minute = menu.isChunkLoader() && menu.getChunkLoaderUntil() > 0
+                ? (menu.getChunkLoaderUntil() - System.currentTimeMillis()) / 60_000L
+                : 0L;
+        if (minute == labelMinute && queue == labelQueue && menu.isChunkLoader() == labelActive) {
+            return;
+        }
+        labelMinute = minute;
+        labelQueue = queue;
+        labelActive = menu.isChunkLoader();
+        chunkLoaderButton.setMessage(chunkLoaderLabel());
+    }
+
     private Component chunkLoaderLabel() {
-        return Component.translatable("gui.remote_access_terminal.chunkloader",
-                Component.translatable(menu.isChunkLoader()
-                        ? "gui.remote_access_terminal.on"
-                        : "gui.remote_access_terminal.off"));
+        Component state;
+        if (menu.getChunkLoaderQueuePosition() > 0) {
+            state = Component.translatable("gui.remote_access_terminal.queued",
+                    menu.getChunkLoaderQueuePosition());
+        } else if (!menu.isChunkLoader()) {
+            state = Component.translatable("gui.remote_access_terminal.off");
+        } else if (menu.getChunkLoaderUntil() <= 0) {
+            state = Component.translatable("gui.remote_access_terminal.on");
+        } else {
+            state = Component.translatable("gui.remote_access_terminal.on_time",
+                    TerminalChunkLoader.remainingLabel(menu.getChunkLoaderUntil()));
+        }
+        return Component.translatable("gui.remote_access_terminal.chunkloader", state);
     }
 
     private void buildInviteWidgets(int x, int y) {
@@ -194,7 +232,9 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
         if (menu.getVersion() != lastVersion) {
             lastVersion = menu.getVersion();
             rebuildWidgets();
+            return;
         }
+        refreshChunkLoaderLabel();
     }
 
     @Override

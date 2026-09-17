@@ -43,6 +43,13 @@ public final class RemoteAccessTerminalConfig {
                         TerminalSettings.setMaxChunkloadersPerPlayer(
                                 obj.get("maxChunkloadersPerPlayer").getAsInt());
                     }
+                    if (obj.has("chunkLoaderTimeoutMinutes")) {
+                        TerminalSettings.setChunkLoaderTimeoutMinutes(
+                                obj.get("chunkLoaderTimeoutMinutes").getAsInt());
+                    }
+                    if (obj.has("chunkLoaderQueue")) {
+                        TerminalSettings.setChunkLoaderQueue(obj.get("chunkLoaderQueue").getAsBoolean());
+                    }
                     if (obj.has("lazyChunkRing")) {
                         TerminalSettings.setLazyChunkRing(obj.get("lazyChunkRing").getAsInt());
                     }
@@ -71,12 +78,16 @@ public final class RemoteAccessTerminalConfig {
                 + "enabled terminal keeps its own chunk fully ticking and loads the lazyChunkRing radius around "
                 + "it. A ring above 1 is only honoured when the crafting_network mod is present, and is then "
                 + "capped at the server's simulation distance; without it the radius is clamped to 1 (the 3x3 "
-                + "footprint).");
+                + "footprint). A chunk-loader lease lasts chunkLoaderTimeoutMinutes minutes (0 = never expires); "
+                + "when both caps are full and chunkLoaderQueue is true the request waits in a queue and is "
+                + "promoted when a lease is released or expires.");
         obj.addProperty("maxTerminals", TerminalSettings.getMaxTerminals());
         obj.addProperty("invitePermissionLevel", TerminalSettings.getInvitePermissionLevel());
         obj.addProperty("allowCrossDimension", TerminalSettings.isAllowCrossDimension());
         obj.addProperty("maxChunkloaderTerminals", TerminalSettings.getMaxChunkloaderTerminals());
         obj.addProperty("maxChunkloadersPerPlayer", TerminalSettings.getMaxChunkloadersPerPlayer());
+        obj.addProperty("chunkLoaderTimeoutMinutes", TerminalSettings.getChunkLoaderTimeoutMinutes());
+        obj.addProperty("chunkLoaderQueue", TerminalSettings.isChunkLoaderQueue());
         obj.addProperty("lazyChunkRing", TerminalSettings.getLazyChunkRing());
         try {
             Files.createDirectories(path.getParent());
