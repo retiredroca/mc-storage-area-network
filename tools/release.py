@@ -16,6 +16,10 @@ By default the GitHub release happens and then the publish-only workflow
 (reading CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment - use secrets.py run to supply
 them from the encrypted vault) and marks the release, so a CI run would skip it. The tag is a
 single series `v<api 3 parts>.<stamp>` (e.g. `v1.0.2.26091512`).
+
+The build reuses a warm Gradle daemon (the 12G one configured in the root gradle.properties), so
+the six Gradle invocations do not each pay cold-start and reconfiguration of every included build.
+Pass --no-daemon to reproduce a CI-like cold build instead.
 """
 
 import argparse
@@ -122,23 +126,27 @@ def bump(mod, stamp):
 # --- build --------------------------------------------------------------------------
 
 
-def build(mc, dry):
+def build(mc, dry, no_daemon=False):
     g = gradlew()
+    # Reuse the warm 12G daemon across these invocations by default: each one used to start a cold
+    # JVM and reconfigure all 12 included builds. --no-daemon is available to reproduce a CI-like
+    # cold build (CI always passes it, where each run is a fresh container).
+    daemon = ["--no-daemon"] if no_daemon else []
     # Bootstrap: the API artifacts must be in repo/ before the hosts compile, because hosts
     # require an API version floor ([<api>,1.1)).
-    run(g + ["--no-daemon", "-p", f"versions/{mc}/api/fabric",
+    run(g + daemon + ["-p", f"versions/{mc}/api/fabric",
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
-    run(g + ["--no-daemon", "-p", f"versions/{mc}/api/neoforge",
+    run(g + daemon + ["-p", f"versions/{mc}/api/neoforge",
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
     # Staged build (loader jars -> loader bundles -> universal -> universal bundles) as four
     # invocations, so a failure names the layer that broke. The last one also unions the staged
     # dirs into build/release/ and republishes the API to ./repo.
     # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
-    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
+    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
         dry=dry)
-    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
-    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
-    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
+    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
+    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
+    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
              "publishRepo"], dry=dry)
 
 
@@ -504,6 +512,8 @@ def main():
     ap.add_argument("--allow-dirty", action="store_true")
     ap.add_argument("--no-push", action="store_true")
     ap.add_argument("--skip-build", action="store_true", help="reuse the existing dist/")
+    ap.add_argument("--no-daemon", action="store_true",
+                    help="do not reuse a Gradle daemon (slower; reproduces a CI-like cold build)")
     args = ap.parse_args()
 
     dry = args.dry_run
@@ -520,7 +530,7 @@ def main():
     log(f"tag: {tag}")
 
     if not args.skip_build:
-        build(args.mc, dry)
+        build(args.mc, dry, args.no_daemon)
         collect(dry)
     else:
         verify(dry)

@@ -24,6 +24,33 @@
 - Report `pruneRepo` output; it refreshes `maven-metadata.xml` (stale entries break range resolution).
 - Deploy to the local Prism test instances: `./deploy.sh --build --local --no-restart`.
 
+## Build performance
+
+Measured on the maintainer's machine (28 cores / 64 GB), full staged sequence cold from clean:
+
+| | baseline | after |
+|---|---|---|
+| `clean releaseLoaderJars` | 105 s | 87 s |
+| full staged sequence (30 jars) | 104 s | 70 s |
+| release-style build warmed (`-p` API publish + 4 staged groups) | n/a | 33 s |
+
+What changed, and the rules that keep it fast:
+
+- **JVM/build settings live in the root `gradle.properties` only.** `org.gradle.jvmargs` is read
+  from a build's *own root* `gradle.properties`: for the composite build that is the repo root, but
+  for `-p versions/<mc>/api/neoforge` it is that directory. So the module/loader files repeat the
+  same value — that is deliberate, not duplication to clean up. If they disagree, Gradle starts a
+  second daemon with the smaller heap (the four neoforge files used to say `-Xmx1G`, and a 1 GiB
+  daemon really was running NeoGradle).
+- Current values: `-Xmx12G -XX:MaxMetaspaceSize=1G -XX:+UseParallelGC`, `org.gradle.parallel=true`,
+  `org.gradle.workers.max=8`, `org.gradle.caching=true`. `workers.max` is below the core count
+  because each worker is its own JVM; do not raise the daemon heap to fix a worker OOM.
+- **Do not pass `--no-daemon` locally.** Six Gradle invocations per release each used to cold-start
+  and reconfigure all 12 included builds. `tools/release.py` now reuses the warm daemon and exposes
+  `--no-daemon` to reproduce a CI-like cold build; CI always passes it (fresh container).
+- Configuration cache is deliberately **off**: Loom 1.9.2 / NeoGradle 7.1.38 on Gradle 8.14 are not
+  reliable with it.
+
 ## Conventions
 
 - **Anything common across the gameplay mods belongs in the API** (`versions/<mc>/api`), never
