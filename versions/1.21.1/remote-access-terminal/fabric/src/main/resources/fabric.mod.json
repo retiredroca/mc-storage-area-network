@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Dye-coloured remote access terminals: place one, name it, then link and travel between them. Break protection and scoreboard-team permissions come from the MC Storage Area Network API. Inspired by Jake Teleports by Neurlimon (https://www.curseforge.com/minecraft/mc-mods/jake-teleports, https://mcreator.net/modification/99707/jake-teleports).",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.retiredroca.remoteaccessterminal.fabric.RemoteAccessTerminal"
+    ],
+    "client": [
+      "com.retiredroca.remoteaccessterminal.fabric.RemoteAccessTerminalClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "mc_storage_area_network": "~1.0.2",
+    "java": ">=21"
+  }
+}

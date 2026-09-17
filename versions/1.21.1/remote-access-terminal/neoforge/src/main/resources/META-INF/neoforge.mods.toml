@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+credits="Inspired by Jake Teleports by Neurlimon - https://www.curseforge.com/minecraft/mc-mods/jake-teleports | MCreator page: https://mcreator.net/modification/99707/jake-teleports"
+description='''
+Dye-coloured remote access terminals: place one, name it, then link and travel between them. Break protection and scoreboard-team permissions come from the MC Storage Area Network API.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[${neo_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="[${minecraft_version}]"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="mc_storage_area_network"
+    type="required"
+    versionRange="[1.0.2,1.1)"
+    ordering="AFTER"
+    side="BOTH"

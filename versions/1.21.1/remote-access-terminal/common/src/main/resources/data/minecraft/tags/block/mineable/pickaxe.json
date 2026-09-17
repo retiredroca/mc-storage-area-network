@@ -1,0 +1,21 @@
+{
+  "replace": false,
+  "values": [
+    "remote_access_terminal:terminal_white",
+    "remote_access_terminal:terminal_orange",
+    "remote_access_terminal:terminal_magenta",
+    "remote_access_terminal:terminal_light_blue",
+    "remote_access_terminal:terminal_yellow",
+    "remote_access_terminal:terminal_lime",
+    "remote_access_terminal:terminal_pink",
+    "remote_access_terminal:terminal_gray",
+    "remote_access_terminal:terminal_light_gray",
+    "remote_access_terminal:terminal_cyan",
+    "remote_access_terminal:terminal_purple",
+    "remote_access_terminal:terminal_blue",
+    "remote_access_terminal:terminal_brown",
+    "remote_access_terminal:terminal_green",
+    "remote_access_terminal:terminal_red",
+    "remote_access_terminal:terminal_black"
+  ]
+}

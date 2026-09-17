@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "remote_access_terminal:block/terminal"
+    }
+  }
+}
