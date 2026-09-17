@@ -15,9 +15,6 @@ or pick only the mods you want:
 | **Remote Access Terminal** | Dye-coloured terminals you name and travel between, optionally keeping a base chunk-loaded. With Network Routing installed, a held Routing Linker becomes a one-way trip home. |
 | **MC Storage Area Network** | The shared library/API that scans storage and powers the mods above. **Required by all**; other mods can hook into it. |
 
-![Storage Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/storage-network/storage-network.gif)
-![Crafting Network demo](https://raw.githubusercontent.com/retiredroca/mc-storage-area-network/main/versions/1.21.1/crafting-network/crafting-network.gif)
-
 ---
 
 ## The four gameplay mods
