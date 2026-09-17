@@ -7,5 +7,5 @@ modId="mc_storage_area_network_bundle_all"
 version="@@VERSION@@"
 displayName="MC Storage Area Network (All-in-One)"
 description='''
-One-file install: the MC Storage Area Network API plus Storage Network and Crafting Network. Works on NeoForge; each loader loads only its own nested jars.
+One-file install: the MC Storage Area Network API plus Storage Network, Crafting Network, Network Routing and Remote Access Terminal. Works on NeoForge; each loader loads only its own nested jars.
 '''

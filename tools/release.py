@@ -37,12 +37,14 @@ STATE = ROOT / "release-state.properties"
 DIST = ROOT / "dist"
 UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
 
-MODS = ("api", "storage", "crafting", "routing", "all")
-COMPONENTS = ("api", "storage", "crafting", "routing")
-COMP_JAR = {"storage": "storage-network", "crafting": "crafting-network", "routing": "network-routing"}
+MODS = ("api", "storage", "crafting", "routing", "access", "all")
+COMPONENTS = ("api", "storage", "crafting", "routing", "access")
+COMP_JAR = {"storage": "storage-network", "crafting": "crafting-network", "routing": "network-routing",
+            "access": "remote-access-terminal"}
 ALLOWED_JAR = re.compile(
     r"^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-network-routing"
-    r"|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing)\.[0-9].*\.jar$"
+    r"|-remote-access-terminal|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing|-bundle-access)"
+    r"\.[0-9].*\.jar$"
 )
 
 
@@ -128,9 +130,16 @@ def build(mc, dry):
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
     run(g + ["--no-daemon", "-p", f"versions/{mc}/api/neoforge",
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
+    # Staged build (loader jars -> loader bundles -> universal -> universal bundles) as four
+    # invocations, so a failure names the layer that broke. The last one also unions the staged
+    # dirs into build/release/ and republishes the API to ./repo.
     # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
-    run(g + ["--no-daemon", f"-Pmc={mc}", "--refresh-dependencies", "clean", "releaseJars", "publishRepo"],
+    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
         dry=dry)
+    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
+    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
+    run(g + ["--no-daemon", "--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
+             "publishRepo"], dry=dry)
 
 
 def collect(dry):
@@ -160,8 +169,8 @@ def verify(dry):
     bad = [j for j in jars if not ALLOWED_JAR.match(j)]
     if bad:
         die(f"unexpected files in dist/: {bad}")
-    if len(jars) != 24:
-        die(f"expected 24 release jars, found {len(jars)}")
+    if len(jars) != 30:
+        die(f"expected 30 release jars, found {len(jars)}")
     log(f"release jar set OK ({len(jars)} files)")
 
 
@@ -176,7 +185,7 @@ def changelog(tag, dry):
 
 def bundle_versions():
     out = {}
-    for key in ("all", "storage", "crafting", "routing"):
+    for key in ("all", "storage", "crafting", "routing", "access"):
         matches = sorted(DIST.glob(f"universal-bundle-{key}.*.jar"))
         if not matches:
             die(f"missing universal-bundle-{key}.*.jar in dist/")
@@ -381,14 +390,14 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
         if file_id:
             set_state(parent_key, str(file_id))
             log(f"{parent_key}={file_id}")
-            for comp in ("storage", "crafting", "routing"):
+            for comp in ("storage", "crafting", "routing", "access"):
                 jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
     else:
         parent = read_props(STATE).get(parent_key) if STATE.exists() else None
         if parent:
-            for comp in ("storage", "crafting", "routing"):
+            for comp in ("storage", "crafting", "routing", "access"):
                 if not changed[comp]:
                     continue
                 jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
@@ -403,6 +412,8 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
         bundle_jobs.append(f"universal-bundle-crafting.{bundles['crafting']}.jar")
     if changed["api"] or changed["storage"] or changed["routing"]:
         bundle_jobs.append(f"universal-bundle-routing.{bundles['routing']}.jar")
+    if changed["api"] or changed["access"]:
+        bundle_jobs.append(f"universal-bundle-access.{bundles['access']}.jar")
     for filename in bundle_jobs:
         jar = DIST / filename
         if jar.exists():
@@ -498,7 +509,7 @@ def main():
     dry = args.dry_run
     ensure_clean(args.allow_dirty)
 
-    stamp = versioning.utc_stamp()
+    stamp = versioning.stamp()
     changed = bump(args.mod, stamp)
     versions = read_props(VERSIONS)
 

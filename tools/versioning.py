@@ -3,7 +3,7 @@
 
 Scheme: ``<major>.<minor>.<patch>.<yymmddhh>`` — e.g. ``1.0.2.26091512``.
 
-* the trailing ``yymmddhh`` stamp is bumped automatically (UTC date/hour);
+* the trailing ``yymmddhh`` stamp is bumped automatically (Hawaii Standard Time, UTC-10, no DST);
 * the patch (3rd component) is edited manually when a semantic bump is wanted;
 * the tag is ``v<major>.<minor>.<patch>.<stamp>`` (single series, e.g. ``v1.0.2.26091512``).
 
@@ -28,9 +28,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Hawaii Standard Time: fixed UTC-10, no daylight saving, so a stamp is always an exact hour offset
+# from UTC and never jumps back and forth across a DST boundary.
+HAWAII = datetime.timezone(datetime.timedelta(hours=-10))
 
-def utc_stamp() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%y%m%d%H")
+
+def stamp() -> str:
+    return datetime.datetime.now(HAWAII).strftime("%y%m%d%H")
 
 
 def bump(value: str, stamp: str) -> str:
@@ -103,7 +107,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Version helpers (scheme <major>.<minor>.<patch>.<yymmddhh>).")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("stamp").set_defaults(func=lambda a: print(utc_stamp()))
+    sub.add_parser("stamp").set_defaults(func=lambda a: print(stamp()))
 
     p_bump = sub.add_parser("bump")
     p_bump.add_argument("value")

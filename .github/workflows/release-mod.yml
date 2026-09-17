@@ -9,7 +9,7 @@ on:
         type: string
         default: 'build'
       mod:
-        description: 'Components to re-version (build mode): api | storage | crafting | routing | all. Only the named component gets a new version and nothing infers it from the files changed, so use "all" whenever a change spans the API and one or more hosts - a narrow release leaves the other components at their old versions and mixes them into the bundles.'
+        description: 'Components to re-version (build mode): api | storage | crafting | routing | access | all. Only the named component gets a new version and nothing infers it from the files changed, so use "all" whenever a change spans the API and one or more hosts - a narrow release leaves the other components at their old versions and mixes them into the bundles.'
         required: false
         type: string
         default: ''
@@ -86,18 +86,23 @@ jobs:
           storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
           crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
           routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          access=$(grep -E '^access=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
 
           api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
+          access_changed=false
           case "$mod" in
             api)      api=$(python3 tools/versioning.py bump "$api" "$stamp"); api_changed=true ;;
             storage)  storage=$(python3 tools/versioning.py bump "$storage" "$stamp"); storage_changed=true ;;
             crafting) crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp"); crafting_changed=true ;;
             routing)  routing=$(python3 tools/versioning.py bump "$routing" "$stamp"); routing_changed=true ;;
+            access)   access=$(python3 tools/versioning.py bump "$access" "$stamp"); access_changed=true ;;
             all)      api=$(python3 tools/versioning.py bump "$api" "$stamp")
                       storage=$(python3 tools/versioning.py bump "$storage" "$stamp")
                       crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp")
                       routing=$(python3 tools/versioning.py bump "$routing" "$stamp")
-                      api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true ;;
+                      access=$(python3 tools/versioning.py bump "$access" "$stamp")
+                      api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true
+                      access_changed=true ;;
             *) echo "Unknown mod: $mod" >&2; exit 1 ;;
           esac
 
@@ -105,6 +110,7 @@ jobs:
           sed -i -E "s/^storage=.*/storage=$storage/" versions.properties
           sed -i -E "s/^crafting=.*/crafting=$crafting/" versions.properties
           sed -i -E "s/^routing=.*/routing=$routing/" versions.properties
+          sed -i -E "s/^access=.*/access=$access/" versions.properties
           cat versions.properties
 
           # Point the hosts at the (possibly new) API version floor.
@@ -126,6 +132,8 @@ jobs:
             echo "STORAGE_CHANGED=$storage_changed"
             echo "CRAFTING_CHANGED=$crafting_changed"
             echo "ROUTING_CHANGED=$routing_changed"
+            echo "ACCESS_VERSION=$access"
+            echo "ACCESS_CHANGED=$access_changed"
             echo "RELEASE_TAG=$tag"
           } >> "$GITHUB_ENV"
 
@@ -138,14 +146,31 @@ jobs:
           ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/fabric" publishMavenJavaPublicationToRepoRepository
           ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/neoforge" publishMavenJavaPublicationToRepoRepository
 
-      - name: Build
+      # Staged build so a failure names the layer that broke: loader jars, loader bundles,
+      # universal jars, universal bundles. The collect step then unions them into build/release/.
+      - name: Build loader jars
         if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" --refresh-dependencies clean releaseJars publishRepo
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" --refresh-dependencies releaseLoaderJars
+
+      - name: Build loader bundles
+        if: ${{ inputs.mode == 'build' }}
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseLoaderBundles
+
+      - name: Build universal jars
+        if: ${{ inputs.mode == 'build' }}
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseUniversal
+
+      - name: Build universal bundles
+        if: ${{ inputs.mode == 'build' }}
+        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseUniversalBundles
 
       - name: Collect release jars
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
+          # Assemble the union (build/release/) from the staged groups and republish the API to
+          # ./repo; the build steps above only staged their own output directories.
+          ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseJars publishRepo
           # Clear any pre-existing dist/ so a reused/self-hosted workspace can't leak a stale jar.
           rm -rf dist
           mkdir -p dist
@@ -174,7 +199,7 @@ jobs:
       - name: Verify release jar set
         run: |
           set -euo pipefail
-          allowed='^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-network-routing|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing)\.[0-9].*\.jar$'
+          allowed='^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-network-routing|-remote-access-terminal|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing|-bundle-access)\.[0-9].*\.jar$'
           bad=$(ls -1 dist | grep -vE "$allowed" || true)
           if [ -n "$bad" ]; then
             echo "Unexpected file(s) in dist/ (refusing to publish):" >&2
@@ -182,8 +207,8 @@ jobs:
             exit 1
           fi
           count=$(ls -1 dist/*.jar | wc -l)
-          if [ "$count" -ne 24 ]; then
-            echo "Expected 24 release jars, found $count:" >&2
+          if [ "$count" -ne 30 ]; then
+            echo "Expected 30 release jars, found $count:" >&2
             ls -la dist >&2
             exit 1
           fi
@@ -202,12 +227,15 @@ jobs:
           storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
           crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
           routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          access=$(grep -E '^access=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
 
           prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
           api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
+          access_changed=false
           if [ -z "$prev" ]; then
             echo "No previous tag; treating every component as changed."
             api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true
+            access_changed=true
           else
             echo "Diffing versions.properties: ${prev}..${tag}"
             diff=$(git diff "$prev" "$tag" -- versions.properties || true)
@@ -216,6 +244,7 @@ jobs:
             if echo "$diff" | grep -qE '^[-+]storage='; then storage_changed=true; fi
             if echo "$diff" | grep -qE '^[-+]crafting='; then crafting_changed=true; fi
             if echo "$diff" | grep -qE '^[-+]routing='; then routing_changed=true; fi
+            if echo "$diff" | grep -qE '^[-+]access='; then access_changed=true; fi
           fi
 
           {
@@ -227,6 +256,8 @@ jobs:
             echo "STORAGE_CHANGED=$storage_changed"
             echo "CRAFTING_CHANGED=$crafting_changed"
             echo "ROUTING_CHANGED=$routing_changed"
+            echo "ACCESS_VERSION=$access"
+            echo "ACCESS_CHANGED=$access_changed"
             echo "RELEASE_TAG=$tag"
           } >> "$GITHUB_ENV"
 
@@ -249,11 +280,13 @@ jobs:
           bs=$(basename dist/universal-bundle-storage.*.jar | sed -E 's/^universal-bundle-storage\.(.*)\.jar$/\1/')
           bc=$(basename dist/universal-bundle-crafting.*.jar | sed -E 's/^universal-bundle-crafting\.(.*)\.jar$/\1/')
           br=$(basename dist/universal-bundle-routing.*.jar | sed -E 's/^universal-bundle-routing\.(.*)\.jar$/\1/')
+          bx=$(basename dist/universal-bundle-access.*.jar | sed -E 's/^universal-bundle-access\.(.*)\.jar$/\1/')
           {
             echo "BUNDLE_ALL_VERSION=$ba"
             echo "BUNDLE_STORAGE_VERSION=$bs"
             echo "BUNDLE_CRAFTING_VERSION=$bc"
             echo "BUNDLE_ROUTING_VERSION=$br"
+            echo "BUNDLE_ACCESS_VERSION=$bx"
           } >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
@@ -293,6 +326,7 @@ jobs:
             dist/universal-storage-network.${{ env.STORAGE_VERSION }}.jar
             dist/universal-crafting-network.${{ env.CRAFTING_VERSION }}.jar
             dist/universal-network-routing.${{ env.ROUTING_VERSION }}.jar
+            dist/universal-remote-access-terminal.${{ env.ACCESS_VERSION }}.jar
           name: SAN API ${{ env.API_VERSION }}
           version: san-api-${{ env.API_VERSION }}
           dependencies: |
@@ -328,7 +362,7 @@ jobs:
       # API unchanged: attach the updated mod(s) under the existing SAN API entry instead of
       # re-uploading the API. Superseded child files must be archived on the CurseForge website.
       - name: CurseForge - attach updated mods to the existing SAN API entry
-        if: ${{ env.API_CHANGED == 'false' && (env.STORAGE_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true' || env.ROUTING_CHANGED == 'true') }}
+        if: ${{ env.API_CHANGED == 'false' && (env.STORAGE_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true' || env.ROUTING_CHANGED == 'true' || env.ACCESS_CHANGED == 'true') }}
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_API_KEY }}
         run: |
@@ -343,6 +377,9 @@ jobs:
           fi
           if [ "$ROUTING_CHANGED" = true ]; then
             files+=("dist/universal-network-routing.${ROUTING_VERSION}.jar")
+          fi
+          if [ "$ACCESS_CHANGED" = true ]; then
+            files+=("dist/universal-remote-access-terminal.${ACCESS_VERSION}.jar")
           fi
           ./.github/scripts/curseforge-upload.sh "$parent" "${files[@]}"
 
@@ -435,6 +472,28 @@ jobs:
           retry-delay: 15000
           fail-mode: warn
 
+      - name: CurseForge - Bundle Access
+        if: ${{ env.API_CHANGED == 'true' || env.ACCESS_CHANGED == 'true' }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1690770
+          curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
+          curseforge-files: dist/universal-bundle-access.${{ env.BUNDLE_ACCESS_VERSION }}.jar
+          name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
+          version: bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}
+          dependencies: |
+            fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
+          changelog-file: dist/changelog.md
+          version-type: release
+          game-versions: ${{ env.MC_VERSION }}
+          loaders: |
+            fabric
+            neoforge
+          java: ${{ env.JAVA_VERSION }}
+          retry-attempts: 5
+          retry-delay: 15000
+          fail-mode: warn
+
       # --- Modrinth (per-project versions; the previous version is archived) -------------------
       - name: Modrinth - SAN API + Bundle All
         if: ${{ vars.PUBLISH_MODRINTH == 'true' }}
@@ -483,6 +542,20 @@ jobs:
             mr.routing.version.${MC_VERSION} "$ROUTING_VERSION" "Network Routing $ROUTING_VERSION" \
             "dist/universal-network-routing.${ROUTING_VERSION}.jar" \
             "dist/universal-bundle-routing.${BUNDLE_ROUTING_VERSION}.jar"
+
+      # Remote Access Terminal shares the suite's Modrinth project, so it has no project variable of
+      # its own; only the state key (which version to archive) is per-component.
+      - name: Modrinth - Remote Access Terminal + Bundle Access
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.ACCESS_CHANGED == 'true') }}
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
+        run: |
+          ./.github/scripts/modrinth-sync.sh \
+            "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
+            mr.access.version.${MC_VERSION} "$ACCESS_VERSION" "Remote Access Terminal $ACCESS_VERSION" \
+            "dist/universal-remote-access-terminal.${ACCESS_VERSION}.jar" \
+            "dist/universal-bundle-access.${BUNDLE_ACCESS_VERSION}.jar"
 
       # --- Persist the bumped versions / learned platform ids back to main ---------------------
       - name: Commit version + release state

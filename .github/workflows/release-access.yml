@@ -1,0 +1,28 @@
+name: Release Remote Access Terminal
+
+on:
+  workflow_dispatch:
+    inputs:
+      minecraft:
+        description: 'Minecraft version to build (folder under versions/)'
+        default: '1.21.1'
+      tag:
+        description: 'Optional release tag override (must be unique). Leave blank to auto-generate v<api>.<yymmddhh>.'
+        default: ''
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      contains(github.event.comment.body, '/release-access')
+    uses: ./.github/workflows/release-mod.yml
+    with:
+      mod: access
+      release_tag: ${{ github.event.inputs.tag }}
+      minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
+    secrets: inherit

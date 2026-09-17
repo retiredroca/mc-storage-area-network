@@ -1,0 +1,16 @@
+{
+  "jars": [
+    {
+      "identifier": { "group": "com.retiredroca.mcstorageareanetwork", "artifact": "mc_storage_area_network-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@API_VERSION@@" },
+      "path": "META-INF/jarjar/mc_storage_area_network-neoforge.jar",
+      "isObfuscated": false
+    },
+    {
+      "identifier": { "group": "com.retiredroca.remoteaccessterminal", "artifact": "remote-access-terminal-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@ACCESS_VERSION@@" },
+      "path": "META-INF/jarjar/remote-access-terminal-neoforge.jar",
+      "isObfuscated": false
+    }
+  ]
+}

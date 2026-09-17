@@ -35,6 +35,9 @@ release-guide.txt
 # local implementation plan (untracked)
 REMOTE-ACCESS-TERMINAL-PLAN.md
 
+# local source-comparison helper (untracked; copied out of the repo)
+tools/compare-sources.py
+
 # local dev session script (untracked)
 oc.sh
 

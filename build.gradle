@@ -22,6 +22,7 @@ def componentVersion = { String mod ->
         case 'storage': return storageVersion
         case 'crafting': return craftingVersion
         case 'routing': return routingVersion
+        case 'access': return accessVersion
         default: throw new GradleException("Unknown component: ${mod}")
     }
 }
@@ -55,17 +56,22 @@ def crUni = { versionedJar("${versionRoot}/crafting-network/build/libs/crafting-
 def rtFab = { versionedJar("${versionRoot}/network-routing/fabric/build/libs/fabric-network_routing-${routingVersion}.jar") }
 def rtNeo = { versionedJar("${versionRoot}/network-routing/neoforge/build/libs/neoforge-network_routing-${routingVersion}.jar") }
 def rtUni = { versionedJar("${versionRoot}/network-routing/build/libs/network-routing-${routingVersion}-universal.jar") }
+def acFab = { versionedJar("${versionRoot}/remote-access-terminal/fabric/build/libs/fabric-remote_access_terminal-${accessVersion}.jar") }
+def acNeo = { versionedJar("${versionRoot}/remote-access-terminal/neoforge/build/libs/neoforge-remote_access_terminal-${accessVersion}.jar") }
+def acUni = { versionedJar("${versionRoot}/remote-access-terminal/build/libs/remote-access-terminal-${accessVersion}-universal.jar") }
 
-def fabJar = [api: apiFab, storage: stFab, crafting: crFab, routing: rtFab]
-def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo, routing: rtNeo]
+def fabJar = [api: apiFab, storage: stFab, crafting: crFab, routing: rtFab, access: acFab]
+def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo, routing: rtNeo, access: acNeo]
 def fabName = [api: 'mc_storage_area_network-fabric.jar',
                storage: 'storage-network-fabric.jar',
                crafting: 'crafting-network-fabric.jar',
-               routing: 'network-routing-fabric.jar']
+               routing: 'network-routing-fabric.jar',
+               access: 'remote-access-terminal-fabric.jar']
 def neoName = [api: 'mc_storage_area_network-neoforge.jar',
                storage: 'storage-network-neoforge.jar',
                crafting: 'crafting-network-neoforge.jar',
-               routing: 'network-routing-neoforge.jar']
+               routing: 'network-routing-neoforge.jar',
+               access: 'remote-access-terminal-neoforge.jar']
 
 def staticTokens = [
         '@@AUTHORS@@'          : 'Retired Roca',
@@ -79,11 +85,13 @@ def versionTokens = {
     def s = stFab()
     def c = crFab()
     def r = rtFab()
+    def x = acFab()
     [
             '@@API_VERSION@@'     : a ? versionFromJar(a, 'fabric-mc_storage_area_network-') : apiVersion,
             '@@STORAGE_VERSION@@' : s ? versionFromJar(s, 'fabric-storage_network-') : storageVersion,
             '@@CRAFTING_VERSION@@': c ? versionFromJar(c, 'fabric-crafting_network-') : craftingVersion,
             '@@ROUTING_VERSION@@' : r ? versionFromJar(r, 'fabric-network_routing-') : routingVersion,
+            '@@ACCESS_VERSION@@'  : x ? versionFromJar(x, 'fabric-remote_access_terminal-') : accessVersion,
     ]
 }
 
@@ -131,12 +139,103 @@ def writeMetadata = { File artifactDir, String groupId, String artifactId, List<
     writeChecksums(meta)
 }
 
-def dependOnBuilds = { org.gradle.api.Task t ->
-    t.dependsOn gradle.includedBuild('fabric').task(':build')
-    t.dependsOn gradle.includedBuild('neoforge').task(':build')
-    t.dependsOn gradle.includedBuild('storage-network').task(':build')
-    t.dependsOn gradle.includedBuild('crafting-network').task(':build')
-    t.dependsOn gradle.includedBuild('network-routing').task(':build')
+// Included-build name for each gameplay mod. The API's two loader builds are top-level included
+// builds named `fabric` / `neoforge`; every other mod is a composite build that exposes thin
+// `:buildFabric` / `:buildNeo` aliases so a parent build can request one loader half on its own.
+def modBuild = [storage: 'storage-network',
+                crafting: 'crafting-network',
+                routing: 'network-routing',
+                access: 'remote-access-terminal']
+
+// Build exactly one loader half of a component.
+def dependOnLoader = { org.gradle.api.Task t, String mod, String loader ->
+    if (mod == 'api') {
+        t.dependsOn gradle.includedBuild(loader).task(':build')
+    } else {
+        t.dependsOn gradle.includedBuild(modBuild[mod]).task(loader == 'fabric' ? ':buildFabric' : ':buildNeo')
+    }
+}
+
+// Build the universal (both-loaders-merged) artifact of a component.
+def dependOnUniversal = { org.gradle.api.Task t, String mod ->
+    if (mod == 'api') {
+        t.dependsOn gradle.includedBuild('fabric').task(':build')
+        t.dependsOn gradle.includedBuild('neoforge').task(':build')
+    } else {
+        t.dependsOn gradle.includedBuild(modBuild[mod]).task(':universalJar')
+    }
+}
+
+// Optional single-loader restriction for the loader stages: -Ploader=fabric|neoforge. Unset builds
+// both loaders. The universal stages always merge both, so they ignore it.
+def loaderFilter = (findProperty('loader') ?: '').toString().toLowerCase()
+if (loaderFilter && loaderFilter != 'fabric' && loaderFilter != 'neoforge') {
+    throw new GradleException("Invalid -Ploader='${loaderFilter}' (expected 'fabric' or 'neoforge')")
+}
+def activeLoaders = loaderFilter ? [loaderFilter] : ['fabric', 'neoforge']
+
+// --- API freshness -------------------------------------------------------------------
+// Hosts resolve the API from repo/, but Loom caches its remapped copy: editing API sources
+// without a version bump would leave them compiling against the stale cache. Fingerprint the API
+// sources and, only when that changes, republish the API and drop the dependents' remapped API
+// artifacts. An unchanged API leaves normal builds untouched (the task stays up-to-date).
+def apiSrcTree = fileTree("${versionRoot}/api") {
+    include '**/src/**'
+}
+def apiFingerprintFile = layout.buildDirectory.file('api-fingerprint.txt')
+def apiFingerprintDigest = { ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    def base = projectDir.absolutePath
+    apiSrcTree.files.findAll { it.isFile() }.sort { it.path }.each { File f ->
+        digest.update(f.absolutePath.substring(base.length()).replace('\\', '/').getBytes('UTF-8'))
+        digest.update(f.bytes)
+    }
+    digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+def apiFingerprintNow = apiFingerprintDigest()
+def apiFingerprintStored = {
+    def f = apiFingerprintFile.get().asFile
+    f.exists() ? f.text.trim() : ''
+}()
+def apiChanged = apiFingerprintNow != apiFingerprintStored
+
+tasks.register('ensureApi') {
+    group = 'build'
+    description = 'Republishes the API and clears dependent Loom caches when the API sources changed.'
+    inputs.files(apiSrcTree)
+    outputs.file(apiFingerprintFile)
+    if (apiChanged) {
+        dependsOn gradle.includedBuild('fabric').task(':publishMavenJavaPublicationToRepoRepository')
+        dependsOn gradle.includedBuild('neoforge').task(':publishMavenJavaPublicationToRepoRepository')
+    }
+    doLast {
+        if (!apiChanged) {
+            return
+        }
+        def removed = 0
+        file(versionRoot).listFiles()?.findAll { it.isDirectory() }?.each { modDir ->
+            ['fabric', 'neoforge'].each { loader ->
+                def remapped = new File(modDir, "${loader}/.gradle/loom-cache/remapped_mods")
+                if (!remapped.isDirectory()) {
+                    return
+                }
+                def stale = []
+                remapped.eachFileRecurse { f ->
+                    if (f.path.replace('\\', '/').contains('mc_storage_area_network')) {
+                        stale << f
+                    }
+                }
+                // Deepest first so files are removed before the directories that hold them.
+                stale.sort { a, b -> b.path.length() <=> a.path.length() }.each { f ->
+                    if (f.exists() && f.delete()) {
+                        removed++
+                    }
+                }
+            }
+        }
+        apiFingerprintFile.get().asFile.text = apiFingerprintNow
+        logger.lifecycle("ensureApi: API republished and dependents de-cached (${apiFingerprintNow}, ${removed} stale entries)")
+    }
 }
 
 /**
@@ -144,7 +243,7 @@ def dependOnBuilds = { org.gradle.api.Task t ->
  * only its own copy of the public com.retiredroca.mcstorageareanetwork.api package.
  */
 tasks.register('apiUniversalJar', Jar) {
-    dependOnBuilds(delegate)
+    dependOnUniversal(delegate, 'api')
     archiveFileName = "universal_mc_san_api.${apiVersion}.jar"
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -172,7 +271,9 @@ tasks.register('apiUniversalJar', Jar) {
  */
 def registerBundle = { String taskName, String templateDir, String artifactPrefix, String bundleVersion, List fabMods, List neoMods ->
     def t = tasks.register(taskName, Jar) {
-        dependOnBuilds(delegate)
+        def staged = delegate
+        fabMods.each { m -> dependOnLoader(staged, m, 'fabric') }
+        neoMods.each { m -> dependOnLoader(staged, m, 'neoforge') }
         archiveFileName = "${artifactPrefix}.${bundleVersion}.jar"
         destinationDirectory = layout.buildDirectory.dir('libs')
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -206,76 +307,160 @@ def apiMods = ['api']
 def storageMods = ['api', 'storage']
 def craftingMods = ['api', 'crafting']
 def routingMods = ['api', 'storage', 'routing']
-def allMods = ['api', 'storage', 'crafting', 'routing']
+def accessMods = ['api', 'access']
+def allMods = ['api', 'storage', 'crafting', 'routing', 'access']
 
 def allBundleVersion = bundleVersionFor(allMods)
 def storageBundleVersion = bundleVersionFor(storageMods)
 def craftingBundleVersion = bundleVersionFor(craftingMods)
 def routingBundleVersion = bundleVersionFor(routingMods)
+def accessBundleVersion = bundleVersionFor(accessMods)
 
 registerBundle('bundleAllJar', 'bundler/bundle-all', 'universal-bundle-all', allBundleVersion, allMods, allMods)
 registerBundle('bundleStorageJar', 'bundler/bundle-storage', 'universal-bundle-storage', storageBundleVersion, storageMods, storageMods)
 registerBundle('bundleCraftingJar', 'bundler/bundle-crafting', 'universal-bundle-crafting', craftingBundleVersion, craftingMods, craftingMods)
 registerBundle('bundleRoutingJar', 'bundler/bundle-routing', 'universal-bundle-routing', routingBundleVersion, routingMods, routingMods)
+registerBundle('bundleAccessJar', 'bundler/bundle-access', 'universal-bundle-access', accessBundleVersion, accessMods, accessMods)
 
 registerBundle('fabricBundleAllJar', 'bundler/bundle-all-fabric', 'fabric-bundle-all', allBundleVersion, allMods, [])
 registerBundle('fabricBundleStorageJar', 'bundler/bundle-storage-fabric', 'fabric-bundle-storage', storageBundleVersion, storageMods, [])
 registerBundle('fabricBundleCraftingJar', 'bundler/bundle-crafting-fabric', 'fabric-bundle-crafting', craftingBundleVersion, craftingMods, [])
 registerBundle('fabricBundleRoutingJar', 'bundler/bundle-routing-fabric', 'fabric-bundle-routing', routingBundleVersion, routingMods, [])
+registerBundle('fabricBundleAccessJar', 'bundler/bundle-access-fabric', 'fabric-bundle-access', accessBundleVersion, accessMods, [])
 
 registerBundle('neoforgeBundleAllJar', 'bundler/bundle-all-neoforge', 'neoforge-bundle-all', allBundleVersion, [], allMods)
 registerBundle('neoforgeBundleStorageJar', 'bundler/bundle-storage-neoforge', 'neoforge-bundle-storage', storageBundleVersion, [], storageMods)
 registerBundle('neoforgeBundleCraftingJar', 'bundler/bundle-crafting-neoforge', 'neoforge-bundle-crafting', craftingBundleVersion, [], craftingMods)
 registerBundle('neoforgeBundleRoutingJar', 'bundler/bundle-routing-neoforge', 'neoforge-bundle-routing', routingBundleVersion, [], routingMods)
+registerBundle('neoforgeBundleAccessJar', 'bundler/bundle-access-neoforge', 'neoforge-bundle-access', accessBundleVersion, [], accessMods)
 
 /**
- * Collects every release jar under build/release/ with its final published name: the bundle
- * containers plus the renamed per-loader / universal mod jars.
+ * The release is built in four ordered stages so a failure points at the layer that broke and a
+ * single loader (or just the universal layer) can be rebuilt without pulling in everything:
+ *   1. releaseLoaderJars        per-loader API jars + per-loader gameplay mod jars
+ *   2. releaseLoaderBundles     the per-loader bundle containers
+ *   3. releaseUniversal         the API universal container + universal gameplay mod jars
+ *   4. releaseUniversalBundles  the universal bundle containers
+ * `releaseJars` unions all four into build/release/ so a release always yields the full set.
+ */
+tasks.register('releaseLoaderJars', Sync) {
+    def staged = delegate
+    group = 'release'
+    description = 'Stage the per-loader API and gameplay mod jars (build/release-loader).'
+    into layout.buildDirectory.dir('release-loader')
+
+    if (activeLoaders.contains('fabric')) {
+        ['api', 'storage', 'crafting', 'routing', 'access'].each { m -> dependOnLoader(staged, m, 'fabric') }
+        from({ def f = apiFab(); f == null ? [] : f }) { rename { "fabric_mc_san_api.${apiVersion}.jar" } }
+        from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${storageVersion}.jar" } }
+        from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${craftingVersion}.jar" } }
+        from({ def f = rtFab(); f == null ? [] : f }) { rename { "fabric-network-routing.${routingVersion}.jar" } }
+        from({ def f = acFab(); f == null ? [] : f }) { rename { "fabric-remote-access-terminal.${accessVersion}.jar" } }
+    }
+    if (activeLoaders.contains('neoforge')) {
+        ['api', 'storage', 'crafting', 'routing', 'access'].each { m -> dependOnLoader(staged, m, 'neoforge') }
+        from({ def f = apiNeo(); f == null ? [] : f }) { rename { "neoforge_mc_san_api.${apiVersion}.jar" } }
+        from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${storageVersion}.jar" } }
+        from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${craftingVersion}.jar" } }
+        from({ def f = rtNeo(); f == null ? [] : f }) { rename { "neoforge-network-routing.${routingVersion}.jar" } }
+        from({ def f = acNeo(); f == null ? [] : f }) { rename { "neoforge-remote-access-terminal.${accessVersion}.jar" } }
+    }
+}
+
+tasks.register('releaseLoaderBundles', Sync) {
+    group = 'release'
+    description = 'Stage the per-loader bundle containers (build/release-loader-bundles).'
+    into layout.buildDirectory.dir('release-loader-bundles')
+
+    if (activeLoaders.contains('fabric')) {
+        dependsOn 'fabricBundleAllJar', 'fabricBundleStorageJar', 'fabricBundleCraftingJar',
+                'fabricBundleRoutingJar', 'fabricBundleAccessJar'
+        from(tasks.named('fabricBundleAllJar'), tasks.named('fabricBundleStorageJar'),
+                tasks.named('fabricBundleCraftingJar'), tasks.named('fabricBundleRoutingJar'),
+                tasks.named('fabricBundleAccessJar'))
+    }
+    if (activeLoaders.contains('neoforge')) {
+        dependsOn 'neoforgeBundleAllJar', 'neoforgeBundleStorageJar', 'neoforgeBundleCraftingJar',
+                'neoforgeBundleRoutingJar', 'neoforgeBundleAccessJar'
+        from(tasks.named('neoforgeBundleAllJar'), tasks.named('neoforgeBundleStorageJar'),
+                tasks.named('neoforgeBundleCraftingJar'), tasks.named('neoforgeBundleRoutingJar'),
+                tasks.named('neoforgeBundleAccessJar'))
+    }
+}
+
+tasks.register('releaseUniversal', Sync) {
+    def staged = delegate
+    group = 'release'
+    description = 'Stage the universal API container and universal gameplay mod jars (build/release-universal).'
+    into layout.buildDirectory.dir('release-universal')
+
+    dependsOn 'apiUniversalJar'
+    ['storage', 'crafting', 'routing', 'access'].each { m -> dependOnUniversal(staged, m) }
+
+    from(tasks.named('apiUniversalJar'))
+    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${storageVersion}.jar" } }
+    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${craftingVersion}.jar" } }
+    from({ def f = rtUni(); f == null ? [] : f }) { rename { "universal-network-routing.${routingVersion}.jar" } }
+    from({ def f = acUni(); f == null ? [] : f }) { rename { "universal-remote-access-terminal.${accessVersion}.jar" } }
+}
+
+tasks.register('releaseUniversalBundles', Sync) {
+    group = 'release'
+    description = 'Stage the universal bundle containers (build/release-universal-bundles).'
+    into layout.buildDirectory.dir('release-universal-bundles')
+
+    dependsOn 'bundleAllJar', 'bundleStorageJar', 'bundleCraftingJar', 'bundleRoutingJar', 'bundleAccessJar'
+    from(tasks.named('bundleAllJar'), tasks.named('bundleStorageJar'), tasks.named('bundleCraftingJar'),
+            tasks.named('bundleRoutingJar'), tasks.named('bundleAccessJar'))
+}
+
+// The stages run in order; a filtered loader stage still comes first.
+tasks.named('releaseLoaderBundles') { mustRunAfter 'releaseLoaderJars' }
+tasks.named('releaseUniversal') { mustRunAfter 'releaseLoaderBundles' }
+tasks.named('releaseUniversalBundles') { mustRunAfter 'releaseUniversal' }
+
+// An API change must reach the hosts first (republish + de-cache before they compile).
+['releaseLoaderJars', 'releaseLoaderBundles', 'releaseUniversal', 'releaseUniversalBundles'].each { n ->
+    tasks.named(n) { dependsOn 'ensureApi' }
+}
+
+/**
+ * Collects every release jar under build/release/ from the four staged dirs. Still the union, so a
+ * release always yields the complete set regardless of how the individual stages were invoked.
  */
 tasks.register('releaseJars', Sync) {
-    dependOnBuilds(delegate)
-    dependsOn 'apiUniversalJar'
-    dependsOn 'bundleAllJar', 'bundleStorageJar', 'bundleCraftingJar', 'bundleRoutingJar'
-    dependsOn 'fabricBundleAllJar', 'fabricBundleStorageJar', 'fabricBundleCraftingJar', 'fabricBundleRoutingJar'
-    dependsOn 'neoforgeBundleAllJar', 'neoforgeBundleStorageJar', 'neoforgeBundleCraftingJar', 'neoforgeBundleRoutingJar'
-
+    group = 'release'
+    description = 'Assemble the complete release jar set into build/release from the four stages.'
+    dependsOn 'ensureApi'
+    dependsOn 'releaseLoaderJars', 'releaseLoaderBundles', 'releaseUniversal', 'releaseUniversalBundles'
     into layout.buildDirectory.dir('release')
 
     // Fail loudly if any version-pinned component jar is missing, rather than silently
     // assembling a bundle without it.
     doFirst {
         def expected = [apiFab(), apiNeo(), stFab(), stNeo(), crFab(), crNeo(), stUni(), crUni(), rtFab(), rtNeo(),
-                        rtUni()]
+                        rtUni(), acFab(), acNeo(), acUni()]
         if (expected.any { it == null }) {
             throw new GradleException('releaseJars: a component jar is missing; did every included build run?')
         }
     }
 
-    // Container jars come straight from their tasks, so stale versions in build/libs never leak in.
-    from(tasks.named('apiUniversalJar'))
-    from(tasks.named('bundleAllJar'), tasks.named('bundleStorageJar'), tasks.named('bundleCraftingJar'),
-            tasks.named('bundleRoutingJar'))
-    from(tasks.named('fabricBundleAllJar'), tasks.named('fabricBundleStorageJar'),
-            tasks.named('fabricBundleCraftingJar'), tasks.named('fabricBundleRoutingJar'))
-    from(tasks.named('neoforgeBundleAllJar'), tasks.named('neoforgeBundleStorageJar'),
-            tasks.named('neoforgeBundleCraftingJar'), tasks.named('neoforgeBundleRoutingJar'))
+    // The staged dirs hold the renamed jars, so the union is a straight copy of their outputs.
+    from(tasks.named('releaseLoaderJars'), tasks.named('releaseLoaderBundles'),
+            tasks.named('releaseUniversal'), tasks.named('releaseUniversalBundles'))
+}
 
-    // API
-    from({ def f = apiFab(); f == null ? [] : f }) { rename { "fabric_mc_san_api.${apiVersion}.jar" } }
-    from({ def f = apiNeo(); f == null ? [] : f }) { rename { "neoforge_mc_san_api.${apiVersion}.jar" } }
+// Targeted rebuilds: wipe just the loader or the universal stage outputs.
+tasks.register('cleanLoader', Delete) {
+    group = 'build'
+    description = 'Deletes the loader stage output dirs so they are rebuilt from scratch.'
+    delete layout.buildDirectory.dir('release-loader'), layout.buildDirectory.dir('release-loader-bundles')
+}
 
-    // Universal gameplay mods
-    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${storageVersion}.jar" } }
-    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${craftingVersion}.jar" } }
-    from({ def f = rtUni(); f == null ? [] : f }) { rename { "universal-network-routing.${routingVersion}.jar" } }
-
-    // Per-loader gameplay mods
-    from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${storageVersion}.jar" } }
-    from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${storageVersion}.jar" } }
-    from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${craftingVersion}.jar" } }
-    from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${craftingVersion}.jar" } }
-    from({ def f = rtFab(); f == null ? [] : f }) { rename { "fabric-network-routing.${routingVersion}.jar" } }
-    from({ def f = rtNeo(); f == null ? [] : f }) { rename { "neoforge-network-routing.${routingVersion}.jar" } }
+tasks.register('cleanUniversal', Delete) {
+    group = 'build'
+    description = 'Deletes the universal stage output dirs so they are rebuilt from scratch.'
+    delete layout.buildDirectory.dir('release-universal'), layout.buildDirectory.dir('release-universal-bundles')
 }
 
 tasks.named('build') {
@@ -290,6 +475,7 @@ tasks.named('clean') {
     dependsOn gradle.includedBuild('storage-network').task(':clean')
     dependsOn gradle.includedBuild('crafting-network').task(':clean')
     dependsOn gradle.includedBuild('network-routing').task(':clean')
+    dependsOn gradle.includedBuild('remote-access-terminal').task(':clean')
 }
 
 publishing {

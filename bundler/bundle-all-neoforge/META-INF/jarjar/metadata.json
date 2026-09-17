@@ -23,6 +23,12 @@
       "version": { "range": "[1,)", "artifactVersion": "@@ROUTING_VERSION@@" },
       "path": "META-INF/jarjar/network-routing-neoforge.jar",
       "isObfuscated": false
+    },
+    {
+      "identifier": { "group": "com.retiredroca.remoteaccessterminal", "artifact": "remote-access-terminal-neoforge" },
+      "version": { "range": "[1,)", "artifactVersion": "@@ACCESS_VERSION@@" },
+      "path": "META-INF/jarjar/remote-access-terminal-neoforge.jar",
+      "isObfuscated": false
     }
   ]
 }
