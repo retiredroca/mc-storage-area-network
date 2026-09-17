@@ -1,6 +1,6 @@
 # MC Storage Area Network
 
-**The shared item-network library behind _Storage Network_, _Crafting Network_ and _Network Routing_.**
+**The shared item-network library behind _Storage Network_, _Crafting Network_, _Network Routing_ and _Remote Access Terminal_.**
 
 MC Storage Area Network scans the world around a block, finds every inventory-bearing
 container (chests, barrels, hoppers, shulker boxes, modded storage — anything with an
@@ -20,6 +20,10 @@ A single jar works on **Fabric** and **NeoForge**.
 - **Shulker-box helpers** — read/write shulker-box contents as a normal item list.
 - **Ownership model** — records who placed each container so hosts can show only global + player-owned storage.
 - **Routing hooks** — `StorageRouter` lets a mod bias which container receives an inserted stack (e.g. labeled containers get priority); `NetworkHost` lets hardware bind to an existing host's scan.
+- **Shared interaction dispatch** — one place for block uses, sneak-clicks, item-on-block and air uses, so mods register hooks instead of their own loader events (`InteractionHooks`).
+- **Permissions** — ownership plus scoreboard-team sharing and per-owner invitation lists; hosts are **open by default** and an owner can privatise one. `NetworkPermissions` is the single `canUse` / `canEdit` / `canBreak` rule every mod consults.
+- **Break protection & container exclusions** — owner-only breaking with an operator override, and a shared exclusion list (`BreakProtection`, `NetworkExclusions`).
+- **Sister-mod awareness** — mods ask which suite mods are installed (`NetworkAwareness`) and publish or consume capabilities (`NetworkCapabilities`), so cross-mod features need no compile dependency on each other.
 
 ## Where it's used
 
@@ -28,6 +32,7 @@ A single jar works on **Fabric** and **NeoForge**.
 | **Storage Network** | Storage Terminal — one searchable interface for every nearby container |
 | **Crafting Network** | Crafting / Smelting / Blasting / Smoking / Brewing Terminals — craft using the network |
 | **Network Routing** | Label containers with item filters; matching labels win routing priority, plus a chest-shaped Routing Terminal to sort/defrag/trim |
+| **Remote Access Terminal** | Dye-coloured terminals you name and travel between, with an optional chunk-loader mode; a held Routing Linker becomes a one-way trip back |
 
 ## Installation
 
@@ -41,9 +46,9 @@ A single jar works on **Fabric** and **NeoForge**.
    One jar for both loaders — a thin container holding the Fabric and NeoForge builds, where each
    loader loads only its own nested copy.
 
-> This API is a **required dependency** of Storage Network, Crafting Network and Network Routing. For
-> the whole suite, use a **bundle**: `universal-bundle-all.<version>.jar` (API + all gameplay mods),
-> or `universal-bundle-storage` / `universal-bundle-crafting` for one gameplay mod each, or
+> This API is a **required dependency** of every gameplay mod. For the whole suite, use a
+> **bundle**: `universal-bundle-all.<version>.jar` (API + all gameplay mods), or one of the
+> per-mod bundles — `universal-bundle-storage` / `-crafting` / `-access` (API + that mod), or
 > `universal-bundle-routing` for Storage Network + Network Routing.
 
 ### Downloads
@@ -54,8 +59,9 @@ A single jar works on **Fabric** and **NeoForge**.
 | `universal-storage-network.<version>.jar` | Fabric + NeoForge | Storage Network (needs the API) |
 | `universal-crafting-network.<version>.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
 | `universal-network-routing.<version>.jar` | Fabric + NeoForge | Network Routing (needs the API) |
-| `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing |
-| `universal-bundle-storage` / `-crafting` / `-routing` | Fabric + NeoForge | API + one gameplay mod (routing also includes Storage Network) |
+| `universal-remote-access-terminal.<version>.jar` | Fabric + NeoForge | Remote Access Terminal (needs the API) |
+| `universal-bundle-all.<version>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing + Remote Access Terminal |
+| `universal-bundle-storage` / `-crafting` / `-routing` / `-access` | Fabric + NeoForge | API + one gameplay mod (routing also includes Storage Network) |
 | `fabric-*` / `neoforge-*` | single loader | any of the above, loader-specific |
 
 Universal jars are published to **CurseForge / Modrinth**; the loader-specific (`fabric-*` /
@@ -70,9 +76,28 @@ you touched, so when one change spans the API and one or more hosts (for example
 into the API) release with `all` / **Release All**: a narrow release leaves the other components at
 their old versions, and those mix into the bundle jars. Every GitHub release still carries the full
 set of jars (including the current, unchanged API) so one page has everything. Versions are
-`<major>.<minor>.<patch>.<yymmddhh>`: the trailing stamp is bumped automatically, the patch is
-manual. The API is `1.0.<patch>.<yymmddhh>`; the gameplay mods and
-bundles are `1.0.0.<yymmddhh>`. Releases are tagged `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`).
+`<major>.<minor>.<patch>.<yymmddhh>`: the trailing stamp is bumped automatically (Hawaii Standard
+Time, UTC-10), the patch is manual. The components are `api`, `storage`, `crafting`, `routing` and
+`access`; the API is `1.0.<patch>.<yymmddhh>`, the gameplay mods and bundles are
+`1.0.0.<yymmddhh>`. Releases are tagged `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`).
+
+### Building
+
+The build runs in four ordered groups, so a release is produced in stages rather than all at once,
+and each group can be built on its own:
+
+```bash
+./gradlew -Pmc=1.21.1 releaseLoaderJars        # 1. per-loader API + mod jars
+./gradlew -Pmc=1.21.1 releaseLoaderBundles     # 2. per-loader bundles
+./gradlew -Pmc=1.21.1 releaseUniversal         # 3. universal API + mod jars
+./gradlew -Pmc=1.21.1 releaseUniversalBundles  # 4. universal bundles
+./gradlew -Pmc=1.21.1 releaseJars              # the whole set (all four groups, in order)
+```
+
+`releaseLoaderJars` / `releaseLoaderBundles` accept `-Ploader=fabric|neoforge` for the fast inner
+loop, and `cleanLoader` / `cleanUniversal` wipe just their group. When the API sources changed,
+`ensureApi` republishes the API into `repo/`, drops dependents' cached API jars and lets the model
+pick the new artifact up automatically.
 
 ### Releasing
 
@@ -89,13 +114,14 @@ python tools/secrets.py run -- python tools/release.py --mod routing --curseforg
 python tools/release.py --mod all --dry-run      # preview; no changes
 ```
 
-`--mod` is `api` / `storage` / `crafting` / `routing` / `all`; pass `all` (or run **Release All**)
-whenever several components changed together, so no old version ends up inside a bundle. The tag is a
-single series `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run publishes the API to
-`repo/` first (hosts require an API version **floor**, so the artifact must be resolvable before they
-compile), builds, commits/tags, creates the release, and optionally uploads to the platforms.
-Creating the release triggers the publish-only workflow — unless the local run already published (it
-marks the release so CI skips it). Add `--unsigned` to skip GPG.
+`--mod` is `api` / `storage` / `crafting` / `routing` / `access` / `all`; pass `all` (or run
+**Release All**) whenever several components changed together, so no old version ends up inside a
+bundle. The tag is a single series `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run
+publishes the API to `repo/` first (hosts require an API version **floor**, so the artifact must be
+resolvable before they compile), builds the four groups in order, commits/tags, creates the release,
+and optionally uploads to the platforms. Creating the release triggers the publish-only workflow —
+unless the local run already published (it marks the release so CI skips it). Add `--unsigned` to
+skip GPG.
 
 **On GitHub (fallback)**
 
@@ -110,8 +136,8 @@ same way (`v1.0.2.<stamp>`). CI cannot sign with your key, so its tags are unsig
 | Secret | `CURSEFORGE_API_KEY` | CurseForge upload key |
 | Secret | `MODRINTH_TOKEN` | Modrinth personal access token |
 | Variable | `PUBLISH_MODRINTH` | `true` to publish to Modrinth (skipped when unset/`false`) |
-| Variable | `MODRINTH_ID` | SAN API project slug/ID |
-| Variable | `MODRINTH_STORAGE_ID` / `MODRINTH_CRAFTING_ID` / `MODRINTH_ROUTING_ID` | gameplay mod projects |
+| Variable | `MODRINTH_ID` | The suite's Modrinth project (all mods publish versions into it) |
+| Variable | `MODRINTH_STORAGE_ID` / `MODRINTH_CRAFTING_ID` / `MODRINTH_ROUTING_ID` | per-mod Modrinth projects (default to the shared project when unset) |
 
 **Token scopes** — CurseForge: a standard upload key. Modrinth PAT: `VERSION_CREATE` (upload) and
 `VERSION_WRITE` (archive superseded versions); `VERSION_DELETE` is not used.
@@ -169,6 +195,13 @@ Register an item source:
 - **Fabric:** add an entrypoint key `mc_storage_area_network` returning `ItemSource` instances.
 - **NeoForge:** send the InterModComms message `register_item_source`.
 - Or call `ItemSourceRegistry.register(source)` directly, and hide container items with `ItemSourceRegistry.addHiddenItemFilter(...)`.
+
+Other API surfaces a companion can use:
+
+- **Interaction hooks** — `InteractionHooks.register(InteractionType.BLOCK_USE | ITEM_ON_BLOCK | AIR_USE, hook)` runs your handler from the API's own loader events (priority-ordered, `HANDLED` consumes the interaction); no mod registers `UseBlockCallback` / `PlayerInteractEvent` itself.
+- **Permissions** — `NetworkPermissions.canUse/canEdit/canBreak`, `isOpen/setOpen`, and per-owner `invite/uninvite/invitesOf/setInvites`.
+- **Presence & capabilities** — `NetworkAwareness.isPresent(SisterMods.X)` / `present()`, and `NetworkCapabilities.register(YourInterface.class, impl)` / `get(...)` for publishing data that sister mods consume without a compile dependency (the suite's `TerminalRegistry` and `RouteProvider` work this way).
+- **Protection** — mark blocks with `NetworkBlock` to get owner-only breaking (`BreakProtection`) and to be skipped by the container-exclusion toggle.
 
 See **[API-README.md](API-README.md)** for the full API reference.
 

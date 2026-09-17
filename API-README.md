@@ -1,7 +1,8 @@
 # MC Storage Area Network API
 
-A small, standalone, multi-loader API for exposing **item sources** to mc-storage-area-network hosts
-(Storage Network, Crafting Network, and anything else that queries a shared network).
+A small, standalone, multi-loader API for the mc-storage-area-network suite — Storage Network,
+Crafting Network, Network Routing, Remote Access Terminal, and anything else that queries or hooks
+into a shared network.
 
 It provides:
 
@@ -11,6 +12,13 @@ It provides:
 - **Nested sources** — expose sub-containers (e.g. a shulker box inside a chest) as child rows.
 - **Hidden-item filters** — hide "container" items that are represented by their contents instead.
 - **Shulker-box helpers** — read/write shulker box contents as a normal item list.
+- **Shared interaction dispatch** — block uses, sneak-clicks, item-on-block and air uses in one
+  place, so mods register hooks instead of their own loader events.
+- **Permissions** — ownership, scoreboard-team sharing and per-owner invitations, with hosts
+  **open by default** (an owner can privatise one).
+- **Presence & capabilities** — ask which suite mods are installed, and publish/consume data between
+  them without a compile dependency.
+- **Break protection** — `NetworkBlock` blocks are owner-only to break, with an operator override.
 
 The mod id is `mc_storage_area_network`. Package: `com.retiredroca.mcstorageareanetwork.api`.
 
@@ -170,6 +178,79 @@ int score = StorageRouter.priority(level, refPos, pos, stack);                  
 `NetworkHost` is implemented by host block entities (the Storage Terminal), so companion hardware
 can bind to an existing host and reuse its `pos()`, `chunkRadius()` and `tier()`.
 
+### Interaction hooks (companions and hosts)
+
+The API owns the world event registrations; mods register hooks and never wire loader events
+themselves:
+
+```java
+InteractionHooks.register(InteractionType.BLOCK_USE, new InteractionHook() {
+    @Override public InteractionOutcome onUse(InteractionContext context) {
+        if (!context.emptyHand() || !context.sneaking()) {
+            return InteractionOutcome.PASS;          // let other hooks / vanilla handle it
+        }
+        // ... do the thing ...
+        return InteractionOutcome.HANDLED;
+    }
+
+    @Override public boolean runsOnClient() { return true; }  // also consumed on the client
+    @Override public int priority() { return 0; }             // lower runs first
+});
+```
+
+- Slots: `BLOCK_USE` (a block is targeted), `ITEM_ON_BLOCK` (targeted with an item in the main
+  hand, dispatched before `BLOCK_USE`) and `AIR_USE` (a genuine ray miss — aiming at air).
+- Hooks run in ascending `priority()`; the first `HANDLED` wins. `runsOnClient()` lets a hook run on
+  the client too, so the interaction is consumed there as well.
+- The API's own behaviours (the Crafter link toggle and the container-exclusion toggle) are
+  registered as the lowest-priority hooks.
+
+### Permissions
+
+```java
+NetworkPermissions.canUse(level, pos, player);   // open || owner || invited || team
+NetworkPermissions.canEdit(level, pos, player);  // owner || invited || team || op — not "open"
+NetworkPermissions.canBreak(level, pos, player); // as canEdit
+NetworkPermissions.isOpen(level, pos);
+NetworkPermissions.setOpen(level, pos, false);   // privatise a host
+
+NetworkPermissions.invite(level, owner, target);
+NetworkPermissions.uninvite(level, owner, target);
+NetworkPermissions.invitesOf(level, owner);
+NetworkPermissions.setInvites(level, owner, targets);   // one-shot "amend" for a GUI or command
+```
+
+Invites are **per owner** and apply to every host that player placed. Public (open) hosts stay
+usable by anyone; editing follows `canEdit`, so a public host is only reconfigured by its owner,
+their team, invitees or an operator. `ContainerOwnership` remains the per-position owner store, and
+`NetworkSettings` carries the server's `ownershipEnabled` / `teamSharing` switches.
+
+### Presence and capabilities
+
+```java
+if (NetworkAwareness.isPresent(SisterMods.CRAFTING)) { ... }      // is a suite mod installed?
+NetworkCapabilities.register(MyApiInterface.class, implementation);  // publish
+Optional<MyApiInterface> mine = NetworkCapabilities.get(MyApiInterface.class);  // consume
+```
+
+Capabilities are plain interfaces in the API: the mod that owns some data publishes an
+implementation, and any other mod reads it — no compile dependency between them. The suite's
+`TerminalRegistry` (placed terminal positions, published by Remote Access Terminal) and
+`RouteProvider` (routing-linker destinations, published by Network Routing) are examples. A missing
+capability simply means the feature is unavailable.
+
+### Break protection and exclusions
+
+Mark a block with `com.retiredroca.mcstorageareanetwork.api.NetworkBlock` and the API handles
+owner-only breaking (with an operator confirmation path) and skips it in the general
+container-exclusion toggle:
+
+```java
+BreakProtection.canBreak(level, pos, player);
+NetworkExclusions.toggle(player, containerPos);
+CrafterAutomation.toggle(player, crafterPos);    // crafter ↔ network link
+```
+
 ---
 
 ## API surface
@@ -186,6 +267,16 @@ can bind to an existing host and reuse its `pos()`, `chunkRadius()` and `tier()`
 | `StorageRouter` | Register rules; `order(...)`/`priority(...)` for insertion priority. |
 | `NetworkHost` | A host block entity a companion can bind to (`pos()`, `chunkRadius()`, `tier()`). |
 | `ShulkerBoxHelper` | Read/write shulker-box contents. |
+| `InteractionHooks` / `InteractionType` / `InteractionHook` / `InteractionContext` | Shared world-interaction dispatch (block use, item-on-block, air use). |
+| `NetworkPermissions` | Owner/team/invite permissions: `canUse`, `canEdit`, `canBreak`, open/private hosts. |
+| `ContainerOwnership` | Per-position owner store (`ownerOf`, `canSee`, `isOwner`). |
+| `NetworkSettings` | Server policy: `ownershipEnabled`, `teamSharing`, excluded containers. |
+| `NetworkAwareness` / `SisterMods` | Which suite mods are installed. |
+| `NetworkCapabilities` | Publish/consume interfaces between sister mods without a compile dependency. |
+| `TerminalRegistry` / `RouteProvider` | The suite's first capabilities: placed terminals, and routing-linker destinations. |
+| `BreakProtection` / `NetworkExclusions` / `CrafterAutomation` | Owner-only breaking, container-exclusion list, crafter ↔ network links. |
+| `NetworkBlock` | Marker: gives a block break protection and skips it in the exclusion toggle. |
+| `NetworkHostLocator` | Find a `NetworkHost` (e.g. a Storage Terminal) near a position. |
 
 ### Semantics
 
@@ -200,11 +291,20 @@ can bind to an existing host and reuse its `pos()`, `chunkRadius()` and `tier()`
 ## Building / publishing
 
 ```bash
-./gradlew build           # API + all gameplay mods + every bundle -> build/release/ (final file names)
-./gradlew releaseJars     # just collect the release jars into build/release/
+# The build runs in four ordered groups; each can be run on its own.
+./gradlew -Pmc=1.21.1 releaseLoaderJars        # per-loader API + mod jars
+./gradlew -Pmc=1.21.1 releaseLoaderBundles     # per-loader bundles
+./gradlew -Pmc=1.21.1 releaseUniversal         # universal API + mod jars
+./gradlew -Pmc=1.21.1 releaseUniversalBundles  # universal bundles
+./gradlew -Pmc=1.21.1 releaseJars              # everything -> build/release/ (final file names)
+
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
 ./gradlew publishRepo     # per-loader jars + universal API -> ./repo (committed maven for distribution)
 ```
+
+`releaseLoaderJars` / `releaseLoaderBundles` take `-Ploader=fabric|neoforge` for the fast inner loop.
+When the API sources change, `ensureApi` republishes the API into `repo/` and drops dependents'
+cached API jars, so hosts always compile against the current API.
 
 The `repo/` directory in this repository is the published Maven repository consumed by hosts and
 modders. Commit it after `publishRepo`; it keeps only the newest 3 versions per artifact so it stays
