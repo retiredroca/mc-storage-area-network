@@ -56,3 +56,12 @@ tasks.register('universalJar', Jar) {
 tasks.named('build') {
     dependsOn 'universalJar'
 }
+
+// Thin aliases so a parent build can request one loader half of this mod without building both.
+tasks.register('buildFabric') {
+    dependsOn gradle.includedBuild('fabric').task(':build')
+}
+
+tasks.register('buildNeo') {
+    dependsOn gradle.includedBuild('neoforge').task(':build')
+}

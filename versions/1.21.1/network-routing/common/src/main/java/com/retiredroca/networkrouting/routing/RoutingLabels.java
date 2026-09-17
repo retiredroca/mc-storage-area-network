@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkPermissions;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -13,6 +15,7 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.saveddata.SavedData;
 
 /** Per-container filter tokens, keyed by block position (mirrors the API's ContainerOwnership store). */
@@ -110,5 +113,17 @@ public final class RoutingLabels {
 
     public static void clear(ServerLevel level, BlockPos pos) {
         set(level, pos, List.of());
+    }
+
+    /**
+     * Clears the container's filter when the player may reconfigure it (owner/trusted or operator);
+     * returns false and leaves the filter untouched otherwise.
+     */
+    public static boolean clear(ServerLevel level, BlockPos pos, Player player) {
+        if (!NetworkPermissions.canEdit(level, pos, player)) {
+            return false;
+        }
+        clear(level, pos);
+        return true;
     }
 }

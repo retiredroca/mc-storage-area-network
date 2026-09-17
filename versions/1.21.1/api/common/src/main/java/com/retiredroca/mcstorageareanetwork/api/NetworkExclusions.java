@@ -109,8 +109,7 @@ public final class NetworkExclusions {
             return Result.INCLUDED;
         }
 
-        boolean allowed = op || ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos), viewer);
-        if (!allowed) {
+        if (!NetworkPermissions.canEdit(level, pos, player)) {
             return Result.NOT_ALLOWED;
         }
         ItemNetworkServices.configService().setContainerExcluded(blockId, true);

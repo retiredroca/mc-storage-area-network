@@ -5,14 +5,10 @@ import com.retiredroca.mcstorageareanetwork.api.CollectionOnlyStorage;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
-import com.retiredroca.storagenetwork.blockentity.AbstractNetworkShareTerminalBlockEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -28,7 +24,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
-import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * Output Terminal: a collection-only sink that receives crafted output. It is hidden from
@@ -83,36 +78,5 @@ public class NetworkShareTerminalBlock extends BaseEntityBlock implements Collec
         if (level instanceof ServerLevel serverLevel && placer instanceof Player player) {
             ContainerOwnership.setOwner(serverLevel, pos, player.getUUID(), player.getGameProfile().getName());
         }
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
-            BlockHitResult hitResult) {
-        if (level.isClientSide) {
-            return InteractionResult.SUCCESS;
-        }
-        if (level instanceof ServerLevel serverLevel
-                && level.getBlockEntity(pos) instanceof AbstractNetworkShareTerminalBlockEntity share) {
-            // Crouch + right-click toggles whether this sink is listed in the network. Only the owner
-            // (or their scoreboard team, when sharing is on) may toggle it.
-            if (player.isSecondaryUseActive()) {
-                ContainerOwnership.Entry viewer = new ContainerOwnership.Entry(player.getUUID(),
-                        player.getGameProfile().getName());
-                if (!ContainerOwnership.canSee(serverLevel, ContainerOwnership.ownerOf(serverLevel, pos), viewer)) {
-                    player.displayClientMessage(Component.translatable("block.storage_network.terminal_locked"), true);
-                    return InteractionResult.CONSUME;
-                }
-                boolean exposed = share.toggleExposedToNetwork();
-                player.displayClientMessage(Component.translatable(exposed
-                        ? "message.storage_network.output_exposed"
-                        : "message.storage_network.output_hidden"), true);
-                return InteractionResult.CONSUME;
-            }
-            if (player instanceof ServerPlayer serverPlayer) {
-                share.startOpen(serverPlayer);
-                StorageNetworkCommon.platform().openShareTerminal(serverPlayer, share);
-            }
-        }
-        return InteractionResult.CONSUME;
     }
 }

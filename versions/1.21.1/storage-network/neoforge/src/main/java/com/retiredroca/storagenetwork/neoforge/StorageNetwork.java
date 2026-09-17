@@ -1,6 +1,7 @@
 package com.retiredroca.storagenetwork.neoforge;
 
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.StorageNetworkHooks;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -15,5 +16,6 @@ public class StorageNetwork {
 
         Registration.register(modEventBus);
         Networking.register(modEventBus);
+        StorageNetworkHooks.register();
     }
 }

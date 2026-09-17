@@ -15,6 +15,7 @@ import com.retiredroca.networkrouting.network.RoutingPackets;
 import com.retiredroca.networkrouting.network.RoutingPackets.ContainerInfo;
 import com.retiredroca.networkrouting.network.RoutingPackets.RoutingSyncPayload;
 import com.retiredroca.mcstorageareanetwork.api.NetworkHostLocator;
+import com.retiredroca.networkrouting.NetworkRoutingAreas;
 import com.retiredroca.networkrouting.routing.NetworkSorter;
 import com.retiredroca.networkrouting.routing.RoutingLabels;
 
@@ -71,6 +72,7 @@ public abstract class AbstractRoutingTerminalBlockEntity extends BlockEntity imp
             return;
         }
         NetworkHost host = NetworkHostLocator.findNearest(serverLevel, worldPosition, RoutingSettings.searchChunks);
+        BlockPos previousHostPos = hostPos;
         BlockPos newPos = host == null ? null : host.pos();
         int newTier = host == null ? 0 : host.tier();
         boolean changed = !Objects.equals(newPos, hostPos) || newTier != hostTier;
@@ -78,13 +80,29 @@ public abstract class AbstractRoutingTerminalBlockEntity extends BlockEntity imp
         hostTier = newTier;
         if (host == null) {
             storages = new ArrayList<>();
+            if (previousHostPos != null && isHostConfirmedGone(serverLevel, previousHostPos)) {
+                NetworkRoutingAreas.remove(serverLevel, worldPosition);
+            }
         } else {
+            NetworkRoutingAreas.update(serverLevel, worldPosition, host);
             scanNetwork(host);
         }
         if (changed) {
             setChanged();
             serverLevel.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
+    }
+
+    /**
+     * True only when the host's chunk is loaded and no {@link NetworkHost} occupies the stored position.
+     * {@link NetworkHostLocator#findNearest} only inspects loaded chunks, so a host that is merely
+     * unloaded (or whose chunk loads after the terminal's) must not be treated as gone.
+     */
+    private static boolean isHostConfirmedGone(ServerLevel level, BlockPos hostPos) {
+        if (level.getChunkSource().getChunkNow(hostPos.getX() >> 4, hostPos.getZ() >> 4) == null) {
+            return false;
+        }
+        return !(level.getBlockEntity(hostPos) instanceof NetworkHost);
     }
 
     private void scanNetwork(NetworkHost host) {

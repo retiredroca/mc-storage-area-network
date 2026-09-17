@@ -9,27 +9,30 @@ import com.retiredroca.mcstorageareanetwork.api.CrafterAutomation;
 import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ItemSource;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
-import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
-import com.retiredroca.mcstorageareanetwork.api.NetworkExclusions;
+import com.retiredroca.mcstorageareanetwork.api.NetworkAwareness;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ConfirmBreakPayload;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ForceBreakPayload;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionContext;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionHooks;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionType;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.CrafterBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.InterModProcessEvent;
 import net.neoforged.fml.loading.FMLLoader;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -52,17 +55,20 @@ public class McStorageAreaNetwork {
     public static final String SOURCE_IMC = "register_item_source";
 
     public McStorageAreaNetwork(IEventBus modEventBus, ModContainer modContainer) {
+        NetworkAwareness.setPresenceTest(mod -> ModList.get().isLoaded(mod.id()));
         ShulkerBoxConfig.register(modContainer);
         modEventBus.addListener(ShulkerBoxConfig::onConfigLoad);
         ItemNetworkServices.setScanner(new NeoForgeItemScanner());
         ItemNetworkServices.setConfigService(ShulkerBoxConfig::setContainerExcluded);
         ItemSourceRegistry.register(new ShulkerItemSource());
         ItemSourceRegistry.addHiddenItemFilter(ShulkerBoxConfig::isRawShulkerBoxHidden);
+        InteractionHooks.registerBuiltins();
         modEventBus.addListener(McStorageAreaNetwork::onInterModProcess);
         modEventBus.addListener(McStorageAreaNetwork::onRegisterPayloads);
         NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onEntityPlace);
         NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onBreak);
         NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(McStorageAreaNetwork::onRightClickItem);
 
         // Drive linked crafters every tick (the automation throttles itself).
         NeoForge.EVENT_BUS.addListener((LevelTickEvent.Post event) -> {
@@ -73,30 +79,51 @@ public class McStorageAreaNetwork {
     }
 
     private static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (event.getHand() != InteractionHand.MAIN_HAND) {
+            return;
+        }
         Player player = event.getEntity();
-        if (event.getHand() != InteractionHand.MAIN_HAND || !player.isSecondaryUseActive()
-                || !player.getMainHandItem().isEmpty()) {
+        Level level = event.getLevel();
+        ItemStack stack = event.getItemStack();
+        InteractionContext context = new InteractionContext(player, level, event.getHand(), stack,
+                event.getPos(), event.getFace(), event.getHitVec().getLocation(),
+                player.isSecondaryUseActive(), level.isClientSide());
+        boolean handled = false;
+        if (!stack.isEmpty()) {
+            handled = dispatch(level.isClientSide(), InteractionType.ITEM_ON_BLOCK, context);
+        }
+        if (!handled) {
+            handled = dispatch(level.isClientSide(), InteractionType.BLOCK_USE, context);
+        }
+        if (handled) {
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.FALSE);
+        }
+    }
+
+    private static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getHand() != InteractionHand.MAIN_HAND
+                || InteractionHooks.isEmpty(InteractionType.AIR_USE)) {
             return;
         }
-        BlockPos pos = event.getPos();
-        BlockState state = event.getLevel().getBlockState(pos);
-        boolean crafter = state.getBlock() instanceof CrafterBlock;
-        boolean container = !crafter && !(state.getBlock() instanceof NetworkBlock)
-                && event.getLevel().getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null;
-        if (!crafter && !container) {
+        Player player = event.getEntity();
+        Level level = event.getLevel();
+        HitResult hit = player.pick(player.blockInteractionRange(), 1.0F, false);
+        if (hit.getType() != HitResult.Type.MISS) {
             return;
         }
-        event.setUseBlock(TriState.FALSE);
-        event.setUseItem(TriState.FALSE);
-        if (event.getLevel().isClientSide()) {
-            return;
+        InteractionContext context = new InteractionContext(player, level, event.getHand(), event.getItemStack(),
+                null, null, null, player.isSecondaryUseActive(), level.isClientSide());
+        if (dispatch(level.isClientSide(), InteractionType.AIR_USE, context)) {
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
         }
-        if (player instanceof ServerPlayer serverPlayer) {
-            Component message = crafter
-                    ? CrafterAutomation.message(CrafterAutomation.toggle(serverPlayer, pos))
-                    : NetworkExclusions.message(NetworkExclusions.toggle(serverPlayer, pos));
-            serverPlayer.displayClientMessage(message, true);
-        }
+    }
+
+    private static boolean dispatch(boolean clientSide, InteractionType type, InteractionContext context) {
+        return clientSide
+                ? InteractionHooks.dispatchClient(type, context)
+                : InteractionHooks.dispatchServer(type, context);
     }
 
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {

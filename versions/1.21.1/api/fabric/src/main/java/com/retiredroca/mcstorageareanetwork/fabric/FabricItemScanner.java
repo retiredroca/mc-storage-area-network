@@ -18,12 +18,18 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 /** Fabric {@link ItemScanner} using the transfer API lookups. Only ticking chunks are read. */
 public final class FabricItemScanner implements ItemScanner {
+    @Override
+    public boolean hasItemStorage(Level level, BlockPos pos) {
+        return ItemStorage.SIDED.find(level, pos, null) != null;
+    }
+
     @Override
     public List<ScannedStorage> scan(ServerLevel level, BlockPos center, int chunkRadius) {
         List<ScannedStorage> out = new ArrayList<>();

@@ -9,8 +9,6 @@ import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -28,7 +26,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
-import net.minecraft.world.phys.BlockHitResult;
 
 public class StationBlock extends BaseEntityBlock implements NetworkBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
@@ -92,34 +89,5 @@ public class StationBlock extends BaseEntityBlock implements NetworkBlock {
     @Override
     public RenderShape getRenderShape(BlockState state) {
         return RenderShape.ENTITYBLOCK_ANIMATED;
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
-            BlockHitResult hitResult) {
-        if (level.isClientSide) {
-            return InteractionResult.SUCCESS;
-        }
-        if (level.getBlockEntity(pos) instanceof AbstractStationBlockEntity station) {
-            // Crouch + right-click collects accumulated cooking experience (owner/team only). Only
-            // cooking stations (smelting/blasting/smoking) earn experience; brewing does not.
-            if (level instanceof ServerLevel serverLevel && !station.type().isBrewing()
-                    && player.isSecondaryUseActive() && player instanceof ServerPlayer serverPlayer
-                    && ContainerOwnership.canSee(serverLevel, ContainerOwnership.ownerOf(serverLevel, pos),
-                            new ContainerOwnership.Entry(serverPlayer.getUUID(),
-                                    serverPlayer.getGameProfile().getName()))) {
-                int xp = station.collectExperience();
-                if (xp > 0) {
-                    serverPlayer.giveExperiencePoints(xp);
-                    return InteractionResult.CONSUME;
-                }
-            }
-            station.scanNetwork();
-            if (player instanceof ServerPlayer serverPlayer) {
-                station.startOpen(serverPlayer);
-                CraftingNetworkCommon.platform().openStation(serverPlayer, station);
-            }
-        }
-        return InteractionResult.CONSUME;
     }
 }

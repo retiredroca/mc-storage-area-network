@@ -45,7 +45,7 @@ public final class CrafterAutomation {
         if (crafter == null) {
             return Result.NOT_A_CRAFTER;
         }
-        if (!canModify(level, pos, player)) {
+        if (!NetworkPermissions.canEdit(level, pos, player)) {
             return Result.NOT_ALLOWED;
         }
         if (CrafterLinks.pattern(level, pos) != null) {
@@ -196,13 +196,5 @@ public final class CrafterAutomation {
 
     private static CrafterBlockEntity crafterAt(ServerLevel level, BlockPos pos) {
         return level.getBlockEntity(pos) instanceof CrafterBlockEntity crafter ? crafter : null;
-    }
-
-    private static boolean canModify(ServerLevel level, BlockPos pos, ServerPlayer player) {
-        if (player.hasPermissions(2)) {
-            return true;
-        }
-        return ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos),
-                new ContainerOwnership.Entry(player.getUUID(), player.getGameProfile().getName()));
     }
 }

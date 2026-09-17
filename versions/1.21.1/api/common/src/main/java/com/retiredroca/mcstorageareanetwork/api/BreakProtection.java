@@ -6,8 +6,9 @@ import net.minecraft.world.entity.player.Player;
 
 /**
  * Break protection for the mod set's blocks ({@link NetworkBlock}). A block may be broken by its
- * owner, a member of the owner's scoreboard team (when {@link NetworkSettings#teamSharing()} is on),
- * or an operator. Operators breaking a block they don't own must confirm first.
+ * owner, a player the owner invited, a member of the owner's scoreboard team (when
+ * {@link NetworkSettings#teamSharing()} is on), or an operator. Operators breaking a block they
+ * don't own must confirm first. The actual rule lives in {@link NetworkPermissions#canBreak}.
  */
 public final class BreakProtection {
     private BreakProtection() {}
@@ -19,18 +20,13 @@ public final class BreakProtection {
 
     /** True if the player may break the block (non-mod blocks are always breakable). */
     public static boolean canBreak(ServerLevel level, BlockPos pos, Player player) {
-        if (!isProtected(level, pos)) {
-            return true;
-        }
-        if (player.hasPermissions(2)) {
-            return true;
-        }
-        return ownerOrTeam(level, pos, player);
+        return !isProtected(level, pos) || NetworkPermissions.canBreak(level, pos, player);
     }
 
-    /** True for an operator who isn't the owner/team and must confirm before breaking. */
+    /** True for an operator who isn't the owner/team/invited and must confirm before breaking. */
     public static boolean needsOpConfirmation(ServerLevel level, BlockPos pos, Player player) {
-        return isProtected(level, pos) && player.hasPermissions(2) && !ownerOrTeam(level, pos, player);
+        return isProtected(level, pos) && player.hasPermissions(2)
+                && !NetworkPermissions.isTrusted(level, pos, player);
     }
 
     /** Force-breaks a protected block (the caller must have already checked permission). */
@@ -38,10 +34,5 @@ public final class BreakProtection {
         if (isProtected(level, pos) && level.destroyBlock(pos, true)) {
             ContainerOwnership.clearOwner(level, pos);
         }
-    }
-
-    private static boolean ownerOrTeam(ServerLevel level, BlockPos pos, Player player) {
-        return ContainerOwnership.canSee(level, ContainerOwnership.ownerOf(level, pos),
-                new ContainerOwnership.Entry(player.getUUID(), player.getGameProfile().getName()));
     }
 }

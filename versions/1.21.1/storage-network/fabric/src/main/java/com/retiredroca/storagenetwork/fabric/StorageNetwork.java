@@ -1,6 +1,7 @@
 package com.retiredroca.storagenetwork.fabric;
 
 import com.retiredroca.storagenetwork.StorageNetworkCommon;
+import com.retiredroca.storagenetwork.StorageNetworkHooks;
 
 import net.fabricmc.api.ModInitializer;
 
@@ -11,5 +12,6 @@ public class StorageNetwork implements ModInitializer {
         StorageNetworkConfig.load();
         Registration.register();
         Networking.register();
+        StorageNetworkHooks.register();
     }
 }

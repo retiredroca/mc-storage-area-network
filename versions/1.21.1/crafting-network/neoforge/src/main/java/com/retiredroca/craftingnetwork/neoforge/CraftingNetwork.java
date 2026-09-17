@@ -1,6 +1,7 @@
 package com.retiredroca.craftingnetwork.neoforge;
 
 import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
+import com.retiredroca.craftingnetwork.CraftingNetworkHooks;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -15,5 +16,6 @@ public class CraftingNetwork {
 
         Registration.register(modEventBus);
         Networking.register(modEventBus);
+        CraftingNetworkHooks.register();
     }
 }

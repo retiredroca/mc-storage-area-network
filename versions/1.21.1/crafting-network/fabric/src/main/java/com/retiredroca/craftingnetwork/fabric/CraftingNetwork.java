@@ -1,6 +1,7 @@
 package com.retiredroca.craftingnetwork.fabric;
 
 import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
+import com.retiredroca.craftingnetwork.CraftingNetworkHooks;
 
 import net.fabricmc.api.ModInitializer;
 
@@ -11,5 +12,6 @@ public class CraftingNetwork implements ModInitializer {
         CraftingNetworkConfig.load();
         Networking.register();
         Registration.register();
+        CraftingNetworkHooks.register();
     }
 }

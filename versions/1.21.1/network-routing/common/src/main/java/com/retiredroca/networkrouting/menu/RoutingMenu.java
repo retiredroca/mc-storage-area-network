@@ -2,12 +2,14 @@ package com.retiredroca.networkrouting.menu;
 
 import java.util.List;
 
+import com.retiredroca.mcstorageareanetwork.api.NetworkPermissions;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.network.RoutingPackets;
 import com.retiredroca.networkrouting.network.RoutingPackets.ContainerInfo;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -82,6 +84,13 @@ public class RoutingMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64.0) {
+            return false;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return true;
+        }
+        // The menu was opened via canUse (terminal) or canEdit (linker); keep it open while either holds.
+        return NetworkPermissions.canUse(level, pos, player) || NetworkPermissions.canEdit(level, pos, player);
     }
 }

@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -24,6 +25,11 @@ import net.neoforged.neoforge.items.IItemHandler;
 
 /** NeoForge {@link ItemScanner} using the item-handler block capability. Only ticking chunks are read. */
 public final class NeoForgeItemScanner implements ItemScanner {
+    @Override
+    public boolean hasItemStorage(Level level, BlockPos pos) {
+        return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null;
+    }
+
     @Override
     public List<ScannedStorage> scan(ServerLevel level, BlockPos center, int chunkRadius) {
         List<ScannedStorage> out = new ArrayList<>();

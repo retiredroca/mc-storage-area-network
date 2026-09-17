@@ -9,28 +9,30 @@ import com.retiredroca.mcstorageareanetwork.api.CrafterAutomation;
 import com.retiredroca.mcstorageareanetwork.api.ItemNetworkServices;
 import com.retiredroca.mcstorageareanetwork.api.ItemSource;
 import com.retiredroca.mcstorageareanetwork.api.ItemSourceRegistry;
-import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
-import com.retiredroca.mcstorageareanetwork.api.NetworkExclusions;
+import com.retiredroca.mcstorageareanetwork.api.NetworkAwareness;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ConfirmBreakPayload;
 import com.retiredroca.mcstorageareanetwork.api.ProtectionPackets.ForceBreakPayload;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionContext;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionHooks;
+import com.retiredroca.mcstorageareanetwork.api.interaction.InteractionType;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.level.block.CrafterBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.HitResult;
 
 /**
  * Fabric entrypoint for the MC Storage Area Network API. Installs the platform scanner and loads every
@@ -43,11 +45,13 @@ public class McStorageAreaNetwork implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        NetworkAwareness.setPresenceTest(mod -> FabricLoader.getInstance().isModLoaded(mod.id()));
         ShulkerBoxConfig.load();
         ItemNetworkServices.setScanner(new FabricItemScanner());
         ItemNetworkServices.setConfigService(ShulkerBoxConfig::setContainerExcluded);
         ItemSourceRegistry.register(new ShulkerItemSource());
         ItemSourceRegistry.addHiddenItemFilter(ShulkerBoxConfig::isRawShulkerBoxHidden);
+        InteractionHooks.registerBuiltins();
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, entity) -> {
             if (level instanceof ServerLevel serverLevel && entity instanceof Container) {
                 ContainerOwnership.clearOwner(serverLevel, pos);
@@ -93,31 +97,46 @@ public class McStorageAreaNetwork implements ModInitializer {
             }
         });
 
-        // Crouch + right-click (empty hand): a crafter toggles its network link; any other container
-        // toggles its block type in/out of the network.
+        // Right-click dispatch: mods register hooks; the API built-ins (crafter link toggle, container
+        // exclusion toggle) run last. Item-on-block is offered first when the main hand holds an item.
         UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
-            if (hand != InteractionHand.MAIN_HAND || !player.isSecondaryUseActive()
-                    || !player.getMainHandItem().isEmpty()) {
+            if (hand != InteractionHand.MAIN_HAND) {
                 return InteractionResult.PASS;
             }
-            BlockPos pos = hitResult.getBlockPos();
-            BlockState state = level.getBlockState(pos);
-            boolean crafter = state.getBlock() instanceof CrafterBlock;
-            boolean container = !crafter && !(state.getBlock() instanceof NetworkBlock)
-                    && ItemStorage.SIDED.find(level, pos, null) != null;
-            if (!crafter && !container) {
-                return InteractionResult.PASS;
+            ItemStack stack = player.getMainHandItem();
+            InteractionContext context = new InteractionContext(player, level, hand, stack,
+                    hitResult.getBlockPos(), hitResult.getDirection(), hitResult.getLocation(),
+                    player.isSecondaryUseActive(), level.isClientSide);
+            boolean handled = false;
+            if (!stack.isEmpty()) {
+                handled = dispatch(level.isClientSide, InteractionType.ITEM_ON_BLOCK, context);
             }
-            if (level.isClientSide) {
-                return InteractionResult.SUCCESS;
+            if (!handled) {
+                handled = dispatch(level.isClientSide, InteractionType.BLOCK_USE, context);
             }
-            if (player instanceof ServerPlayer serverPlayer) {
-                Component message = crafter
-                        ? CrafterAutomation.message(CrafterAutomation.toggle(serverPlayer, pos))
-                        : NetworkExclusions.message(NetworkExclusions.toggle(serverPlayer, pos));
-                serverPlayer.displayClientMessage(message, true);
-            }
-            return InteractionResult.SUCCESS;
+            return handled ? InteractionResult.SUCCESS : InteractionResult.PASS;
         });
+
+        // Using an item while aiming at air (the pick is a genuine miss) is offered as AIR_USE.
+        UseItemCallback.EVENT.register((player, level, hand) -> {
+            ItemStack stack = player.getItemInHand(hand);
+            if (hand != InteractionHand.MAIN_HAND || InteractionHooks.isEmpty(InteractionType.AIR_USE)) {
+                return InteractionResultHolder.pass(stack);
+            }
+            HitResult hit = player.pick(player.blockInteractionRange(), 1.0F, false);
+            if (hit.getType() != HitResult.Type.MISS) {
+                return InteractionResultHolder.pass(stack);
+            }
+            InteractionContext context = new InteractionContext(player, level, hand, stack,
+                    null, null, null, player.isSecondaryUseActive(), level.isClientSide);
+            boolean handled = dispatch(level.isClientSide, InteractionType.AIR_USE, context);
+            return handled ? InteractionResultHolder.success(stack) : InteractionResultHolder.pass(stack);
+        });
+    }
+
+    private static boolean dispatch(boolean clientSide, InteractionType type, InteractionContext context) {
+        return clientSide
+                ? InteractionHooks.dispatchClient(type, context)
+                : InteractionHooks.dispatchServer(type, context);
     }
 }

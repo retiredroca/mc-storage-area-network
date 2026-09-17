@@ -3,6 +3,8 @@ package com.retiredroca.networkrouting.block;
 import com.mojang.serialization.MapCodec;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
+import com.retiredroca.mcstorageareanetwork.api.NetworkPermissions;
+import com.retiredroca.networkrouting.NetworkRoutingAreas;
 import com.retiredroca.networkrouting.NetworkRoutingCommon;
 import com.retiredroca.networkrouting.blockentity.AbstractRoutingTerminalBlockEntity;
 
@@ -16,6 +18,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
@@ -97,12 +100,37 @@ public class RoutingTerminalBlock extends BaseEntityBlock implements NetworkBloc
     }
 
     @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        BlockState result = super.playerWillDestroy(level, pos, state, player);
+        clearBinding(level, pos);
+        return result;
+    }
+
+    @Override
+    public void wasExploded(Level level, BlockPos pos, Explosion explosion) {
+        super.wasExploded(level, pos, explosion);
+        clearBinding(level, pos);
+    }
+
+    private void clearBinding(Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        NetworkRoutingAreas.remove(serverLevel, pos);
+        ContainerOwnership.clearOwner(serverLevel, pos);
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
             BlockHitResult hitResult) {
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
         if (level.getBlockEntity(pos) instanceof AbstractRoutingTerminalBlockEntity terminal) {
+            if (level instanceof ServerLevel serverLevel && !NetworkPermissions.canUse(serverLevel, pos, player)) {
+                player.displayClientMessage(Component.translatable("block.network_routing.terminal_locked"), true);
+                return InteractionResult.CONSUME;
+            }
             terminal.refreshBinding();
             if (player instanceof ServerPlayer serverPlayer) {
                 if (!terminal.isBound()) {

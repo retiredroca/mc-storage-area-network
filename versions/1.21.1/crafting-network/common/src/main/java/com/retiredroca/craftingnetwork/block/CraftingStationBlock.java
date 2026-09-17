@@ -5,9 +5,11 @@ import com.retiredroca.craftingnetwork.CraftingNetworkCommon;
 import com.retiredroca.craftingnetwork.blockentity.AbstractCraftingStationBlockEntity;
 import com.retiredroca.mcstorageareanetwork.api.ContainerOwnership;
 import com.retiredroca.mcstorageareanetwork.api.NetworkBlock;
+import com.retiredroca.mcstorageareanetwork.api.NetworkPermissions;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -101,6 +103,10 @@ public class CraftingStationBlock extends BaseEntityBlock implements NetworkBloc
             return InteractionResult.SUCCESS;
         }
         if (level.getBlockEntity(pos) instanceof AbstractCraftingStationBlockEntity station) {
+            if (level instanceof ServerLevel serverLevel && !NetworkPermissions.canUse(serverLevel, pos, player)) {
+                player.displayClientMessage(Component.translatable("block.crafting_network.terminal_locked"), true);
+                return InteractionResult.CONSUME;
+            }
             station.scanNetwork();
             if (player instanceof ServerPlayer serverPlayer) {
                 station.startOpen(serverPlayer);
