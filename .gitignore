@@ -51,3 +51,6 @@ session.json
 # python bytecode
 __pycache__/
 *.pyc
+
+#agents.md
+AGENTS.md
