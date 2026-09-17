@@ -3,8 +3,12 @@
 Run from anywhere:  python tools/generate_textures.py
 
 Outputs (relative to this module):
-  common/src/main/resources/assets/network_routing/textures/entity/chest/network_routing.png
   common/src/main/resources/assets/network_routing/textures/item/routing_linker.png
+
+The routing terminal's chest atlas
+(common/src/main/resources/assets/network_routing/textures/entity/chest/network_routing.png)
+is hand-supplied art, so it is only written when explicitly requested with --chest. A plain run
+writes the linker sprite alone and can never clobber the terminal texture.
 
 The chest atlas follows the vanilla chest model UV layout (64x64). For a box at UV (u,v) with
 size (dx,dy,dz): down/bottom = (u+dz, v), up/top = (u+dz+dx, v), sides = row at y=v+dz in the
@@ -15,12 +19,14 @@ order west, north, east, south.
 The lid underside is the terminal screen; the bottom floor is the keyboard.
 """
 
+import argparse
 import os
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "common", "src", "main", "resources", "assets", "network_routing", "textures")
 
+# Palette shared with the supplied terminal atlas: copper/wood body, grey steel, green CRT.
 CASING = (46, 52, 58, 255)
 CASING_D = (30, 35, 40, 255)
 CASING_L = (70, 78, 86, 255)
@@ -31,6 +37,20 @@ GREEN = (86, 255, 130, 255)
 GREEN_DIM = (40, 150, 70, 255)
 KEY = (60, 66, 74, 255)
 WELL = (34, 40, 46, 255)
+
+# Terminal-atlas palette (hand-drawn source), used for the linker so the two match.
+T_COPPER = (104, 66, 30, 255)
+T_COPPER_L = (198, 140, 74, 255)
+T_COPPER_D = (72, 46, 20, 255)
+T_SEAM = (34, 22, 12, 255)
+T_STEEL = (66, 64, 70, 255)
+T_STEEL_L = (104, 102, 110, 255)
+T_STEEL_D = (40, 38, 42, 255)
+T_CRT = (10, 26, 10, 255)
+T_GREEN = (128, 236, 76, 255)
+T_KEY = (182, 180, 188, 255)
+T_ANTENNA = (188, 96, 44, 255)
+T_ANTENNA_D = (120, 60, 28, 255)
 
 
 def face(d, x, y, w, h, color):
@@ -101,35 +121,58 @@ def chest_atlas():
 
 
 def linker_sprite():
+    """A hand-held pocket unit matching the supplied terminal: copper case, steel band, green CRT."""
     img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    # antenna
-    d.rectangle([7, 1, 8, 2], fill=(210, 70, 70, 255))
-    d.rectangle([7, 2, 8, 3], fill=(120, 40, 40, 255))
-    # body
-    d.rounded_rectangle([3, 3, 12, 14], radius=1, fill=(44, 50, 56, 255), outline=(22, 26, 30, 255))
-    # screen
-    d.rectangle([5, 5, 10, 9], fill=SCREEN)
-    for row in range(2):
-        d.line([6, 6 + row * 2, 6 + (3 - row * 2), 6 + row * 2], fill=GREEN)
-    d.rectangle([6, 8, 6, 8], fill=GREEN_DIM)
-    # button + copper accent
-    d.rectangle([7, 10, 8, 11], fill=GREEN)
-    d.rectangle([3, 12, 12, 13], fill=(184, 115, 51, 255))
-    d.rectangle([3, 13, 12, 13], fill=(140, 85, 38, 255))
+    # antenna, offset to the top-left so the silhouette stays readable at 16x16
+    d.rectangle([4, 1, 5, 3], fill=T_ANTENNA_D)
+    d.point((4, 0), fill=T_ANTENNA)
+    d.point((5, 0), fill=T_ANTENNA)
+    d.point((4, 1), fill=T_ANTENNA)
+
+    # copper case with a darker seam edge
+    panel(d, 2, 4, 12, 11, T_COPPER, edge_top=T_COPPER_L, edge_bottom=T_SEAM)
+
+    # steel faceplate band around the screen
+    panel(d, 3, 5, 10, 6, T_STEEL, edge_top=T_STEEL_L, edge_bottom=T_STEEL_D)
+
+    # CRT screen with two readout rows and a cursor
+    face(d, 4, 6, 8, 5, T_CRT)
+    d.line([5, 7, 10, 7], fill=T_GREEN)
+    d.line([5, 8, 8, 8], fill=T_GREEN)
+    d.point((5, 9), fill=T_GREEN)
+    d.rectangle([4, 6, 11, 10], outline=T_STEEL_D)
+
+    # pale key row along the bottom of the case
+    for col in range(4):
+        d.rectangle([3 + col * 3, 12, 4 + col * 3, 13], fill=T_KEY)
+
+    # green status lamp above the keys
+    d.point((12, 5), fill=T_GREEN)
+
     return img
 
 
 def main():
-    entity_path = os.path.join(ASSETS, "entity", "chest", "network_routing.png")
+    ap = argparse.ArgumentParser(description="Generate Network Routing textures.")
+    ap.add_argument("--chest", action="store_true",
+                    help="also (re)write the terminal chest atlas; it is hand-supplied art, so this "
+                         "is off by default to avoid clobbering it")
+    args = ap.parse_args()
+
     linker_path = os.path.join(ASSETS, "item", "routing_linker.png")
-    os.makedirs(os.path.dirname(entity_path), exist_ok=True)
     os.makedirs(os.path.dirname(linker_path), exist_ok=True)
-    chest_atlas().save(entity_path)
     linker_sprite().save(linker_path)
-    print("wrote", os.path.normpath(entity_path))
     print("wrote", os.path.normpath(linker_path))
+
+    if args.chest:
+        entity_path = os.path.join(ASSETS, "entity", "chest", "network_routing.png")
+        os.makedirs(os.path.dirname(entity_path), exist_ok=True)
+        chest_atlas().save(entity_path)
+        print("wrote", os.path.normpath(entity_path))
+    else:
+        print("skipped the chest atlas (hand-supplied); pass --chest to regenerate a placeholder")
 
 
 if __name__ == "__main__":
