@@ -594,4 +594,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        # An idle Gradle daemon keeps Loom's cached mapping jars open, and the next build needs
+        # exclusive access to re-merge them (FileSystemException: "being used by another process").
+        # Stopping it here releases those handles; the next run pays one cold start instead.
+        try:
+            subprocess.run(gradlew() + ["--stop"], cwd=ROOT,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+        except Exception:
+            pass
