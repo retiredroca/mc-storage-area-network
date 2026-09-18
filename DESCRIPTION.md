@@ -57,6 +57,8 @@ Label containers with item filters so the ones you care about win.
 - **Routing Terminal** — label containers with item filters using the **Routing Linker**, so matching containers win routing priority.
 - Inherits its range from the **Storage Terminal** it connects to (it shows *Connected to Storage Terminal (Tier N)*).
 - **Sort**, **defragment** and **trim** the network from the terminal.
+- **Filter autocomplete** — the filter box suggests items you could actually obtain as you type, matching anywhere in the name or id (`ingot` finds `gold_ingot`), and offering item tags as `#namespace:path`. Suggestions already covered by the container's current filters are skipped, so the list stays useful.
+- **Distinct look** — the terminal is a copper-and-steel console with a green readout, and the handheld **Routing Linker** matches it.
 - **Requires Storage Network** — Network Routing does not run without it, which is why `universal-bundle-routing` contains both.
 
 ### Remote Access Terminal
