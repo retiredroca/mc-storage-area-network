@@ -514,6 +514,10 @@ def main():
     ap.add_argument("--skip-build", action="store_true", help="reuse the existing dist/")
     ap.add_argument("--no-daemon", action="store_true",
                     help="do not reuse a Gradle daemon (slower; reproduces a CI-like cold build)")
+    ap.add_argument("--local-only", action="store_true",
+                    help="build and stage the jars locally only: no commit, tag, push, GitHub release "
+                         "or platform/CI publishing. versions.properties is still bumped so the local "
+                         "jars carry the next version; undo with `git checkout -- versions.properties`.")
     args = ap.parse_args()
 
     dry = args.dry_run
@@ -535,6 +539,12 @@ def main():
     else:
         verify(dry)
     changelog(tag, dry)
+
+    if args.local_only:
+        log(f"local-only: built the {tag} jars into build/release/ and dist/")
+        log("no commit, tag, push, GitHub release or platform publishing was performed")
+        log("versions.properties was bumped; undo with: git checkout -- versions.properties")
+        return
 
     sign = not args.unsigned
 
