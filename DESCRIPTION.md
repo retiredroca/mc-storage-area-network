@@ -13,7 +13,7 @@ or pick only the mods you want:
 | **Crafting Network** | **Crafting / Smelting / Blasting / Smoking / Brewing Terminals** — upgradable machines that craft, cook and brew using items pulled from the network. |
 | **Network Routing** | **Routing Terminal** and **Routing Linker** — label containers with item filters so matching containers win routing priority; the terminal can also sort, defrag and trim the network. |
 | **Remote Access Terminal** | Dye-coloured terminals you name and travel between, optionally keeping a base chunk-loaded. With Network Routing installed, a held Routing Linker becomes a one-way trip home. |
-| **MC Storage Area Network** | The shared library/API that scans storage and powers the mods above. **Required by all**; other mods can hook into it. |
+| **MC Storage Area Network** | The shared library/API that scans storage, powers the mods above, and links vanilla **Crafters** to the network. **Required by all**; other mods can hook into it. |
 
 ---
 
@@ -49,6 +49,11 @@ Upgradable machines that craft, cook and brew straight from the network.
   - **Brewing** (Brewing Stand) — pick a target potion, and it pulls water bottles, blaze powder and ingredients to brew **one batch (3 potions)**.
 - **Inventory first** — send crafted output straight to your inventory.
 - **Shulkers first** — the same per-machine toggle as Storage.
+- **Vanilla Crafters** — link the vanilla **Crafter** to the network and it keeps itself stocked and crafting; no companion machine needed. **Crouch + right-click** a Crafter to link or unlink it.
+  - It remembers the recipe you set, pulls missing ingredients from the network, crafts every cycle, and sends the output (plus any recipe remainders) back through the network.
+  - **Pauses, never ruins a grid** — if an ingredient is missing it pauses and resumes once restocked, and it will not disturb a slot you have filled with something else.
+  - **Needs a Storage Terminal within 2 chunks**; without one in range it stays paused. Linking respects build permissions, and there is no command — it is in-world only.
+  - **With each mod**: the **API** alone is enough to link one; add **Storage Network** for it to draw from and return to the network; add **Crafting Network** and its output follows the same routing as the machine terminals (Output Terminal first, then a container already holding that item, then the nearest, then you); add **Network Routing** and your container filters decide where its output lands. **Remote Access Terminal** does not change it.
 
 ### Network Routing
 
@@ -93,6 +98,7 @@ is a bonus when **Network Routing** is installed.
 - **Craft even when your inventory is full** — output goes into the network, or straight back to you with *Inventory first*.
 - **Smart output routing** — crafted items go to an **Output Terminal** first, then a container already holding that item, then the nearest container, then your inventory.
 - **Travel as well as storage** — dye-coloured **Remote Access Terminals** give you a named teleport network, and one can keep a base chunk-loaded while you are away ***.
+- **Vanilla crafters too** — link a **Crafter** to the network and it keeps itself stocked and producing; no separate machine required.
 - **Ownership & privacy** — worldgen storage is visible to everyone; player-placed storage only to the terminal's owner (and optionally their scoreboard team). Terminals are openable by anyone, but breakable only by their owner; a **Remote Access Terminal** starts public and its owner can privatise it and invite players.
 - **Configurable** — every option can be tuned per server (see Configuration).
 
@@ -196,6 +202,8 @@ place.
 | `remote_access_terminal` | `chunkLoaderQueue` | `true` | When true a request blocked by the caps waits in a queue instead of being refused. |
 | `remote_access_terminal` | `lazyChunkRing` | `1` | Neighbour chunks kept loaded (not ticked) around a chunk-loader terminal: 0 = off, 1 = 3×3. |
 | `remote_access_terminal` | `invitePermissionLevel` | `0` | Permission level needed for `/remoteaccess invite`, `uninvite` and `list`. |
+
+**Crafter automation has no configuration** — it is always active, checks every 10 ticks, and looks up to 2 chunks for a Storage Terminal. Linking is stored per block and respects build permissions.
 
 ## Compatibility
 
