@@ -17,17 +17,23 @@ limitations under the License.
 Third-party notices and attributions
 --------------------------------------------------------------------------
 
+This project distributes no Mojang or Minecraft code, assets or data. The
+released jars contain only this project's own classes, models, textures and
+language files. Minecraft is required at runtime but is not bundled.
+
 Minecraft
   "Minecraft" and "Mojang" are trademarks of Mojang Synergies AB. This
   project is an unofficial, fan-made modification and is not affiliated
   with, endorsed by, or sponsored by Mojang Studios or Microsoft
-  Corporation.
+  Corporation. Minecraft: Java Edition and its source code are the property
+  of Mojang Studios / Microsoft Corporation and are governed by the
+  Minecraft End User License Agreement, available at
+  https://account.mojang.com/documents/minecraft_eula.
 
 Official Mojang mappings
-  This project is developed against the official Mojang mappings. The
-  mappings are used solely for development purposes and are NOT
-  redistributed by this project, in whole or in part. They are provided
-  subject to the following notice:
+  This project is developed against the official Mojang mappings. They are
+  used solely for development and are NOT redistributed by this project, in
+  whole or in part. They are provided "as-is":
 
   (c) 2020 Microsoft Corporation. These mappings are provided "as-is" and
   you bear the risk of using them. You may copy and use the mappings for
@@ -38,14 +44,17 @@ Official Mojang mappings
   governed by the Minecraft End User License Agreement available at
   https://account.mojang.com/documents/minecraft_eula.
 
-  Minecraft: Java Edition and its source code are the property of Mojang
-  Studios / Microsoft Corporation and are governed by the Minecraft End
-  User License Agreement.
-
-Fabric
-  Fabric Loader and Fabric API are developed by the FabricMC project and
-  are licensed under the Apache License, Version 2.0.
+Fabric Loader and Fabric API
+  Developed by the FabricMC project (https://fabricmc.net) and licensed
+  under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0). Apache-2.0 requires that
+  the licence and this notice are preserved.
 
 NeoForge
-  NeoForge is developed by the NeoForged project and is licensed under the
-  GNU Lesser General Public License, version 2.1.
+  Developed by the NeoForged project (https://neoforged.net) and licensed
+  under the GNU Lesser General Public License, version 2.1
+  (https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+
+Gradle
+  The Gradle wrapper included in source distributions is Gradle's own
+  (https://gradle.org), licensed under the Apache License, Version 2.0.
