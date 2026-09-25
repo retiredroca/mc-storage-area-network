@@ -558,7 +558,13 @@ jobs:
             "dist/universal-bundle-access.${BUNDLE_ACCESS_VERSION}.jar"
 
       # --- Persist the bumped versions / learned platform ids back to main ---------------------
+      # Runs on failure as well as success, but not on cancellation. A platform upload can fail
+      # after another platform has already learned new ids (e.g. CurseForge creates the "SAN API"
+      # entry and records its file id before Modrinth runs), and without this the job would stop at
+      # the failed upload and silently discard those ids, so the next release would create yet
+      # another entry instead of reusing the one just uploaded.
       - name: Commit version + release state
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
