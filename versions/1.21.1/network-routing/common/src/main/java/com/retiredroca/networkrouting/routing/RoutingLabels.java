@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.retiredroca.mcstorageareanetwork.api.NetworkPermissions;
+import com.retiredroca.networkrouting.config.RoutingSettings;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -100,6 +101,7 @@ public final class RoutingLabels {
                 .filter(t -> t != null && !t.isBlank())
                 .map(String::trim)
                 .distinct()
+                .limit(RoutingSettings.maxTokens)
                 .toList();
         if (clean.isEmpty()) {
             if (data.labels().remove(pos) != null) {

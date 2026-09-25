@@ -118,8 +118,6 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
     private ItemStack cachedRecipeInput = ItemStack.EMPTY;
     private RecipeHolder<? extends AbstractCookingRecipe> cachedRecipe;
 
-    private ItemStack lastSmelted = ItemStack.EMPTY;
-
     private final StationType type;
 
     protected AbstractStationBlockEntity(BlockEntityType<?> blockEntityType, BlockPos pos, BlockState state) {
@@ -540,7 +538,6 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                 int got = pullFromNetwork(c, c.getMaxStackSize());
                 if (got > 0) {
                     input = c.copyWithCount(got);
-                    lastSmelted = c;
                 }
             }
         }
@@ -705,6 +702,10 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
             // One batch per target selection: wait until the target is re-selected.
             return;
         }
+        // Check the target before charging: with no resolvable path there is no brewing step to burn
+        // for, and the function returns immediately below either way, so charging first only pulls
+        // blaze powder out of the network for a stand that is doing nothing.
+        if (path == null || path.empty()) return;
         if (fuelCharge < 20) {
             int got = pullFromNetwork(new ItemStack(Items.BLAZE_POWDER), 1);
             if (got > 0) {
@@ -712,7 +713,6 @@ public abstract class AbstractStationBlockEntity extends BlockEntity implements 
                 setChanged();
             }
         }
-        if (path == null || path.empty()) return;
 
         // Fill empty bottle slots with water first, then pull the ingredient for the current step.
         ItemStack water = PotionContents.createItemStack(Items.POTION, Potions.WATER);

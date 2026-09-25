@@ -149,6 +149,11 @@ public class CookingStationMenu extends RecipeBookMenu<SingleRecipeInput, Abstra
     }
 
     @Override
+    public void setServerSources(List<CraftingSourceInfo> fresh) {
+        support.setServerSources(fresh);
+    }
+
+    @Override
     public int getSelectedSource() {
         return support.getSelectedSource();
     }

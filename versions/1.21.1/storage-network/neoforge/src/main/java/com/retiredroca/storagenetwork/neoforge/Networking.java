@@ -82,10 +82,6 @@ public final class Networking {
                 if (player.containerMenu instanceof StorageTerminalMenu menu
                         && menu.getPos().equals(payload.pos())) {
                     menu.doExtract(player, payload.stack(), payload.mode());
-                    if (player.level().getBlockEntity(payload.pos())
-                            instanceof AbstractStorageTerminalBlockEntity terminal) {
-                        PacketDistributor.sendToPlayer(player, terminal.buildSync());
-                    }
                 }
             }
         });

@@ -22,6 +22,9 @@ public interface IStationMenu {
 
     List<CraftingSourceInfo> getSources();
 
+    /** Applies a source list pushed from the server after the menu was already open. */
+    void setServerSources(List<CraftingSourceInfo> sources);
+
     int getSelectedSource();
 
     void selectSource(int id);

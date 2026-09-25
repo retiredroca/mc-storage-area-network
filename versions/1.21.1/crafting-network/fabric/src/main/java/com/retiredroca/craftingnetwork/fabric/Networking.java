@@ -68,6 +68,11 @@ public final class Networking {
             if (net.minecraft.client.Minecraft.getInstance().player != null
                     && net.minecraft.client.Minecraft.getInstance().player.containerMenu instanceof CraftingStationMenu menu) {
                 menu.setServerSources(payload.sources(), payload.shulkersFirst(), payload.inventoryFirst());
+            } else if (net.minecraft.client.Minecraft.getInstance().player != null
+                    && net.minecraft.client.Minecraft.getInstance().player.containerMenu instanceof IStationMenu menu) {
+                // Cooking and brewing stations list sources too, and StationMenuSupport already
+                // sends them, so they need this push as well or their source panel goes stale.
+                menu.setServerSources(payload.sources());
             }
         });
     }

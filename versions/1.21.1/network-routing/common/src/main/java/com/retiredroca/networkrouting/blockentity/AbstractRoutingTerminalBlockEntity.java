@@ -175,7 +175,10 @@ public abstract class AbstractRoutingTerminalBlockEntity extends BlockEntity imp
     }
 
     public void setFlags(int value) {
-        this.flags = value;
+        // The value arrives straight off a client packet. Only the three defined bits do anything,
+        // so keeping an unknown bit would leave flags non-zero and have serverTick run an empty
+        // maintenance pass every interval. Mask here rather than trust the sender.
+        this.flags = value & (FLAG_SORT | FLAG_DEFRAG | FLAG_TRIM);
         setChanged();
     }
 
