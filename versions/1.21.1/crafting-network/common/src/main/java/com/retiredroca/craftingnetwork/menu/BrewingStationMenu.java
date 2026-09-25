@@ -137,6 +137,11 @@ public class BrewingStationMenu extends AbstractContainerMenu implements IStatio
     }
 
     @Override
+    public void setServerSources(List<CraftingSourceInfo> fresh) {
+        support.setServerSources(fresh);
+    }
+
+    @Override
     public int getSelectedSource() {
         return support.getSelectedSource();
     }

@@ -640,8 +640,9 @@ public final class RemoteAccessCommands {
     }
 
     /**
-     * Drops a single record. When {@code withOwnership} the chunk ticket is released and the API's
-     * owner record is cleared as well; otherwise the record alone is dropped.
+     * Drops a single record. The chunk ticket is always released: once the record is gone nothing is
+     * left that could ever release it, so skipping that would strand the loaded chunks. Only the
+     * API's owner record is conditional, on {@code withOwnership}.
      */
     private static int deleteRecords(CommandContext<CommandSourceStack> context, boolean withOwnership) {
         DyeColor color = parseColor(context);
@@ -656,11 +657,9 @@ public final class RemoteAccessCommands {
             return 0;
         }
         ServerLevel level = linkLevel(context, link);
-        if (withOwnership) {
-            releaseTicket(context.getSource().getServer(), link);
-            if (level != null) {
-                ContainerOwnership.clearOwner(level, link.pos());
-            }
+        releaseTicket(context.getSource().getServer(), link);
+        if (withOwnership && level != null) {
+            ContainerOwnership.clearOwner(level, link.pos());
         }
         TerminalLinksAccess access = access(context);
         if (access.links().remove(color, link.dimension(), link.pos())) {
@@ -686,11 +685,9 @@ public final class RemoteAccessCommands {
         int removed = 0;
         for (TerminalLinks.Link link : records) {
             ServerLevel level = server.getLevel(link.dimension());
-            if (withOwnership) {
-                releaseTicket(server, link);
-                if (level != null) {
-                    ContainerOwnership.clearOwner(level, link.pos());
-                }
+            releaseTicket(server, link);
+            if (withOwnership && level != null) {
+                ContainerOwnership.clearOwner(level, link.pos());
             }
             if (access.links().remove(color, link.dimension(), link.pos())) {
                 removed++;

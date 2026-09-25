@@ -253,6 +253,12 @@ public class StorageTerminalMenu extends AbstractContainerMenu {
                 player.drop(output, false);
             }
         }
+        // The terminal view is a snapshot, and the screen only redraws when a payload bumps the data
+        // version, so every extraction has to push a fresh one. Keeping this here (like the deposit
+        // path in quickMoveStack) means both loaders behave the same without duplicating it per side.
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            StorageNetworkCommon.platform().sendTerminalSync(serverPlayer, terminal.buildSync());
+        }
     }
 
     @Override

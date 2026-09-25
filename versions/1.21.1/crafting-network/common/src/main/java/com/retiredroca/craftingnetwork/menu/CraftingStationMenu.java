@@ -2,7 +2,6 @@ package com.retiredroca.craftingnetwork.menu;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +53,6 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
     private final TransientCraftingContainer craftSlots;
     private final ResultContainer resultSlots;
     private List<ScannedStorage> menuStorages;
-    private List<ScannedStorage> storagesAll;
     private List<CraftingSourceInfo> sources;
     private static final record SourceTarget(BlockPos pos, int handlerIndex, int childIndex) {}
     private final Map<Integer, SourceTarget> flatTargets = new LinkedHashMap<>();
@@ -80,7 +78,6 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         this.menuStorages = new ArrayList<>(station.getScannedStorages());
         this.sources = station.getSourceInfos();
         rebuildFlatTargets();
-        this.storagesAll = dedupeStorages(menuStorages);
         BlockPos pin = station.getPinnedSource();
         if (pin != null) {
             for (Map.Entry<Integer, SourceTarget> e : flatTargets.entrySet()) {
@@ -139,46 +136,10 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         this.craftSlots = new TransientCraftingContainer(this, 3, 3);
         this.resultSlots = new ResultContainer();
         this.menuStorages = new ArrayList<>();
-        this.storagesAll = new ArrayList<>();
         this.sources = sources;
         rebuildFlatTargets();
         this.catalog = new SimpleContainer(CATALOG_SIZE);
         addOwnSlots();
-    }
-
-    private static List<ScannedStorage> dedupeStorages(List<ScannedStorage> storages) {
-        List<ScannedStorage> result = new ArrayList<>();
-        for (ScannedStorage storage : storages) {
-            boolean dup = false;
-            for (ScannedStorage existing : result) {
-                if (sameInventory(existing, storage)) {
-                    dup = true;
-                    break;
-                }
-            }
-            if (!dup) {
-                result.add(storage);
-            }
-        }
-        return result;
-    }
-
-    private static boolean sameInventory(ScannedStorage a, ScannedStorage b) {
-        if (a == b) {
-            return true;
-        }
-        return contents(a).equals(contents(b));
-    }
-
-    private static Map<ItemStack, Integer> contents(ScannedStorage storage) {
-        Map<ItemStack, Integer> map = new HashMap<>();
-        for (ItemStack stack : storage.enumerate()) {
-            if (stack.isEmpty()) {
-                continue;
-            }
-            map.merge(stack.copyWithCount(1), stack.getCount(), Integer::sum);
-        }
-        return map;
     }
 
     private void addOwnSlots() {
@@ -401,7 +362,6 @@ public class CraftingStationMenu extends RecipeBookMenu<CraftingInput, CraftingR
         }
         this.sources = new ArrayList<>(freshSources);
         this.menuStorages = new ArrayList<>(station.getScannedStorages());
-        this.storagesAll = dedupeStorages(menuStorages);
         rebuildFlatTargets();
         this.dataVersion++;
         if (owner != null) {
