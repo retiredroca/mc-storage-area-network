@@ -64,7 +64,7 @@ Label containers with item filters so the ones you care about win.
 - **Sort**, **defragment** and **trim** the network from the terminal — each is a one-shot button or a standing toggle that repeats every couple of seconds:
   - **Sort** moves each stack to its nearest matching labeled container. With no filters nothing has priority, so sorting leaves the network as it is.
   - **Defrag** merges partial stacks of the same item inside each container to free up slots. It works with or without filters.
-  - **Trim** cleans labeled containers only: stacks that do not match a container's filter are moved out to the nearest unlabeled container, or to an Output Terminal if one is exposed, and it stops if there is nowhere to put them. Containers without a filter are never touched.
+  - **Trim** cleans labeled containers only: stacks that do not match a container's filter are moved out to the nearest unlabeled container, or failing that to an Output Terminal anywhere in the network, and it stops if there is nowhere to put them. Containers without a filter are never touched.
 - **Filter autocomplete** — the filter box suggests items you could actually obtain as you type, matching anywhere in the name or id (`ingot` finds `gold_ingot`), and offering item tags as `#namespace:path`. Suggestions already covered by the container's current filters are skipped, so the list stays useful.
 - **Distinct look** — the terminal is a copper-and-steel console with a green readout, and the handheld **Routing Linker** matches it.
 - **Requires Storage Network** — Network Routing does not run without it, which is why `universal-bundle-routing` contains both.
