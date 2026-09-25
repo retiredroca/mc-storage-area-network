@@ -54,30 +54,32 @@ def tag(api_version: str, stamp: str) -> str:
 # --- host floor rewriting -----------------------------------------------------------
 
 
-def _sub(path: Path, pattern: str, repl: str) -> bool:
+def _sub(path: Path, pattern: str, repl: str, dry: bool = False) -> bool:
     text = path.read_text(encoding="utf-8")
     new = re.sub(pattern, repl, text)
     if new != text:
-        path.write_text(new, encoding="utf-8")
+        # dry: report the change without writing, so a dry run leaves the tree clean.
+        if not dry:
+            path.write_text(new, encoding="utf-8")
         return True
     return False
 
 
-def _rewrite_props(path: Path, f: str) -> bool:
-    return _sub(path, r"(?m)^api_version=.*$", f"api_version=[{f},1.1)")
+def _rewrite_props(path: Path, f: str, dry: bool = False) -> bool:
+    return _sub(path, r"(?m)^api_version=.*$", f"api_version=[{f},1.1)", dry)
 
 
-def _rewrite_fabric(path: Path, f: str) -> bool:
+def _rewrite_fabric(path: Path, f: str, dry: bool = False) -> bool:
     return _sub(path, r'("mc_storage_area_network"\s*:\s*")[^"]*(")',
-                rf"\g<1>~{f}\g<2>")
+                rf"\g<1>~{f}\g<2>", dry)
 
 
-def _rewrite_neoforge(path: Path, f: str) -> bool:
+def _rewrite_neoforge(path: Path, f: str, dry: bool = False) -> bool:
     return _sub(path, r'(?s)(modId="mc_storage_area_network".*?versionRange=")[^"]*(")',
-                rf"\g<1>[{f},1.1)\g<2>")
+                rf"\g<1>[{f},1.1)\g<2>", dry)
 
 
-def apply_floor(mc: str, api_version: str) -> list:
+def apply_floor(mc: str, api_version: str, dry: bool = False) -> list:
     """Point every gameplay host in versions/<mc> at the API floor. Returns the changed paths."""
     f = floor(api_version)
     base = ROOT / "versions" / mc
@@ -90,15 +92,15 @@ def apply_floor(mc: str, api_version: str) -> list:
             if not loader_dir.is_dir():
                 continue
             props = loader_dir / "gradle.properties"
-            if props.exists() and _rewrite_props(props, f):
+            if props.exists() and _rewrite_props(props, f, dry):
                 changed.append(str(props.relative_to(ROOT)))
             if loader == "fabric":
                 meta = loader_dir / "src/main/resources/fabric.mod.json"
-                if meta.exists() and _rewrite_fabric(meta, f):
+                if meta.exists() and _rewrite_fabric(meta, f, dry):
                     changed.append(str(meta.relative_to(ROOT)))
             else:
                 meta = loader_dir / "src/main/resources/META-INF/neoforge.mods.toml"
-                if meta.exists() and _rewrite_neoforge(meta, f):
+                if meta.exists() and _rewrite_neoforge(meta, f, dry):
                     changed.append(str(meta.relative_to(ROOT)))
     return changed
 

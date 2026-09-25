@@ -106,7 +106,7 @@ def set_prop(text, key, value):
     return pattern.sub(f"{key}={value}", text)
 
 
-def bump(mod, stamp):
+def bump(mod, stamp, dry=False):
     text = VERSIONS.read_text(encoding="utf-8")
     current = read_props(VERSIONS)
     changed = {c: False for c in COMPONENTS}
@@ -114,13 +114,19 @@ def bump(mod, stamp):
     for comp in targets:
         if comp not in COMPONENTS:
             die(f"unknown mod '{mod}'")
-        text = set_prop(text, comp, versioning.bump(current[comp], stamp))
+        current[comp] = versioning.bump(current[comp], stamp)
+        text = set_prop(text, comp, current[comp])
         changed[comp] = True
     # newline="\n": without it Windows text mode writes CRLF, and CI then reads the version
     # values with a trailing \r (which breaks mc-publish's file paths).
-    VERSIONS.write_text(text, encoding="utf-8", newline="\n")
-    log(f"bumped {', '.join(targets)} to stamp {stamp}")
-    return changed
+    # dry: report the bump without writing, so a dry run leaves the tree clean and the caller can
+    # still show the versions and tag it would have used.
+    if dry:
+        log(f"[dry-run] would bump {', '.join(targets)} to stamp {stamp}")
+    else:
+        VERSIONS.write_text(text, encoding="utf-8", newline="\n")
+        log(f"bumped {', '.join(targets)} to stamp {stamp}")
+    return changed, current
 
 
 # --- build --------------------------------------------------------------------------
@@ -524,11 +530,12 @@ def main():
     ensure_clean(args.allow_dirty)
 
     stamp = versioning.stamp()
-    changed = bump(args.mod, stamp)
-    versions = read_props(VERSIONS)
+    changed, versions = bump(args.mod, stamp, dry)
+    if dry:
+        log("[dry-run] versions.properties left unchanged")
 
     # When the API changes, point the hosts at the new version floor.
-    floor_paths = versioning.apply_floor(args.mc, versions["api"]) if changed["api"] else []
+    floor_paths = versioning.apply_floor(args.mc, versions["api"], dry) if changed["api"] else []
 
     tag = args.tag or versioning.tag(versions["api"], stamp)
     log(f"tag: {tag}")
