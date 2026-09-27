@@ -138,3 +138,24 @@ publishing {
         }
     }
 }
+
+// Keep only this build's jars in build/libs. Without this the directory accumulates every version
+// ever built, and a root lookup that still points at an old filename will happily resolve a
+// two-week-old jar while the build reports success. .toString() on each entry is required: a
+// GString never equals the String that File.name returns, so a keep-set built from a closure would
+// match nothing and delete the jar this build just produced.
+tasks.named('build') {
+    doLast {
+        def libs = layout.buildDirectory.dir('libs').get().asFile
+        if (!libs.isDirectory()) {
+            return
+        }
+        def keep = [jarFileName(mod_id, routingVersion, 'fabric').toString(),
+                    jarFileName(mod_id, routingVersion, 'sources').toString()] as Set
+        libs.listFiles()?.each { f ->
+            if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
+                f.delete()
+            }
+        }
+    }
+}

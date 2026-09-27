@@ -2,16 +2,20 @@
 // release workflow for the component that changed). This script locates that file
 // from whichever build applies it and exposes the versions as project extensions.
 
-def versionsFile = {
+// Every build finds the files it needs by walking up from its own projectDir, so a loader build
+// under versions/<mc>/<module>/<loader>/ resolves the right files with no hardcoded paths.
+def findUp = { String name ->
     def d = projectDir
-    while (d != null && !new File(d, 'versions.properties').exists()) {
+    while (d != null && !new File(d, name).exists()) {
         d = d.parentFile
     }
-    if (d == null) {
-        throw new GradleException("versions.properties not found above ${projectDir}")
-    }
-    new File(d, 'versions.properties')
-}()
+    d == null ? null : new File(d, name)
+}
+
+def versionsFile = findUp('versions.properties')
+if (versionsFile == null) {
+    throw new GradleException("versions.properties not found above ${projectDir}")
+}
 
 def componentVersions = new Properties()
 versionsFile.withInputStream { componentVersions.load(it) }
@@ -23,20 +27,23 @@ ext.componentVersions = componentVersions
 // the convention, and it is applied when *staging* the release set, deliberately NOT to
 // archivesName: the per-module build/libs names feed the in-repo maven publications whose
 // filenames hosts resolve, so renaming those would break every dependent module.
-ext.jarFileName = { String id, String version, String kind -> "${id}-${version}-${kind}.jar" }
+ext.jarFileName = { String id, String version, String loader -> "${id}-${version}-${loader}.jar" }
 
 // Build-time version stamp. versions.properties may hold a bare "<major>.<minor>.<patch>" (before a
 // release) or an already-stamped "<major>.<minor>.<patch>.<yymmddhh>" (after one). A bare value is
 // stamped here, in the project's stamp timezone (TIMEZONE in tools/versioning.py), so built jars
 // always carry the full version. Override with -PversionStamp=<stamp>; disable with -Pnostamp=true.
-def stampTimezone = {
+// Read a module-level string constant out of tools/versioning.py, so the value is declared once in
+// python rather than duplicated here where the two can silently drift apart.
+def pyConst = { String name, String fallback ->
     def f = findUp('tools/versioning.py')
     if (f == null) {
-        return 'UTC'
+        return fallback
     }
-    def m = f.getText('UTF-8') =~ /(?m)^TIMEZONE\s*=\s*"([^"]+)"/
-    return m.find() ? m.group(1) : 'UTC'
+    def m = f.getText('UTF-8') =~ /(?m)^${name}\s*=\s*"([^"]+)"/
+    return m.find() ? m.group(1) : fallback
 }
+def stampTimezone = { pyConst('TIMEZONE', 'UTC') }
 def fixedOffsetZone = { String name ->
     def t = name.trim().toUpperCase()
     if (t in ['UTC', 'Z', 'GMT']) {
@@ -92,7 +99,7 @@ ext.accessVersion = stampVersion(componentVersions.getProperty('access'))
 // versions.properties: bump the API's minor to 1.1 and every dependent mod stops matching it,
 // while the build stays green because Gradle pins the exact version. Deriving them here means
 // the API version is declared once, in versions.properties.
-ext.floorUpper = '1.1'   // keep in step with versioning.py's FLOOR_UPPER
+ext.floorUpper = pyConst('FLOOR_UPPER', '1.1')   // single source: tools/versioning.py
 ext.apiFloor = apiVersion.tokenize('.').take(3).join('.')
 ext.apiRangeFabric = "~${ext.apiFloor}"
 ext.apiRangeNeo = "[${ext.apiFloor},${ext.floorUpper})"

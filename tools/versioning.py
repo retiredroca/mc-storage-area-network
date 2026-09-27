@@ -9,9 +9,9 @@ Scheme: ``<major>.<minor>.<patch>.<yymmddhh>`` — e.g. ``1.0.2.26091512``.
 
 Hosts depend on the API with a **floor range** derived from the API's first three components, so an
 older API can never silently satisfy a host:
-    gradle.properties   api_version=[<floor>,1.1)
+    gradle.properties   api_version=[<floor>,FLOOR_UPPER)
     fabric.mod.json     "mc_storage_area_network": "~<floor>"
-    neoforge.mods.toml  versionRange="[<floor>,1.1)"
+    neoforge.mods.toml  versionRange="[<floor>,FLOOR_UPPER)"
 
 CLI:
     python tools/versioning.py stamp
@@ -34,6 +34,10 @@ ROOT = Path(__file__).resolve().parent.parent
 # the name and the double-quoted form. Templates leave it as __VERSION_TZ__ and substitute the
 # zone chosen at project creation.
 TIMEZONE = "GMT-10"
+
+# Range upper bound written into the API floor. gradle/versions.gradle mirrors this as
+# ext.floorUpper, so the two must be changed together when the API's major version line moves.
+FLOOR_UPPER = "1.1"
 
 HAWAII = datetime.timezone(datetime.timedelta(hours=-10))
 
@@ -71,7 +75,7 @@ def _sub(path: Path, pattern: str, repl: str, dry: bool = False) -> bool:
 
 
 def _rewrite_props(path: Path, f: str, dry: bool = False) -> bool:
-    return _sub(path, r"(?m)^api_version=.*$", f"api_version=[{f},1.1)", dry)
+    return _sub(path, r"(?m)^api_version=.*$", f"api_version=[{f},{FLOOR_UPPER})", dry)
 
 
 def _rewrite_fabric(path: Path, f: str, dry: bool = False) -> bool:
@@ -81,7 +85,7 @@ def _rewrite_fabric(path: Path, f: str, dry: bool = False) -> bool:
 
 def _rewrite_neoforge(path: Path, f: str, dry: bool = False) -> bool:
     return _sub(path, r'(?s)(modId="mc_storage_area_network".*?versionRange=")[^"]*(")',
-                rf"\g<1>[{f},1.1)\g<2>", dry)
+                rf"\g<1>[{f},{FLOOR_UPPER})\g<2>", dry)
 
 
 def apply_floor(mc: str, api_version: str, dry: bool = False) -> list:
@@ -135,9 +139,9 @@ def main() -> int:
         if a.mc:
             changed = apply_floor(a.mc, a.api)
             for path in changed:
-                print(f"floor -> [{f},1.1)  {path}")
+                print(f"floor -> [{f},{FLOOR_UPPER})  {path}")
             if not changed:
-                print(f"floor already [{f},1.1)")
+                print(f"floor already [{f},{FLOOR_UPPER})")
         else:
             print(f)
 

@@ -241,7 +241,7 @@ tasks.register('ensureApi') {
  */
 tasks.register('apiUniversalJar', Jar) {
     dependOnUniversal(delegate, 'api')
-    archiveFileName = jarFileName(COMP_ID.api, apiVersion, 'universal')
+        archiveFileName = jarFileName(COMP_ID.api, apiVersion, 'universal')
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -273,7 +273,7 @@ def registerBundle = { String taskName, String templateDir, String kind, String 
         def staged = delegate
         fabMods.each { m -> dependOnLoader(staged, m, 'fabric') }
         neoMods.each { m -> dependOnLoader(staged, m, 'neoforge') }
-        archiveFileName = jarFileName("bundle-${bundleKey}", bundleVersion, kind)
+            archiveFileName = jarFileName("bundle-${bundleKey}", bundleVersion, kind)
         destinationDirectory = layout.buildDirectory.dir('libs')
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 

@@ -12,17 +12,12 @@ apply from: new File(repoRoot, 'gradle/versions.gradle')
 version = accessVersion
 group = 'com.retiredroca.remoteaccessterminal'
 
-// Newest non-sources / non-dev jar in a directory (loader builds are date-versioned).
-def newestJar = { String dir ->
-    def d = file(dir)
-    def jars = (d.listFiles() ?: new File[0]).findAll {
-        it.name.endsWith('.jar') && !it.name.contains('sources') && !it.name.contains('dev')
-    }
-    if (jars.isEmpty()) {
-        return null
-    }
-    jars.sort { it.lastModified() }
-    return jars.last()
+// Exact, version-pinned lookup of a loader jar, matching the name the loader build writes. A scan
+// for "the newest jar in the directory" would accept a mis-named or stale file; naming it exactly
+// means a wrong name fails the build instead of silently packaging the wrong jar.
+def loaderJar = { String loader, String version ->
+    def f = file("${loader}/build/libs/${jarFileName('remote_access_terminal', version, loader)}")
+    f.exists() ? f : null
 }
 
 /**
@@ -42,11 +37,11 @@ tasks.register('universalJar', Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     from({
-        def jar = newestJar('fabric/build/libs')
+        def jar = loaderJar('fabric', accessVersion)
         jar == null ? [] : zipTree(jar)
     })
     from({
-        def jar = newestJar('neoforge/build/libs')
+        def jar = loaderJar('neoforge', accessVersion)
         jar == null ? [] : zipTree(jar)
     }) {
         include 'com/retiredroca/remoteaccessterminal/neoforge/**'
@@ -56,6 +51,23 @@ tasks.register('universalJar', Jar) {
 
 tasks.named('build') {
     dependsOn 'universalJar'
+
+    // This module's build/libs also accumulates every version ever built, including
+    // jars left under the old hyphenated names. A root lookup pointing at one of those
+    // would resolve a stale jar while the build reports success. .toString() is
+    // required: a GString never equals the String that File.name returns.
+    doLast {
+        def libs = layout.buildDirectory.dir('libs').get().asFile
+        if (!libs.isDirectory()) {
+            return
+        }
+        def keep = [jarFileName('remote_access_terminal', accessVersion, 'universal').toString()] as Set
+        libs.listFiles()?.each { f ->
+            if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
+                f.delete()
+            }
+        }
+    }
 }
 
 // Thin aliases so a parent build can request one loader half of this mod without building both.

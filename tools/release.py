@@ -51,13 +51,23 @@ COMP_ID = {"api": "mc_storage_area_network", "storage": "storage_network",
 def jar_name(comp, version, kind):
     """Release jar name, matching jarFileName in gradle/versions.gradle: <id>-<version>-<kind>.jar."""
     return f"{COMP_ID[comp]}-{version}-{kind}.jar"
-# Release jar names are <id>-<version>-<kind>.jar; the version is numeric and the kind is one of the
-# three loaders, so match on those rather than listing every id.
-ALLOWED_JAR = re.compile(
-    r"^(mc_storage_area_network|storage_network|crafting_network|network_routing|remote_access_terminal"
-    r"|bundle-all|bundle-storage|bundle-crafting|bundle-routing|bundle-access)"
-    r"-[0-9][0-9.]*-(fabric|neoforge|universal)\.jar$"
-)
+
+
+def bundle_name(key, version):
+    """Bundle container jar name: bundle-<key>-<version>-universal.jar.
+
+    Same convention as jar_name(), with the bundle key in the id position and the universal loader
+    last. Every bundle upload path goes through here so the shape is defined once.
+    """
+    return f"bundle-{key}-{version}-universal.jar"
+
+
+# A release jar is <id>-<version>-<kind>.jar, matching jarFileName in gradle/versions.gradle: the
+# version is numeric and the kind is one of the three loaders. Matching the shape rather than listing
+# every id means an added module needs no edit here, and it rejects every pre-rename shape (a leading
+# loader, or a dot before the version), which a count check cannot. The id group allows dashes so a
+# `bundle-` prefix matches. Identical to the same guard in redstone-pcbs and both templates.
+ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)\.jar$")
 
 
 def log(msg):
@@ -140,27 +150,34 @@ def bump(mod, stamp, dry=False):
 # --- build --------------------------------------------------------------------------
 
 
-def build(mc, dry, no_daemon=False):
+def build(mc, dry, no_daemon=False, stamp=None):
     g = gradlew()
     # Reuse the warm 12G daemon across these invocations by default: each one used to start a cold
     # JVM and reconfigure all 12 included builds. --no-daemon is available to reproduce a CI-like
     # cold build (CI always passes it, where each run is a fresh container).
     daemon = ["--no-daemon"] if no_daemon else []
+    # One stamp, computed once, by versioning.stamp() and written into versions.properties for the
+    # component being released. Gradle would otherwise compute its own at build time, and the two can
+    # disagree: an hour boundary between this call and the build, or a component still holding a bare
+    # "1.0.0" (a project generated from the template), which stampVersion() stamps at build time.
+    # Then the jar names built from the python value do not match the jars on disk, and every upload
+    # path misses and skips silently. Passing the stamp in makes the two agree by construction.
+    pin = [f"-PversionStamp={stamp}"] if stamp else []
     # Bootstrap: the API artifacts must be in repo/ before the hosts compile, because hosts
     # require an API version floor ([<api>,1.1)).
-    run(g + daemon + ["-p", f"versions/{mc}/api/fabric",
+    run(g + daemon + pin + ["-p", f"versions/{mc}/api/fabric",
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
-    run(g + daemon + ["-p", f"versions/{mc}/api/neoforge",
+    run(g + daemon + pin + ["-p", f"versions/{mc}/api/neoforge",
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
     # Staged build (loader jars -> loader bundles -> universal -> universal bundles) as four
     # invocations, so a failure names the layer that broke. The last one also unions the staged
     # dirs into build/release/ and republishes the API to ./repo.
     # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
-    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
+    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
         dry=dry)
-    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
-    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
-    run(g + daemon + ["--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
+    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
+    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
+    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
              "publishRepo"], dry=dry)
 
 
@@ -206,12 +223,25 @@ def changelog(tag, dry):
 
 
 def bundle_versions():
+    """Version of each bundle, read back from the universal container jar in dist/.
+
+    The glob must name the universal jar explicitly. A bundle produces three files (fabric,
+    neoforge, universal) whose names differ only in the trailing loader, so `bundle-<key>-*.jar`
+    matches all three and sorted()[0] is the *fabric* jar. Slicing a "-universal.jar" suffix off
+    that name silently yields a truncated version (it eats 3 characters of the version), which then
+    propagates into every bundle upload path below. The trailing-loaders-last convention means the
+    universal jar cannot be identified by ordering, only by name.
+    """
     out = {}
     for key in ("all", "storage", "crafting", "routing", "access"):
-        matches = sorted(DIST.glob(f"bundle-{key}-*.jar"))
+        matches = sorted(DIST.glob(f"bundle-{key}-*-universal.jar"))
         if not matches:
-            die(f"missing bundle-{key}-*.jar in dist/")
-        out[key] = matches[0].name[len(f"bundle-{key}-"):-len(f"-universal.jar")]
+            die(f"missing bundle-{key}-*-universal.jar in dist/")
+        version = matches[0].name[len(f"bundle-{key}-"):-len("-universal.jar")]
+        # Fail loudly rather than publish a mangled version: every upload path below trusts this.
+        if not re.fullmatch(r"\d+(\.\d+)+", version):
+            die(f"cannot read a version out of {matches[0].name!r}: got {version!r}")
+        out[key] = version
     return out
 
 
@@ -427,19 +457,22 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
 
     # Bundles (bundle-all always; the rest when their content changed).
-    bundle_jobs = [f"bundle-all-{bundles['all']}-universal.jar"]
+    bundle_jobs = [bundle_name("all", bundles["all"])]
     if changed["api"] or changed["storage"]:
-        bundle_jobs.append(f"bundle-storage.{bundles['storage']}.jar")
+        bundle_jobs.append(bundle_name("storage", bundles["storage"]))
     if changed["api"] or changed["crafting"]:
-        bundle_jobs.append(f"bundle-crafting.{bundles['crafting']}.jar")
+        bundle_jobs.append(bundle_name("crafting", bundles["crafting"]))
     if changed["api"] or changed["storage"] or changed["routing"]:
-        bundle_jobs.append(f"bundle-routing.{bundles['routing']}.jar")
+        bundle_jobs.append(bundle_name("routing", bundles["routing"]))
     if changed["api"] or changed["access"]:
-        bundle_jobs.append(f"bundle-access.{bundles['access']}.jar")
+        bundle_jobs.append(bundle_name("access", bundles["access"]))
     for filename in bundle_jobs:
         jar = DIST / filename
-        if jar.exists():
-            cf_upload(token, project_id, jar, {**common, "displayName": jar.name}, dry)
+        if not jar.exists():
+            # Do not skip silently: a missing jar here means the name or the version is wrong, and
+            # that is a bug, not a reason to publish a partial set.
+            die(f"bundle jar missing from dist/: {filename}")
+        cf_upload(token, project_id, jar, {**common, "displayName": jar.name}, dry)
 
 
 # --- Modrinth -----------------------------------------------------------------------
@@ -460,6 +493,12 @@ def modrinth_sync(token, project, state_key, version_number, version_name, mc, p
         "dependencies": [],
     }
     previous = read_props(STATE).get(state_key) if STATE.exists() else None
+    # Every file named here is uploaded, so a missing one is a naming or version bug. Fail before
+    # the request rather than after: a curl error would otherwise be logged and swallowed below,
+    # and the release would report success having published nothing.
+    missing = [p.name for p in [primary, *extras] if not p.exists()]
+    if missing:
+        die(f"modrinth upload for {state_key}: not in dist/: {missing}")
     if dry:
         print(f"  [dry-run] modrinth POST /v2/version project={project} v={version_number} files={[primary.name] + [e.name for e in extras]}")
         return
@@ -549,7 +588,7 @@ def main():
     log(f"tag: {tag}")
 
     if not args.skip_build:
-        build(args.mc, dry, args.no_daemon)
+        build(args.mc, dry, args.no_daemon, stamp)
         collect(dry)
     else:
         verify(dry)
@@ -599,8 +638,8 @@ def main():
             die("--modrinth needs MODRINTH_TOKEN (use tools/secrets.py run)")
         modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
                       f"mr.api.version.{args.mc}", versions["api"], f"SAN API {versions['api']}", args.mc,
-                      DIST / f"universal_mc_san_api.{versions['api']}.jar",
-                      [DIST / f"bundle-all.{bundles['all']}.jar"], dry)
+                      DIST / jar_name("api", versions["api"], "universal"),
+                      [DIST / bundle_name("all", bundles["all"])], dry)
 
     if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
         run(["git", "push", "origin", current_branch()], dry=dry)
