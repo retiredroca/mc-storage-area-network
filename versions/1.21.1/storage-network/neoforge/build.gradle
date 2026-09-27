@@ -198,6 +198,7 @@ tasks.withType(ProcessResources).configureEach {
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
+            api_range              : apiRangeNeo,
             mod_version            : storageVersion,
     ]
     inputs.properties replaceProperties

@@ -43,12 +43,20 @@ UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
 
 MODS = ("api", "storage", "crafting", "routing", "access", "all")
 COMPONENTS = ("api", "storage", "crafting", "routing", "access")
-COMP_JAR = {"storage": "storage-network", "crafting": "crafting-network", "routing": "network-routing",
-            "access": "remote-access-terminal"}
+COMP_ID = {"api": "mc_storage_area_network", "storage": "storage_network",
+           "crafting": "crafting_network", "routing": "network_routing",
+           "access": "remote_access_terminal"}
+
+
+def jar_name(comp, version, kind):
+    """Release jar name, matching jarFileName in gradle/versions.gradle: <id>-<version>-<kind>.jar."""
+    return f"{COMP_ID[comp]}-{version}-{kind}.jar"
+# Release jar names are <id>-<version>-<kind>.jar; the version is numeric and the kind is one of the
+# three loaders, so match on those rather than listing every id.
 ALLOWED_JAR = re.compile(
-    r"^(universal|fabric|neoforge)(_mc_san_api|-storage-network|-crafting-network|-network-routing"
-    r"|-remote-access-terminal|-bundle-all|-bundle-storage|-bundle-crafting|-bundle-routing|-bundle-access)"
-    r"\.[0-9].*\.jar$"
+    r"^(mc_storage_area_network|storage_network|crafting_network|network_routing|remote_access_terminal"
+    r"|bundle-all|bundle-storage|bundle-crafting|bundle-routing|bundle-access)"
+    r"-[0-9][0-9.]*-(fabric|neoforge|universal)\.jar$"
 )
 
 
@@ -200,10 +208,10 @@ def changelog(tag, dry):
 def bundle_versions():
     out = {}
     for key in ("all", "storage", "crafting", "routing", "access"):
-        matches = sorted(DIST.glob(f"universal-bundle-{key}.*.jar"))
+        matches = sorted(DIST.glob(f"bundle-{key}-*.jar"))
         if not matches:
-            die(f"missing universal-bundle-{key}.*.jar in dist/")
-        out[key] = matches[0].name[len(f"universal-bundle-{key}."):-len(".jar")]
+            die(f"missing bundle-{key}-*.jar in dist/")
+        out[key] = matches[0].name[len(f"bundle-{key}-"):-len(f"-universal.jar")]
     return out
 
 
@@ -398,14 +406,14 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
     parent_key = f"cf.api.file.{mc}"
 
     if changed["api"]:
-        api_jar = DIST / f"universal_mc_san_api.{versions['api']}.jar"
+        api_jar = DIST / jar_name("api", versions["api"], "universal")
         result = cf_upload(token, project_id, api_jar, {**common, "displayName": api_jar.name}, dry)
         file_id = (result or {}).get("id")
         if file_id:
             set_state(parent_key, str(file_id))
             log(f"{parent_key}={file_id}")
             for comp in ("storage", "crafting", "routing", "access"):
-                jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
+                jar = DIST / jar_name(comp, versions[comp], "universal")
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
     else:
@@ -414,20 +422,20 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
             for comp in ("storage", "crafting", "routing", "access"):
                 if not changed[comp]:
                     continue
-                jar = DIST / f"universal-{COMP_JAR[comp]}.{versions[comp]}.jar"
+                jar = DIST / jar_name(comp, versions[comp], "universal")
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
 
     # Bundles (bundle-all always; the rest when their content changed).
-    bundle_jobs = [f"universal-bundle-all.{bundles['all']}.jar"]
+    bundle_jobs = [f"bundle-all-{bundles['all']}-universal.jar"]
     if changed["api"] or changed["storage"]:
-        bundle_jobs.append(f"universal-bundle-storage.{bundles['storage']}.jar")
+        bundle_jobs.append(f"bundle-storage.{bundles['storage']}.jar")
     if changed["api"] or changed["crafting"]:
-        bundle_jobs.append(f"universal-bundle-crafting.{bundles['crafting']}.jar")
+        bundle_jobs.append(f"bundle-crafting.{bundles['crafting']}.jar")
     if changed["api"] or changed["storage"] or changed["routing"]:
-        bundle_jobs.append(f"universal-bundle-routing.{bundles['routing']}.jar")
+        bundle_jobs.append(f"bundle-routing.{bundles['routing']}.jar")
     if changed["api"] or changed["access"]:
-        bundle_jobs.append(f"universal-bundle-access.{bundles['access']}.jar")
+        bundle_jobs.append(f"bundle-access.{bundles['access']}.jar")
     for filename in bundle_jobs:
         jar = DIST / filename
         if jar.exists():
@@ -592,7 +600,7 @@ def main():
         modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
                       f"mr.api.version.{args.mc}", versions["api"], f"SAN API {versions['api']}", args.mc,
                       DIST / f"universal_mc_san_api.{versions['api']}.jar",
-                      [DIST / f"universal-bundle-all.{bundles['all']}.jar"], dry)
+                      [DIST / f"bundle-all.{bundles['all']}.jar"], dry)
 
     if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
         run(["git", "push", "origin", current_branch()], dry=dry)

@@ -16,6 +16,12 @@ def versionRoot = "versions/${mc}"
 version = apiVersion
 group = 'com.retiredroca.mcstorageareanetwork'
 
+// Each component's maven mod id, which is also the id in its release jar name. Directory names
+// differ from the ids (storage-network -> storage_network), so keep one table.
+def COMP_ID = [api: 'mc_storage_area_network', storage: 'storage_network',
+               crafting: 'crafting_network', routing: 'network_routing',
+               access: 'remote_access_terminal']
+
 def componentVersion = { String mod ->
     switch (mod) {
         case 'api': return apiVersion
@@ -34,14 +40,6 @@ def bundleVersionFor = { List<String> mods ->
 def versionedJar = { String path ->
     def f = file(path)
     f.exists() ? f : null
-}
-
-def versionFromJar = { File jar, String prefix ->
-    def name = jar.name
-    if (name.startsWith(prefix)) {
-        name = name.substring(prefix.length())
-    }
-    name.endsWith('.jar') ? name.substring(0, name.length() - 4) : name
 }
 
 // Per-mod, per-loader source jars (lazy so they resolve after the child builds run).
@@ -80,18 +78,17 @@ def staticTokens = [
         '@@MC_VERSION_RANGE@@' : mc,
 ]
 def apiTokens = staticTokens + ['@@VERSION@@': apiVersion]
+// The version each component is built at, straight from versions.properties. This used to be
+// recovered by parsing the built jar's filename, which meant a rename to the naming scheme broke
+// the bundle templates at build time, and the parse was the only thing tying a template's declared
+// dependency version to a file name. The versions are already variables, so use them.
 def versionTokens = {
-    def a = apiFab()
-    def s = stFab()
-    def c = crFab()
-    def r = rtFab()
-    def x = acFab()
     [
-            '@@API_VERSION@@'     : a ? versionFromJar(a, 'fabric-mc_storage_area_network-') : apiVersion,
-            '@@STORAGE_VERSION@@' : s ? versionFromJar(s, 'fabric-storage_network-') : storageVersion,
-            '@@CRAFTING_VERSION@@': c ? versionFromJar(c, 'fabric-crafting_network-') : craftingVersion,
-            '@@ROUTING_VERSION@@' : r ? versionFromJar(r, 'fabric-network_routing-') : routingVersion,
-            '@@ACCESS_VERSION@@'  : x ? versionFromJar(x, 'fabric-remote_access_terminal-') : accessVersion,
+            '@@API_VERSION@@'     : apiVersion,
+            '@@STORAGE_VERSION@@' : storageVersion,
+            '@@CRAFTING_VERSION@@': craftingVersion,
+            '@@ROUTING_VERSION@@' : routingVersion,
+            '@@ACCESS_VERSION@@'  : accessVersion,
     ]
 }
 
@@ -244,7 +241,7 @@ tasks.register('ensureApi') {
  */
 tasks.register('apiUniversalJar', Jar) {
     dependOnUniversal(delegate, 'api')
-    archiveFileName = "universal_mc_san_api.${apiVersion}.jar"
+    archiveFileName = jarFileName(COMP_ID.api, apiVersion, 'universal')
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -269,12 +266,14 @@ tasks.register('apiUniversalJar', Jar) {
  * Bundle container. `fabMods` are nested under META-INF/jars (Fabric), `neoMods` under
  * META-INF/jarjar (NeoForge); one jar can only carry one mod per loader, hence the container.
  */
-def registerBundle = { String taskName, String templateDir, String artifactPrefix, String bundleVersion, List fabMods, List neoMods ->
+// `kind` and `bundleKey` replace the old compound artifactPrefix (e.g. "universal-bundle-all"),
+// so the archive name comes from jarFileName like every other release artifact.
+def registerBundle = { String taskName, String templateDir, String kind, String bundleKey, String bundleVersion, List fabMods, List neoMods ->
     def t = tasks.register(taskName, Jar) {
         def staged = delegate
         fabMods.each { m -> dependOnLoader(staged, m, 'fabric') }
         neoMods.each { m -> dependOnLoader(staged, m, 'neoforge') }
-        archiveFileName = "${artifactPrefix}.${bundleVersion}.jar"
+        archiveFileName = jarFileName("bundle-${bundleKey}", bundleVersion, kind)
         destinationDirectory = layout.buildDirectory.dir('libs')
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -316,23 +315,23 @@ def craftingBundleVersion = bundleVersionFor(craftingMods)
 def routingBundleVersion = bundleVersionFor(routingMods)
 def accessBundleVersion = bundleVersionFor(accessMods)
 
-registerBundle('bundleAllJar', 'bundler/bundle-all', 'universal-bundle-all', allBundleVersion, allMods, allMods)
-registerBundle('bundleStorageJar', 'bundler/bundle-storage', 'universal-bundle-storage', storageBundleVersion, storageMods, storageMods)
-registerBundle('bundleCraftingJar', 'bundler/bundle-crafting', 'universal-bundle-crafting', craftingBundleVersion, craftingMods, craftingMods)
-registerBundle('bundleRoutingJar', 'bundler/bundle-routing', 'universal-bundle-routing', routingBundleVersion, routingMods, routingMods)
-registerBundle('bundleAccessJar', 'bundler/bundle-access', 'universal-bundle-access', accessBundleVersion, accessMods, accessMods)
+registerBundle('bundleAllJar', 'bundler/bundle-all', 'universal', 'all', allBundleVersion, allMods, allMods)
+registerBundle('bundleStorageJar', 'bundler/bundle-storage', 'universal', 'storage', storageBundleVersion, storageMods, storageMods)
+registerBundle('bundleCraftingJar', 'bundler/bundle-crafting', 'universal', 'crafting', craftingBundleVersion, craftingMods, craftingMods)
+registerBundle('bundleRoutingJar', 'bundler/bundle-routing', 'universal', 'routing', routingBundleVersion, routingMods, routingMods)
+registerBundle('bundleAccessJar', 'bundler/bundle-access', 'universal', 'access', accessBundleVersion, accessMods, accessMods)
 
-registerBundle('fabricBundleAllJar', 'bundler/bundle-all-fabric', 'fabric-bundle-all', allBundleVersion, allMods, [])
-registerBundle('fabricBundleStorageJar', 'bundler/bundle-storage-fabric', 'fabric-bundle-storage', storageBundleVersion, storageMods, [])
-registerBundle('fabricBundleCraftingJar', 'bundler/bundle-crafting-fabric', 'fabric-bundle-crafting', craftingBundleVersion, craftingMods, [])
-registerBundle('fabricBundleRoutingJar', 'bundler/bundle-routing-fabric', 'fabric-bundle-routing', routingBundleVersion, routingMods, [])
-registerBundle('fabricBundleAccessJar', 'bundler/bundle-access-fabric', 'fabric-bundle-access', accessBundleVersion, accessMods, [])
+registerBundle('fabricBundleAllJar', 'bundler/bundle-all-fabric', 'fabric', 'all', allBundleVersion, allMods, [])
+registerBundle('fabricBundleStorageJar', 'bundler/bundle-storage-fabric', 'fabric', 'storage', storageBundleVersion, storageMods, [])
+registerBundle('fabricBundleCraftingJar', 'bundler/bundle-crafting-fabric', 'fabric', 'crafting', craftingBundleVersion, craftingMods, [])
+registerBundle('fabricBundleRoutingJar', 'bundler/bundle-routing-fabric', 'fabric', 'routing', routingBundleVersion, routingMods, [])
+registerBundle('fabricBundleAccessJar', 'bundler/bundle-access-fabric', 'fabric', 'access', accessBundleVersion, accessMods, [])
 
-registerBundle('neoforgeBundleAllJar', 'bundler/bundle-all-neoforge', 'neoforge-bundle-all', allBundleVersion, [], allMods)
-registerBundle('neoforgeBundleStorageJar', 'bundler/bundle-storage-neoforge', 'neoforge-bundle-storage', storageBundleVersion, [], storageMods)
-registerBundle('neoforgeBundleCraftingJar', 'bundler/bundle-crafting-neoforge', 'neoforge-bundle-crafting', craftingBundleVersion, [], craftingMods)
-registerBundle('neoforgeBundleRoutingJar', 'bundler/bundle-routing-neoforge', 'neoforge-bundle-routing', routingBundleVersion, [], routingMods)
-registerBundle('neoforgeBundleAccessJar', 'bundler/bundle-access-neoforge', 'neoforge-bundle-access', accessBundleVersion, [], accessMods)
+registerBundle('neoforgeBundleAllJar', 'bundler/bundle-all-neoforge', 'neoforge', 'all', allBundleVersion, [], allMods)
+registerBundle('neoforgeBundleStorageJar', 'bundler/bundle-storage-neoforge', 'neoforge', 'storage', storageBundleVersion, [], storageMods)
+registerBundle('neoforgeBundleCraftingJar', 'bundler/bundle-crafting-neoforge', 'neoforge', 'crafting', craftingBundleVersion, [], craftingMods)
+registerBundle('neoforgeBundleRoutingJar', 'bundler/bundle-routing-neoforge', 'neoforge', 'routing', routingBundleVersion, [], routingMods)
+registerBundle('neoforgeBundleAccessJar', 'bundler/bundle-access-neoforge', 'neoforge', 'access', accessBundleVersion, [], accessMods)
 
 /**
  * The release is built in four ordered stages so a failure points at the layer that broke and a
@@ -351,19 +350,19 @@ tasks.register('releaseLoaderJars', Sync) {
 
     if (activeLoaders.contains('fabric')) {
         ['api', 'storage', 'crafting', 'routing', 'access'].each { m -> dependOnLoader(staged, m, 'fabric') }
-        from({ def f = apiFab(); f == null ? [] : f }) { rename { "fabric_mc_san_api.${apiVersion}.jar" } }
-        from({ def f = stFab(); f == null ? [] : f }) { rename { "fabric-storage-network.${storageVersion}.jar" } }
-        from({ def f = crFab(); f == null ? [] : f }) { rename { "fabric-crafting-network.${craftingVersion}.jar" } }
-        from({ def f = rtFab(); f == null ? [] : f }) { rename { "fabric-network-routing.${routingVersion}.jar" } }
-        from({ def f = acFab(); f == null ? [] : f }) { rename { "fabric-remote-access-terminal.${accessVersion}.jar" } }
+        from({ def f = apiFab(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.api, apiVersion, 'fabric') } }
+        from({ def f = stFab(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.storage, storageVersion, 'fabric') } }
+        from({ def f = crFab(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.crafting, craftingVersion, 'fabric') } }
+        from({ def f = rtFab(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.routing, routingVersion, 'fabric') } }
+        from({ def f = acFab(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.access, accessVersion, 'fabric') } }
     }
     if (activeLoaders.contains('neoforge')) {
         ['api', 'storage', 'crafting', 'routing', 'access'].each { m -> dependOnLoader(staged, m, 'neoforge') }
-        from({ def f = apiNeo(); f == null ? [] : f }) { rename { "neoforge_mc_san_api.${apiVersion}.jar" } }
-        from({ def f = stNeo(); f == null ? [] : f }) { rename { "neoforge-storage-network.${storageVersion}.jar" } }
-        from({ def f = crNeo(); f == null ? [] : f }) { rename { "neoforge-crafting-network.${craftingVersion}.jar" } }
-        from({ def f = rtNeo(); f == null ? [] : f }) { rename { "neoforge-network-routing.${routingVersion}.jar" } }
-        from({ def f = acNeo(); f == null ? [] : f }) { rename { "neoforge-remote-access-terminal.${accessVersion}.jar" } }
+        from({ def f = apiNeo(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.api, apiVersion, 'neoforge') } }
+        from({ def f = stNeo(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.storage, storageVersion, 'neoforge') } }
+        from({ def f = crNeo(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.crafting, craftingVersion, 'neoforge') } }
+        from({ def f = rtNeo(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.routing, routingVersion, 'neoforge') } }
+        from({ def f = acNeo(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.access, accessVersion, 'neoforge') } }
     }
 }
 
@@ -398,10 +397,10 @@ tasks.register('releaseUniversal', Sync) {
     ['storage', 'crafting', 'routing', 'access'].each { m -> dependOnUniversal(staged, m) }
 
     from(tasks.named('apiUniversalJar'))
-    from({ def f = stUni(); f == null ? [] : f }) { rename { "universal-storage-network.${storageVersion}.jar" } }
-    from({ def f = crUni(); f == null ? [] : f }) { rename { "universal-crafting-network.${craftingVersion}.jar" } }
-    from({ def f = rtUni(); f == null ? [] : f }) { rename { "universal-network-routing.${routingVersion}.jar" } }
-    from({ def f = acUni(); f == null ? [] : f }) { rename { "universal-remote-access-terminal.${accessVersion}.jar" } }
+    from({ def f = stUni(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.storage, storageVersion, 'universal') } }
+    from({ def f = crUni(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.crafting, craftingVersion, 'universal') } }
+    from({ def f = rtUni(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.routing, routingVersion, 'universal') } }
+    from({ def f = acUni(); f == null ? [] : f }) { rename { jarFileName(COMP_ID.access, accessVersion, 'universal') } }
 }
 
 tasks.register('releaseUniversalBundles', Sync) {

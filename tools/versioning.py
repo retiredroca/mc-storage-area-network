@@ -28,8 +28,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Hawaii Standard Time: fixed UTC-10, no daylight saving, so a stamp is always an exact hour offset
-# from UTC and never jumps back and forth across a DST boundary.
+# Stamp timezone: Hawaii Standard Time, a fixed UTC-10 with no daylight saving, so a stamp is
+# always an exact hour offset from UTC and never jumps back and forth across a DST boundary.
+# gradle/versions.gradle reads this constant *by name* to stamp versions at build time, so keep
+# the name and the double-quoted form. Templates leave it as __VERSION_TZ__ and substitute the
+# zone chosen at project creation.
+TIMEZONE = "GMT-10"
+
 HAWAII = datetime.timezone(datetime.timedelta(hours=-10))
 
 

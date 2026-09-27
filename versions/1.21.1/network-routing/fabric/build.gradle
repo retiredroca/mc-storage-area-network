@@ -95,6 +95,7 @@ processResources {
     inputs.property "mod_name", mod_name
     inputs.property "mod_license", mod_license
     inputs.property "mod_authors", mod_authors
+    inputs.property "api_floor", apiRangeFabric
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
@@ -103,7 +104,8 @@ processResources {
                 "mod_id": mod_id,
                 "mod_name": mod_name,
                 "mod_license": mod_license,
-                "mod_authors": mod_authors
+                "mod_authors": mod_authors,
+                "api_floor": apiRangeFabric
     }
 }
 

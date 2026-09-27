@@ -15,12 +15,87 @@ def versionsFile = {
 
 def componentVersions = new Properties()
 versionsFile.withInputStream { componentVersions.load(it) }
+ext.componentVersions = componentVersions
 
-ext.apiVersion = componentVersions.getProperty('api')
-ext.storageVersion = componentVersions.getProperty('storage')
-ext.craftingVersion = componentVersions.getProperty('crafting')
-ext.routingVersion = componentVersions.getProperty('routing')
-ext.accessVersion = componentVersions.getProperty('access')
+// Release jar name: <id>-<version>-<kind>.jar, e.g. storage_network-1.0.0.26092501-fabric.jar.
+// The kind is the trailing element, so the loader designation sits last, matching the other
+// projects in this scheme (redstone-pcbs, multiversion-mod-template). This is the only copy of
+// the convention, and it is applied when *staging* the release set, deliberately NOT to
+// archivesName: the per-module build/libs names feed the in-repo maven publications whose
+// filenames hosts resolve, so renaming those would break every dependent module.
+ext.jarFileName = { String id, String version, String kind -> "${id}-${version}-${kind}.jar" }
+
+// Build-time version stamp. versions.properties may hold a bare "<major>.<minor>.<patch>" (before a
+// release) or an already-stamped "<major>.<minor>.<patch>.<yymmddhh>" (after one). A bare value is
+// stamped here, in the project's stamp timezone (TIMEZONE in tools/versioning.py), so built jars
+// always carry the full version. Override with -PversionStamp=<stamp>; disable with -Pnostamp=true.
+def stampTimezone = {
+    def f = findUp('tools/versioning.py')
+    if (f == null) {
+        return 'UTC'
+    }
+    def m = f.getText('UTF-8') =~ /(?m)^TIMEZONE\s*=\s*"([^"]+)"/
+    return m.find() ? m.group(1) : 'UTC'
+}
+def fixedOffsetZone = { String name ->
+    def t = name.trim().toUpperCase()
+    if (t in ['UTC', 'Z', 'GMT']) {
+        return java.time.ZoneOffset.UTC
+    }
+    def m = t =~ /^(?:UTC|GMT)?([+-])(\d{1,2})(?::?(\d{2}))?$/
+    if (!m.matches()) {
+        return null
+    }
+    int sign = m.group(1) == '+' ? 1 : -1
+    int hours = m.group(2) as int
+    int minutes = (m.group(3) ?: '0') as int
+    return java.time.ZoneOffset.ofTotalSeconds(sign * (hours * 3600 + minutes * 60))
+}
+def resolveStampZone = { String name ->
+    def fixed = fixedOffsetZone(name)
+    if (fixed != null) {
+        return fixed
+    }
+    try {
+        return java.time.ZoneId.of(name)
+    } catch (Exception ignored) {
+        return java.time.ZoneOffset.UTC
+    }
+}
+def currentStamp = {
+    def override = project.findProperty('versionStamp')
+    if (override != null) {
+        return override.toString()
+    }
+    def zone = resolveStampZone(stampTimezone())
+    return java.time.ZonedDateTime.now(zone)
+            .format(java.time.format.DateTimeFormatter.ofPattern('yyMMddHH'))
+}
+def stampVersion = { String version ->
+    if (version == null || project.findProperty('nostamp') != null) {
+        return version
+    }
+    return version.tokenize('.').size() >= 4 ? version : "${version}.${currentStamp()}"
+}
+ext.stampVersion = stampVersion
+
+
+ext.apiVersion = stampVersion(componentVersions.getProperty('api'))
+ext.storageVersion = stampVersion(componentVersions.getProperty('storage'))
+ext.craftingVersion = stampVersion(componentVersions.getProperty('crafting'))
+ext.routingVersion = stampVersion(componentVersions.getProperty('routing'))
+ext.accessVersion = stampVersion(componentVersions.getProperty('access'))
+
+// The API's version floor, and the two loader-specific dependency ranges built from it. These
+// were hand-written literals in every mod's metadata ("~1.0.2" and "[1.0.2,1.1)"), which made
+// them the one version constraint in the project that nothing kept in step with
+// versions.properties: bump the API's minor to 1.1 and every dependent mod stops matching it,
+// while the build stays green because Gradle pins the exact version. Deriving them here means
+// the API version is declared once, in versions.properties.
+ext.floorUpper = '1.1'   // keep in step with versioning.py's FLOOR_UPPER
+ext.apiFloor = apiVersion.tokenize('.').take(3).join('.')
+ext.apiRangeFabric = "~${ext.apiFloor}"
+ext.apiRangeNeo = "[${ext.apiFloor},${ext.floorUpper})"
 // Version stamps are fixed-width YYMMDDHH, so lexical max == most recent.
 ext.stampOf = { String v -> v.tokenize('.').last() as String }
 ext.newestStamp = { List<String> versions -> versions.collect { stampOf(it) }.max() }
