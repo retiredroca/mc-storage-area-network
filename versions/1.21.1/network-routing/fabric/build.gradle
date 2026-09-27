@@ -13,9 +13,14 @@ apply from: new File(repoRoot, 'gradle/versions.gradle')
 version = routingVersion
 group = mod_group_id
 
+// Name the jar here rather than via archiveClassifier: a classifier is inherited by the maven
+// publication below and lands in repo/ as <artifactId>-<version>-fabric.jar, which no host can
+// resolve. archiveFileName leaves the classifier empty and the published coordinate untouched.
 base {
-    archivesName = 'fabric-' + mod_id
+    archivesName = mod_id
 }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, routingVersion, 'fabric') }
+tasks.named('remapJar') { archiveFileName = jarFileName(mod_id, routingVersion, 'fabric') }
 
 repositories {
     maven {

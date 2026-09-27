@@ -34,8 +34,10 @@ tasks.register('universalJar', Jar) {
     dependsOn gradle.includedBuild('fabric').task(':build')
     dependsOn gradle.includedBuild('neoforge').task(':build')
 
-    archiveBaseName = 'remote-access-terminal'
-    archiveClassifier = 'universal'
+    // Named from the maven mod id, not the directory name, so the universal jar matches the
+    // per-loader jars: <mod-id>-<version>-universal.jar. This build publishes nothing, so the
+    // name is free to change.
+    archiveFileName = jarFileName('remote_access_terminal', accessVersion, 'universal')
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 

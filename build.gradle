@@ -43,20 +43,20 @@ def versionedJar = { String path ->
 }
 
 // Per-mod, per-loader source jars (lazy so they resolve after the child builds run).
-def apiFab = { versionedJar("${versionRoot}/api/fabric/build/libs/fabric-mc_storage_area_network-${apiVersion}.jar") }
-def apiNeo = { versionedJar("${versionRoot}/api/neoforge/build/libs/neoforge-mc_storage_area_network-${apiVersion}.jar") }
-def stFab = { versionedJar("${versionRoot}/storage-network/fabric/build/libs/fabric-storage_network-${storageVersion}.jar") }
-def stNeo = { versionedJar("${versionRoot}/storage-network/neoforge/build/libs/neoforge-storage_network-${storageVersion}.jar") }
-def crFab = { versionedJar("${versionRoot}/crafting-network/fabric/build/libs/fabric-crafting_network-${craftingVersion}.jar") }
-def crNeo = { versionedJar("${versionRoot}/crafting-network/neoforge/build/libs/neoforge-crafting_network-${craftingVersion}.jar") }
-def stUni = { versionedJar("${versionRoot}/storage-network/build/libs/storage-network-${storageVersion}-universal.jar") }
-def crUni = { versionedJar("${versionRoot}/crafting-network/build/libs/crafting-network-${craftingVersion}-universal.jar") }
-def rtFab = { versionedJar("${versionRoot}/network-routing/fabric/build/libs/fabric-network_routing-${routingVersion}.jar") }
-def rtNeo = { versionedJar("${versionRoot}/network-routing/neoforge/build/libs/neoforge-network_routing-${routingVersion}.jar") }
-def rtUni = { versionedJar("${versionRoot}/network-routing/build/libs/network-routing-${routingVersion}-universal.jar") }
-def acFab = { versionedJar("${versionRoot}/remote-access-terminal/fabric/build/libs/fabric-remote_access_terminal-${accessVersion}.jar") }
-def acNeo = { versionedJar("${versionRoot}/remote-access-terminal/neoforge/build/libs/neoforge-remote_access_terminal-${accessVersion}.jar") }
-def acUni = { versionedJar("${versionRoot}/remote-access-terminal/build/libs/remote-access-terminal-${accessVersion}-universal.jar") }
+def apiFab = { versionedJar("${versionRoot}/api/fabric/build/libs/${jarFileName(COMP_ID.api, apiVersion, 'fabric')}") }
+def apiNeo = { versionedJar("${versionRoot}/api/neoforge/build/libs/${jarFileName(COMP_ID.api, apiVersion, 'neoforge')}") }
+def stFab = { versionedJar("${versionRoot}/storage-network/fabric/build/libs/${jarFileName(COMP_ID.storage, storageVersion, 'fabric')}") }
+def stNeo = { versionedJar("${versionRoot}/storage-network/neoforge/build/libs/${jarFileName(COMP_ID.storage, storageVersion, 'neoforge')}") }
+def crFab = { versionedJar("${versionRoot}/crafting-network/fabric/build/libs/${jarFileName(COMP_ID.crafting, craftingVersion, 'fabric')}") }
+def crNeo = { versionedJar("${versionRoot}/crafting-network/neoforge/build/libs/${jarFileName(COMP_ID.crafting, craftingVersion, 'neoforge')}") }
+def stUni = { versionedJar("${versionRoot}/storage-network/build/libs/${jarFileName(COMP_ID.storage, storageVersion, 'universal')}") }
+def crUni = { versionedJar("${versionRoot}/crafting-network/build/libs/${jarFileName(COMP_ID.crafting, craftingVersion, 'universal')}") }
+def rtFab = { versionedJar("${versionRoot}/network-routing/fabric/build/libs/${jarFileName(COMP_ID.routing, routingVersion, 'fabric')}") }
+def rtNeo = { versionedJar("${versionRoot}/network-routing/neoforge/build/libs/${jarFileName(COMP_ID.routing, routingVersion, 'neoforge')}") }
+def rtUni = { versionedJar("${versionRoot}/network-routing/build/libs/${jarFileName(COMP_ID.routing, routingVersion, 'universal')}") }
+def acFab = { versionedJar("${versionRoot}/remote-access-terminal/fabric/build/libs/${jarFileName(COMP_ID.access, accessVersion, 'fabric')}") }
+def acNeo = { versionedJar("${versionRoot}/remote-access-terminal/neoforge/build/libs/${jarFileName(COMP_ID.access, accessVersion, 'neoforge')}") }
+def acUni = { versionedJar("${versionRoot}/remote-access-terminal/build/libs/${jarFileName(COMP_ID.access, accessVersion, 'universal')}") }
 
 def fabJar = [api: apiFab, storage: stFab, crafting: crFab, routing: rtFab, access: acFab]
 def neoJar = [api: apiNeo, storage: stNeo, crafting: crNeo, routing: rtNeo, access: acNeo]

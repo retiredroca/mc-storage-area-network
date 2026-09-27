@@ -36,9 +36,12 @@ sourceSets {
     }
 }
 
+// Named here, not via archiveClassifier: see the fabric note. from components.java carries that
+// classifier into the published filename.
 base {
-    archivesName = 'neoforge-' + mod_id
+    archivesName = mod_id
 }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, apiVersion, 'neoforge') }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
 

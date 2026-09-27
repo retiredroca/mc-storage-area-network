@@ -85,9 +85,12 @@ sourceSets {
     }
 }
 
+// Named here, not via archiveClassifier: see the fabric note. from components.java carries that
+// classifier into the published filename.
 base {
-    archivesName = 'neoforge-' + mod_id
+    archivesName = mod_id
 }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, storageVersion, 'neoforge') }
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
