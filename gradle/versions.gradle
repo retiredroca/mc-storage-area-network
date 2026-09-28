@@ -86,6 +86,36 @@ def stampVersion = { String version ->
 }
 ext.stampVersion = stampVersion
 
+// --- version ordering -----------------------------------------------------------------------------------
+// The one place a version string becomes a comparable key. Every ordering decision -- which
+// component a bundle takes its version from, which maven-metadata entry is newest, which loader
+// version to resolve -- goes through here, so a change to what a version means is a change in one
+// file. It lives in versions.gradle rather than version-resolver.gradle because versions.gradle is
+// applied first by every build; a comparator defined in a script applied at the end is not available
+// to the code above it, which is what previously forced a second copy into build.gradle.
+//
+// Cast, do not compare strings. A decimal component has no fixed width, so lexical order and numeric
+// order must not be assumed to agree: '9' sorts after '10'. tokenize('.-+') and toInteger() make
+// 1.0.9 < 1.0.10 and 1.0.99 < 1.0.100, at any width, with no zero-padding on the versions.
+ext.versionKey = { String v -> v.tokenize('.-+').collect { it.isInteger() ? it.toInteger() : 0 } }
+ext.compareVersions = { String a, String b ->
+    def ka = versionKey(a)
+    def kb = versionKey(b)
+    for (int i = 0; i < Math.max(ka.size(), kb.size()); i++) {
+        def x = i < ka.size() ? ka[i] : 0
+        def y = i < kb.size() ? kb[i] : 0
+        if (x != y) {
+            return x <=> y
+        }
+    }
+    0
+}
+ext.maxVersion = { List<String> versions ->
+    // copy before sorting: sort() mutates in place, and a caller passing a shared list would see it
+    // reordered as a side effect.
+    versions ? new ArrayList(versions).sort { a, b -> compareVersions(a, b) }.last() : null
+}
+
 
 ext.apiVersion = stampVersion(componentVersions.getProperty('api'))
 ext.storageVersion = stampVersion(componentVersions.getProperty('storage'))
@@ -103,9 +133,9 @@ ext.floorUpper = pyConst('FLOOR_UPPER', '1.1')   // single source: tools/version
 ext.apiFloor = apiVersion.tokenize('.').take(3).join('.')
 ext.apiRangeFabric = "~${ext.apiFloor}"
 ext.apiRangeNeo = "[${ext.apiFloor},${ext.floorUpper})"
-// Version stamps are fixed-width YYMMDDHH, so lexical max == most recent.
-ext.stampOf = { String v -> v.tokenize('.').last() as String }
-ext.newestStamp = { List<String> versions -> versions.collect { stampOf(it) }.max() }
+// Selecting a bundle version is maxVersion over the member components, above. It is deliberately
+// not a "newest stamp wins" rule over a fixed prefix: a version is ordered as a whole, and a string
+// max over the stamp column would rank them lexically.
 
 // Multi-version: loader builds live under versions/<mc>/, so each finds its own per-version
 // pins (MC/loader/toolchain) by walking up for version.properties. Exposes the MC version so

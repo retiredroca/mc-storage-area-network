@@ -11,8 +11,11 @@ apply from: new File(projectDir, 'gradle/version-resolver.gradle')
 def mc = providers.gradleProperty('mc').getOrElse('1.21.1')
 def versionRoot = "versions/${mc}"
 
-// The API version comes from versions.properties. Each bundle is versioned by the newest stamp
-// among the components it contains, so a bundle only changes when something inside it changed.
+// The API version comes from versions.properties. A bundle takes the highest version among the
+// components it contains, so a bundle's major.minor.patch tracks its own contents: raising the API
+// to 1.0.3 raises bundle-all to 1.0.3. It used to be a hardcoded '1.0.0.' plus the newest stamp
+// found inside, which held the numbers still and moved only when the stamp did -- an API minor bump
+// made inside one hour republished bundle-all under the same version as before.
 version = apiVersion
 group = 'com.retiredroca.mcstorageareanetwork'
 
@@ -33,7 +36,10 @@ def componentVersion = { String mod ->
     }
 }
 def bundleVersionFor = { List<String> mods ->
-    '1.0.0.' + newestStamp(mods.collect { componentVersion(it) })
+    if (mods.isEmpty()) {
+        throw new GradleException("A bundle needs at least one component to take a version from; got an empty list.")
+    }
+    maxVersion(mods.collect { componentVersion(it) })
 }
 
 // Exact, version-pinned lookups so a stale jar from an earlier version can never be picked.
@@ -93,19 +99,6 @@ def versionTokens = {
 }
 
 // --- repo/ maven housekeeping -------------------------------------------------------
-def versionKey = { String v -> v.tokenize('.').collect { it.isInteger() ? it.toInteger() : 0 } }
-def compareVersions = { String a, String b ->
-    def ka = versionKey(a)
-    def kb = versionKey(b)
-    for (int i = 0; i < Math.max(ka.size(), kb.size()); i++) {
-        def x = i < ka.size() ? ka[i] : 0
-        def y = i < kb.size() ? kb[i] : 0
-        if (x != y) {
-            return x <=> y
-        }
-    }
-    0
-}
 def writeChecksums = { File f ->
     def bytes = f.bytes
     ['md5': 'MD5', 'sha1': 'SHA-1', 'sha256': 'SHA-256', 'sha512': 'SHA-512'].each { ext, algo ->
@@ -115,7 +108,7 @@ def writeChecksums = { File f ->
     }
 }
 def writeMetadata = { File artifactDir, String groupId, String artifactId, List<String> versions ->
-    def sorted = versions.sort { a, b -> compareVersions(a, b) }
+    def sorted = new ArrayList(versions).sort { a, b -> compareVersions(a, b) }
     def latest = sorted.last()
     def xml = new StringBuilder()
     xml << '<?xml version="1.0" encoding="UTF-8"?>\n'
