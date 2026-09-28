@@ -20,7 +20,7 @@
     "fabric-api": "*",
     "minecraft": "${minecraft_version}",
     "mc_storage_area_network": "~${mc_storage_area_network_range}",
-    "storage_network": "~1.0",
+    "storage_network": "~${storage_network_range}",
     "java": ">=21"
   }
 }

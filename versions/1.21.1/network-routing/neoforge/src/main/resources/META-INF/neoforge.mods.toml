@@ -34,6 +34,6 @@ Label storage containers with item filters and make matching containers win rout
 [[dependencies.${mod_id}]]
     modId="storage_network"
     type="required"
-    versionRange="[1.0.0,1.1)"
+    versionRange="[${storage_network_range},1.1)"
     ordering="AFTER"
     side="BOTH"

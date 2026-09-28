@@ -132,7 +132,27 @@ ext.maxVersion = { List<String> versions ->
 // because a composite module's root build (versions/<mc>/<module>/build.gradle) is its own Gradle
 // build root and cannot see a sub-build's project properties -- a mod_id in gradle.properties was
 // invisible in exactly the place that needed it, which is why those roots hardcoded the id.
-ext.mod_depends = []      // a build with no module.properties above it has no dependencies
+//
+// Two kinds of module dependency, because they are two different facts and only one of them is a
+// build input:
+//
+//   depends=  modules this build resolves against. They are published to the in-repo maven, so
+//             there is a coordinate to depend on and a version to pin. network-routing's sources
+//             import com.retiredroca.mcstorageareanetwork.api.* and nothing else of ours, so this
+//             is the library and nothing more.
+//   requires= modules this mod needs at runtime but cannot build against, because they are not
+//             published. network-routing routes between storage containers, so it declares
+//             storage_network required even though it only ever touches the library's abstractions
+//             (ItemSourceRegistry, ScannedStorage, StorageRouter) that Storage Network implements.
+//             Bundle-routing ships both, so the requirement is always met in a bundle.
+//
+// The mod's metadata declares the union of the two. It used to declare the runtime one as a
+// hand-written "~1.0" / "[1.0.0,1.1)" in its own metadata, which no build step kept in step with
+// versions.properties: bump storage_network to 1.1.0 and network-routing would ship declaring its
+// own sibling incompatible with the copy nested beside it in the same archive, with the build green.
+ext.mod_depends = []       // a build with no module.properties above it has no dependencies
+ext.mod_requires = []
+ext.mod_runtime_depends = []
 def moduleFile = findUp('module.properties')
 if (moduleFile != null) {
     def module = loadProps(moduleFile)
@@ -145,8 +165,12 @@ if (moduleFile != null) {
     ext.mod_description = module.getProperty('description')
     ext.mod_version = stampVersion(componentVersions.getProperty(ext.mod_id))
     ext.mod_library = (module.getProperty('library') ?: 'false').toBoolean()
-    ext.mod_depends = (module.getProperty('depends') ?: '')
-            .tokenize(',').collect { it.trim() }.findAll { it }
+    def idList = { String key ->
+        (module.getProperty(key) ?: '').tokenize(',').collect { it.trim() }.findAll { it }
+    }
+    ext.mod_depends = idList('depends')
+    ext.mod_requires = idList('requires')
+    ext.mod_runtime_depends = (ext.mod_depends + ext.mod_requires).unique()
 }
 
 // The library module is the release line: its version is what the tag is keyed on and what every
@@ -189,6 +213,10 @@ ext.moduleGroup = { String id ->
 }
 
 ext.moduleFloorOf = { String id ->
+    if (!moduleProps.containsKey(id)) {
+        throw new GradleException("No module '${id}' under versions/${mcSelected} " +
+                "(known: ${moduleProps.keySet().sort()}) -- check depends=/requires= in module.properties")
+    }
     def version = componentVersions.getProperty(id)
     if (version == null) {
         throw new GradleException("versions.properties has no '${id}=' entry (modules: ${moduleProps.keySet().sort()})")
@@ -204,13 +232,14 @@ ext.moduleFloorOf = { String id ->
 // publishing a range that matches nothing.
 ext.moduleFloor = { String id -> "[${moduleFloorOf(id)},${floorUpper})" }
 
-// One token per dependency for processResources, so a metadata file can write
+// One token per runtime dependency for processResources, so a metadata file can write
 // "~${mc_storage_area_network_range}" / versionRange="${mc_storage_area_network_range}" and have the
 // floor follow versions.properties. The range syntax stays visible in the metadata file, where a
-// reader expects it, and only the number is substituted.
+// reader expects it, and only the number is substituted. Both `depends=` and `requires=` get a token:
+// the mod's metadata declares the union, whether or not the build resolves it.
 ext.dependencyTokens = { ->
     def t = [:]
-    mod_depends.each { dep -> t["${dep}_range"] = moduleFloorOf(dep) }
+    mod_runtime_depends.each { dep -> t["${dep}_range"] = moduleFloorOf(dep) }
     return t
 }
 
