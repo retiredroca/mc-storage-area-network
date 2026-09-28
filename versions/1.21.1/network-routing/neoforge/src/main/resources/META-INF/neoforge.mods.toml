@@ -27,7 +27,7 @@ Label storage containers with item filters and make matching containers win rout
 [[dependencies.${mod_id}]]
     modId="mc_storage_area_network"
     type="required"
-    versionRange="${api_range}"
+    versionRange="[1.0.2,1.1)"
     ordering="AFTER"
     side="BOTH"
 

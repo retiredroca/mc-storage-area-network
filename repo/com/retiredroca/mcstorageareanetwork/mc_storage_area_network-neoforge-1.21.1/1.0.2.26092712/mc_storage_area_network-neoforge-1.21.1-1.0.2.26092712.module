@@ -1,0 +1,60 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.retiredroca.mcstorageareanetwork",
+    "module": "mc_storage_area_network-neoforge-1.21.1",
+    "version": "1.0.2.26092712",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26092712.jar",
+          "url": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26092712.jar",
+          "size": 89619,
+          "sha512": "cd611f94e9825e580c6cd3bc0c4373c4532deeb56772afadd73a37e0903f5876468d91aaf3db9e9eea6cfcaf0e734dae5e61814e4c95531b2c722e994feeafcb",
+          "sha256": "91eec0212511bdefcd5c480015834f66c2f706a973eabbc92c070e416345969a",
+          "sha1": "3086d9be3dfbd8457f5f12f2efe4f88339ffa7a8",
+          "md5": "2d0aa0dd0f341989c8af67332fa2770b"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26092712.jar",
+          "url": "mc_storage_area_network-neoforge-1.21.1-1.0.2.26092712.jar",
+          "size": 89619,
+          "sha512": "cd611f94e9825e580c6cd3bc0c4373c4532deeb56772afadd73a37e0903f5876468d91aaf3db9e9eea6cfcaf0e734dae5e61814e4c95531b2c722e994feeafcb",
+          "sha256": "91eec0212511bdefcd5c480015834f66c2f706a973eabbc92c070e416345969a",
+          "sha1": "3086d9be3dfbd8457f5f12f2efe4f88339ffa7a8",
+          "md5": "2d0aa0dd0f341989c8af67332fa2770b"
+        }
+      ]
+    }
+  ]
+}

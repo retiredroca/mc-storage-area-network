@@ -28,6 +28,6 @@ Dye-coloured remote access terminals: place one, name it, then link and travel b
 [[dependencies.${mod_id}]]
     modId="mc_storage_area_network"
     type="required"
-    versionRange="${api_range}"
+    versionRange="[1.0.2,1.1)"
     ordering="AFTER"
     side="BOTH"
