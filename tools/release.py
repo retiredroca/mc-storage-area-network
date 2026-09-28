@@ -147,6 +147,34 @@ def bump(mod, stamp, dry=False):
     return changed, current
 
 
+def bump_semantic(mod, part, dry=False):
+    """Move the semantic version line, dropping the stamp so the build re-stamps it.
+
+    This is the only supported way to change <major>.<minor>.<patch>: the tooling stays the sole
+    writer of versions.properties, so a hand edit cannot drift from what the build and the tag
+    expect. A feature branch takes the next patch so its jars are distinguishable from the released
+    line by filename; a release that needs more asks for minor or major explicitly.
+    """
+    text = VERSIONS.read_text(encoding="utf-8")
+    current = read_props(VERSIONS)
+    changed = {c: False for c in COMPONENTS}
+    targets = COMPONENTS if mod == "all" else (mod,)
+    for comp in targets:
+        if comp not in COMPONENTS:
+            die(f"unknown mod '{mod}'")
+        current[comp] = versioning.bump_semantic(current[comp], part)
+        text = set_prop(text, comp, current[comp])
+        changed[comp] = True
+    if dry:
+        log(f"[dry-run] would bump {', '.join(targets)} to {part}: "
+            + ", ".join(f"{c}={current[c]}" for c in targets))
+    else:
+        VERSIONS.write_text(text, encoding="utf-8", newline="\n")
+        log(f"bumped {', '.join(targets)} to {part}: "
+            + ", ".join(f"{c}={current[c]}" for c in targets))
+    return changed, current
+
+
 # --- build --------------------------------------------------------------------------
 
 
@@ -571,10 +599,27 @@ def main():
                     help="build and stage the jars locally only: no commit, tag, push, GitHub release "
                          "or platform/CI publishing. versions.properties is still bumped so the local "
                          "jars carry the next version; undo with `git checkout -- versions.properties`.")
+    ap.add_argument("--bump", choices=("patch", "minor", "major"), default=None,
+                    help="move the semantic version line and stop: no build, no tag, no push. A feature "
+                         "branch takes the next patch so its jars are distinguishable from the released "
+                         "line by filename. Commits the change; --dry-run shows it without writing.")
+    ap.add_argument("--commit", action="store_true",
+                    help="with --bump, also commit the change (otherwise it is left staged for review)")
     args = ap.parse_args()
 
     dry = args.dry_run
     ensure_clean(args.allow_dirty)
+
+    # --bump is a standalone, version-only operation: it writes versions.properties and stops. It
+    # never builds or publishes, so it is safe to run in a worktree or a plain checkout.
+    if args.bump:
+        bump_semantic(args.mod, args.bump, dry)
+        if not dry and args.commit:
+            commit([VERSIONS], f"Bump {args.mod} to the {args.bump} line", dry, not args.unsigned)
+        elif not dry:
+            log("left uncommitted; review with `git diff versions.properties`, then "
+                "`git commit -am` or re-run with --commit")
+        return
 
     stamp = versioning.stamp()
     changed, versions = bump(args.mod, stamp, dry)
