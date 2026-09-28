@@ -47,17 +47,23 @@ def moduleBuildTask = { String id, String loader ->
 version = moduleVersion(libraryId)
 group = loadModule(libraryId).getProperty('group')
 
-// Bundles are declared in bundles.properties as bundle.<name>=<comma-separated module ids>, the same
-// file the release tooling reads to decide which bundles a release changed. The version is the
-// highest among the members, so a bundle's major.minor.patch tracks its own contents: raising the
-// library to 1.0.3 raises bundle-all to 1.0.3. It used to be a hardcoded '1.0.0.' plus the newest
-// stamp found inside, which held the numbers still and moved only when the stamp did.
+// Bundles are declared in bundles.properties: bundle.<name>=<ids>, plus a display title and a
+// one-line description. The same file is read by the release tooling to decide which bundles a
+// release changed and how many jars to expect, so membership exists once. The version is the highest
+// among the members, so a bundle's major.minor.patch tracks its own contents: raising the library to
+// 1.0.3 raises bundle-all to 1.0.3. It used to be a hardcoded '1.0.0.' plus the newest stamp found
+// inside, which held the numbers still and moved only when the stamp did.
+//
+// A bundle's container metadata is generated from this, not read from a template directory. It used
+// to be 16 hand-written directories under bundler/, where each bundle's member list appeared five
+// times over (fabric.mod.json jars, jarjar metadata.json paths, jarjar identifiers, and the nested
+// jar names themselves) and every one of them had to be edited by hand when a module was renamed.
 def bundleDefs = [:]
 def bundlesFile = file('bundles.properties')
 if (bundlesFile.exists()) {
     def bundleProps = new Properties()
     bundlesFile.withInputStream { bundleProps.load(it) }
-    bundleProps.stringPropertyNames().findAll { it.startsWith('bundle.') }.sort().each { key ->
+    bundleProps.stringPropertyNames().findAll { it ==~ /bundle\.[^.]+$/ }.sort().each { key ->
         def name = key.substring('bundle.'.length())
         def ids = bundleProps.getProperty(key).tokenize(',').collect { it.trim() }.findAll { it }
         if (ids.isEmpty()) {
@@ -67,7 +73,12 @@ if (bundlesFile.exists()) {
         if (!missing.isEmpty()) {
             throw new GradleException("bundles.properties: bundle '${name}' references unknown module(s): ${missing}")
         }
-        bundleDefs[name] = ids
+        bundleDefs[name] = [
+                ids    : ids,
+                title  : bundleProps.getProperty("bundle.${name}.title") ?: name.capitalize(),
+                blurb  : bundleProps.getProperty("bundle.${name}.description")
+                        ?: "One-file install: ${ids.collect { loadModule(it).getProperty('name') }.join(', ')}.",
+        ]
     }
 }
 def bundleVersionFor = { List<String> ids -> maxVersion(ids.collect { moduleVersion(it) }) }
@@ -92,26 +103,34 @@ def perUniversalJar = { String id ->
             : null
 }
 
-// The name a module's jar takes inside a bundle. The id is used, not the directory name: those two
-// used to differ (storage-network -> storage-network-fabric.jar for a mod whose id was
-// storage_network), which is the same module wearing two names in one archive.
-def nestedName = { String id, String loader -> "${id}-${loader}.jar" }
+// The name a module's jar takes inside a bundle: exactly the name it has as a release artifact, so
+// a nested jar and the standalone jar of the same mod are the same file name. It used to be the
+// directory name plus a loader suffix (storage-network-fabric.jar, for a module whose id is
+// storage_network) with no version, which is the same module wearing a second, different name inside
+// one archive -- and with duplicatesStrategy = EXCLUDE, two members colliding on that name would
+// have been silently dropped from the bundle. Distinct members now differ by id and version, so that
+// cannot happen.
+def nestedName = { String id, String loader -> jarFileName(id, moduleVersion(id), loader) }
 
-def staticTokens = [
-        '@@AUTHORS@@'          : 'Retired Roca',
-        '@@LICENSE@@'          : 'Apache-2.0',
-        '@@MC_VERSION@@'       : mc,
-        '@@MC_VERSION_RANGE@@' : mc,
-]
-// The version each module is built at, straight from versions.properties. This used to be recovered
-// by parsing the built jar's filename, which meant a rename to the naming scheme broke the bundle
-// templates at build time, and the parse was the only thing tying a template's declared dependency
-// version to a file name. The versions are already variables, so use them. The token names come from
-// the module ids, so a renamed module renames its token in the templates with it.
-def versionTokens = { ->
-    moduleDirById.keySet().sort().collectEntries { [(("@@${it.toUpperCase()}_VERSION@@")): moduleVersion(it)] }
+// Where a module's jar sits inside a bundle, per loader. Fabric reads META-INF/jars, NeoForge
+// JarJar reads META-INF/jarjar, and both resolve the nested jar by this path.
+def nestedPath = { String id, String loader -> "META-INF/${loader == 'fabric' ? 'jars' : 'jarjar'}/${nestedName(id, loader)}" }
+def nestedDir = { String loader -> loader == 'fabric' ? 'META-INF/jars' : 'META-INF/jarjar' }
+
+// The display name of a bundle's own mod entry, and its description. Both are derived from
+// bundles.properties so the three containers of one bundle cannot disagree about what it is.
+def bundleModId = { String name, String loader -> "mc_storage_area_network_bundle_${name}${loader == 'universal' ? '' : '_' + loader}" }
+def bundleDisplayName = { String name, String loader ->
+    def t = loadModule(libraryId).getProperty('name').replace(' API', '')
+    loader == 'universal' ? "${t} (${bundleDefs[name].title})" : "${t} (${bundleDefs[name].title}) (${loader == 'fabric' ? 'Fabric' : 'NeoForge'})"
 }
-def tokensFor = { String id -> staticTokens + versionTokens() + [('@@VERSION@@'): moduleVersion(id)] }
+def bundleDescription = { String name, String loader ->
+    def how = loader == 'universal' ? 'both loaders' : (loader == 'fabric' ? 'Fabric' : 'NeoForge')
+    "${bundleDefs[name].blurb} Works on ${how}; each loader loads only its own nested jars."
+}
+
+// A bundle's own licence and authors come from its first member's module.properties rather than
+// from a template, so a bundle cannot claim a licence its nested jars do not carry.
 
 // --- repo/ maven housekeeping -------------------------------------------------------
 def writeChecksums = { File f ->
@@ -236,6 +255,99 @@ tasks.register('ensureLibrary') {
     }
 }
 
+// --- generated container metadata -------------------------------------------------------------------
+// A bundle's fabric.mod.json, neoforge.mods.toml and jarjar metadata.json are written here rather
+// than kept as template files, so a module's id, group, version and nested jar path are read from
+// module.properties and versions.properties instead of being copied into 16 hand-written
+// directories. The jar paths and the renames below come from the same nestedName/nestedPath, so the
+// declared path and the file actually placed there cannot disagree.
+//
+// JarJar's identifier is only used to detect conflicting nested jars (ContainedJarIdentifier is
+// {group, artifact} and is never compared against the nested mod's own modId), so the artifact is
+// spelled from the module id for consistency with the maven artifactId.
+def generatedMetadata = { String bundleName, String kind, List<String> ids, String version ->
+    def dir = layout.buildDirectory.dir("generated/bundles/${bundleName}/${kind}").get().asFile
+    new File(dir, 'META-INF/jarjar').mkdirs()   // the toml sits in META-INF, the jarjar metadata below it
+    def json = groovy.json.JsonOutput
+    def modId = bundleModId(bundleName, kind)
+    def display = bundleDisplayName(bundleName, kind)
+    def blurb = bundleDescription(bundleName, kind)
+    def license = loadModule(ids[0]).getProperty('license') ?: 'All-Rights-Reserved'
+    def authors = loadModule(ids[0]).getProperty('authors') ?: 'Unknown'
+
+    if (kind == 'fabric' || kind == 'universal') {
+        def mods = ids.collect { [file: nestedPath(it, 'fabric')] }
+        def fabric = [schemaVersion: 1, id: modId, version: version, name: display,
+                      description: blurb, authors: [authors], license: license,
+                      environment: '*', jars: mods]
+        new File(dir, 'fabric.mod.json').text = json.prettyPrint(json.toJson(fabric)) + '\n'
+    }
+    if (kind == 'neoforge' || kind == 'universal') {
+        def toml = 'modLoader="javafml"\n' +
+                'loaderVersion="[1,)"\n' +
+                "license=\"${license}\"\n\n" +
+                '[[mods]]\n' +
+                "modId=\"${modId}\"\n" +
+                "version=\"${version}\"\n" +
+                "displayName=\"${display}\"\n" +
+                "description='''${blurb}'''\n"
+        new File(dir, 'META-INF/neoforge.mods.toml').text = toml
+        def jarjar = [jars: ids.collect { id ->
+            [identifier : [group: loadModule(id).getProperty('group'),
+                           artifact: "${id}-neoforge"],
+             version    : [range: '[1,)', artifactVersion: moduleVersion(id)],
+             path       : nestedPath(id, 'neoforge'),
+             isObfuscated: false]
+        }]
+        new File(dir, 'META-INF/jarjar/metadata.json').text = json.prettyPrint(json.toJson(jarjar)) + '\n'
+    }
+    return dir
+}
+
+/**
+ * Universal library jar: thin container nesting the loader-specific library jars so each loader
+ * loads only its own copy of the library's public api package. The root builds this one because the
+ * library is a split module with no build root of its own to build it in.
+ */
+// The library universal container's metadata, generated rather than read from bundler/.
+def generateLibraryUniversalMetadata = tasks.register('generateLibraryUniversalMetadata') {
+    group = 'build'
+    description = 'Generate the library universal container metadata.'
+    def libVersion = moduleVersion(libraryId)
+    def props = loadModule(libraryId)
+    inputs.property 'libraryVersion', libVersion
+    inputs.property 'libraryId', libraryId
+    def outDir = layout.buildDirectory.dir('generated/bundles/library/universal')
+    outputs.dir outDir
+    doLast {
+        def dir = outDir.get().asFile
+        new File(dir, 'META-INF/jarjar').mkdirs()
+        def json = groovy.json.JsonOutput
+        def modId = 'mc_storage_area_network_bundle'
+        // The library container is the one bundle with no bundles.properties entry: it carries the
+        // library alone, and its description explains why it exists at all.
+        def display = "${props.getProperty('name')} (Universal)"
+        def blurb = "Universal distribution of the ${props.getProperty('name')}. Bundles the Fabric " +
+                "and NeoForge builds; each loader loads only its own nested copy, so the public " +
+                "${props.getProperty('group')}.api package stays intact."
+        new File(dir, 'fabric.mod.json').text = json.prettyPrint(json.toJson(
+                [schemaVersion: 1, id: modId, version: libVersion, name: display,
+                 description: blurb, authors: [props.getProperty('authors')],
+                 license: props.getProperty('license'), environment: '*',
+                 jars: [[file: nestedPath(libraryId, 'fabric')]]])) + '\n'
+        new File(dir, 'META-INF/neoforge.mods.toml').text =
+                'modLoader="javafml"\nloaderVersion="[1,)"\n' +
+                "license=\"${props.getProperty('license')}\"\n\n[[mods]]\n" +
+                "modId=\"${modId}\"\nversion=\"${libVersion}\"\n" +
+                "displayName=\"${display}\"\ndescription='''${blurb}'''\n"
+        new File(dir, 'META-INF/jarjar/metadata.json').text = json.prettyPrint(json.toJson(
+                [jars: [[identifier: [group: props.getProperty('group'),
+                                      artifact: "${libraryId}-neoforge"],
+                         version: [range: '[1,)', artifactVersion: libVersion],
+                         path: nestedPath(libraryId, 'neoforge'), isObfuscated: false]]])) + '\n'
+    }
+}
+
 /**
  * Universal library jar: thin container nesting the loader-specific library jars so each loader
  * loads only its own copy of the library's public api package. The root builds this one because the
@@ -247,16 +359,10 @@ tasks.register('libraryUniversalJar', Jar) {
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    from('bundler/bundle') {
-        filter { String line ->
-            def out = line
-            tokensFor(libraryId).each { token, value -> out = out.replace(token, value) }
-            out
-        }
-    }
+    from(generateLibraryUniversalMetadata)
     ['fabric', 'neoforge'].each { l ->
         from({ def f = perLoaderJar(libraryId, l); f == null ? [] : f }) {
-            into(l == 'fabric' ? 'META-INF/jars' : 'META-INF/jarjar')
+            into nestedDir(l)
             rename { nestedName(libraryId, l) }
         }
     }
@@ -268,24 +374,29 @@ tasks.register('libraryUniversalJar', Jar) {
  */
 // `kind` and `bundleKey` replace the old compound artifactPrefix (e.g. "universal-bundle-all"),
 // so the archive name comes from jarFileName like every other release artifact.
-def registerBundle = { String taskName, String templateDir, String kind, String bundleKey, String bundleVersion, List fabMods, List neoMods ->
+def registerBundle = { String taskName, String bundleName, String kind, String bundleVersion, List fabMods, List neoMods ->
+    def ids = (fabMods + neoMods).unique()
+    def suffix = bundleName.capitalize() + kind.capitalize()
+    def genTask = tasks.register("generateBundle${suffix}") {
+        group = 'build'
+        description = "Generate the ${kind} container metadata for bundle '${bundleName}'."
+        def outDir = layout.buildDirectory.dir("generated/bundles/${bundleName}/${kind}")
+        inputs.property 'bundleVersion', bundleVersion
+        inputs.property 'memberVersions', ids.collectEntries { [(it): moduleVersion(it)] }
+        outputs.dir outDir
+        doLast {
+            generatedMetadata(bundleName, kind, ids, bundleVersion)
+        }
+    }
     def t = tasks.register(taskName, Jar) {
         def staged = delegate
         fabMods.each { m -> dependOnLoader(staged, m, 'fabric') }
         neoMods.each { m -> dependOnLoader(staged, m, 'neoforge') }
-            archiveFileName = jarFileName("bundle-${bundleKey}", bundleVersion, kind)
+            archiveFileName = jarFileName("bundle-${bundleName}", bundleVersion, kind)
         destinationDirectory = layout.buildDirectory.dir('libs')
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-        from(templateDir) {
-            filter { String line ->
-                def out = line
-                (['@@VERSION@@': bundleVersion] + staticTokens + versionTokens()).each { token, value ->
-                    out = out.replace(token, value)
-                }
-                out
-            }
-        }
+        from(genTask)
         fabMods.each { m ->
             from({ def f = perLoaderJar(m, 'fabric'); f == null ? [] : f }) {
                 into 'META-INF/jars'
@@ -305,11 +416,12 @@ def registerBundle = { String taskName, String templateDir, String kind, String 
 // Every bundle in bundles.properties becomes three containers: a universal one carrying both
 // loaders' copies, and one per loader. Iterating the map means a new bundle is a line in
 // bundles.properties and nothing here.
-bundleDefs.each { bundleName, ids ->
+bundleDefs.each { bundleName, spec ->
+    def ids = spec.ids
     def bVersion = bundleVersionFor(ids)
-    registerBundle("bundle${bundleName.capitalize()}Jar", "bundler/bundle-${bundleName}", 'universal', bundleName, bVersion, ids, ids)
-    registerBundle("fabricBundle${bundleName.capitalize()}Jar", "bundler/bundle-${bundleName}-fabric", 'fabric', bundleName, bVersion, ids, [])
-    registerBundle("neoforgeBundle${bundleName.capitalize()}Jar", "bundler/bundle-${bundleName}-neoforge", 'neoforge', bundleName, bVersion, [], ids)
+    registerBundle("bundle${bundleName.capitalize()}Jar", bundleName, 'universal', bVersion, ids, ids)
+    registerBundle("fabricBundle${bundleName.capitalize()}Jar", bundleName, 'fabric', bVersion, ids, [])
+    registerBundle("neoforgeBundle${bundleName.capitalize()}Jar", bundleName, 'neoforge', bVersion, [], ids)
 }
 
 /**
@@ -369,11 +481,15 @@ tasks.register('releaseUniversal', Sync) {
     // composite module merges its own universal jar, and the discovered set says which is which.
     dependsOn 'libraryUniversalJar'
     from(tasks.named('libraryUniversalJar'))
-    moduleDirById.keySet().sort().findAll { !isComposite(it) || it != libraryId }.each { m ->
+    moduleDirById.keySet().sort().findAll { it != libraryId }.each { m ->
         dependOnUniversal(staged, m)
-        def f = perUniversalJar(m)
-        if (f != null) {
-            from(f) { rename { jarFileName(m, moduleVersion(m), 'universal') } }
+        // The closure form matters: perUniversalJar() resolves at configuration time, and right
+        // after a clean the jar does not exist yet, so an eager from(f) silently contributed
+        // nothing and the release set came out four jars short with no failure. The per-loader jars
+        // below were already lazy, which is why only the universals went missing. releaseJars'
+        // doFirst check is what now catches a universal jar that really is missing.
+        from({ def f = perUniversalJar(m); f == null ? [] : f }) {
+            rename { jarFileName(m, moduleVersion(m), 'universal') }
         }
     }
 }

@@ -55,13 +55,20 @@ def library_ids(mc):
 
 
 def bundle_definitions(mc):
-    """bundles.properties as an ordered {name: [module ids]} map, skipping empty bundles."""
+    """bundles.properties as an ordered {name: [module ids]} map, skipping empty bundles.
+
+    Only bare `bundle.<name>` keys are membership. `bundle.<name>.title` and
+    `bundle.<name>.description` are the container's display strings and must not be counted as
+    bundles: a startswith("bundle.") filter picks them up, and each then looks like a bundle with one
+    bogus member, which doubles expected_jars and puts a publish gate on a bundle that does not exist.
+    gradle/versions.gradle and build.gradle use the same pattern.
+    """
     path = ROOT / "bundles.properties"
     if not path.exists():
         return {}
     props = read_props(path)
     out = {}
-    for key in sorted(k for k in props if k.startswith("bundle.")):
+    for key in sorted(k for k in props if re.fullmatch(r"bundle\.[^.]+", k)):
         ids = [i.strip() for i in props[key].split(",") if i.strip()]
         if ids:
             out[key[len("bundle."):]] = ids
