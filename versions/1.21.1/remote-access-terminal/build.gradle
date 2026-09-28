@@ -9,14 +9,14 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
 // Remote Access Terminal version from versions.properties (bumped only when it changed).
-version = accessVersion
+version = mod_version
 group = 'com.retiredroca.remoteaccessterminal'
 
 // Exact, version-pinned lookup of a loader jar, matching the name the loader build writes. A scan
 // for "the newest jar in the directory" would accept a mis-named or stale file; naming it exactly
 // means a wrong name fails the build instead of silently packaging the wrong jar.
 def loaderJar = { String loader, String version ->
-    def f = file("${loader}/build/libs/${jarFileName('remote_access_terminal', version, loader)}")
+    def f = file("${loader}/build/libs/${jarFileName(mod_id, version, loader)}")
     f.exists() ? f : null
 }
 
@@ -32,16 +32,16 @@ tasks.register('universalJar', Jar) {
     // Named from the maven mod id, not the directory name, so the universal jar matches the
     // per-loader jars: <mod-id>-<version>-universal.jar. This build publishes nothing, so the
     // name is free to change.
-    archiveFileName = jarFileName('remote_access_terminal', accessVersion, 'universal')
+    archiveFileName = jarFileName(mod_id, mod_version, 'universal')
     destinationDirectory = layout.buildDirectory.dir('libs')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     from({
-        def jar = loaderJar('fabric', accessVersion)
+        def jar = loaderJar('fabric', mod_version)
         jar == null ? [] : zipTree(jar)
     })
     from({
-        def jar = loaderJar('neoforge', accessVersion)
+        def jar = loaderJar('neoforge', mod_version)
         jar == null ? [] : zipTree(jar)
     }) {
         include 'com/retiredroca/remoteaccessterminal/neoforge/**'
@@ -61,7 +61,7 @@ tasks.named('build') {
         if (!libs.isDirectory()) {
             return
         }
-        def keep = [jarFileName('remote_access_terminal', accessVersion, 'universal').toString()] as Set
+        def keep = [jarFileName(mod_id, mod_version, 'universal').toString()] as Set
         libs.listFiles()?.each { f ->
             if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
                 f.delete()

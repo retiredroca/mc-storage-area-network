@@ -18,16 +18,30 @@ rootProject.name = 'mc-storage-area-network'
 // `-Pmc=<version>` (default 1.21.1). Only that version's builds are included, which keeps
 // configuration fast and focuses the IDE on one version at a time.
 def mc = providers.gradleProperty('mc').getOrElse('1.21.1')
-def versionRoot = "versions/${mc}"
+def versionRoot = file("versions/${mc}")
 
-// The loader builds are separate (included) builds because Fabric Loom and NeoGradle
-// cannot share a single Gradle project. Each version's root project merges their outputs
-// into one universal jar that both loaders accept.
-includeBuild("${versionRoot}/api/fabric")
-includeBuild("${versionRoot}/api/neoforge")
-
-// The gameplay mods live in this monorepo as child builds and depend on the API.
-includeBuild("${versionRoot}/storage-network")
-includeBuild("${versionRoot}/crafting-network")
-includeBuild("${versionRoot}/network-routing")
-includeBuild("${versionRoot}/remote-access-terminal")
+// Each module under versions/<mc>/ is a directory with a module.properties declaring its identity,
+// plus common/, fabric/ and neoforge/ sources. Two shapes exist, and the difference is on disk
+// rather than in a table here:
+//
+//   * A composite module (versions/<mc>/<module>/settings.gradle exists) is its own build root. It
+//     includes its own fabric/ and neoforge/ halves and exposes :buildFabric / :buildNeo aliases
+//     plus the merged :universalJar, so the root includes the module directory itself.
+//   * A split module has no build root of its own; the root includes its two loader halves
+//     directly. The API works this way.
+//
+// Discovering by directory rather than by a hand-written list means adding a module is a matter of
+// adding a directory, and the names below are derived from the directory that was found.
+versionRoot.listFiles()
+        ?.findAll { it.isDirectory() && new File(it, 'fabric').exists() && new File(it, 'neoforge').exists() }
+        ?.sort { it.name }
+        ?.each { module ->
+            if (new File(module, 'settings.gradle').exists()) {
+                includeBuild("versions/${mc}/${module.name}")
+            } else {
+                // Named, not the bare 'fabric'/'neoforge' the directory would default to: those
+                // are global in the root build, so a second split module would collide with them.
+                includeBuild("versions/${mc}/${module.name}/fabric") { name = "${module.name}-fabric" }
+                includeBuild("versions/${mc}/${module.name}/neoforge") { name = "${module.name}-neoforge" }
+            }
+        }

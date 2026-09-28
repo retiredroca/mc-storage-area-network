@@ -15,7 +15,7 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
 // API version comes from versions.properties (bumped only when the API changed).
-version = apiVersion
+version = mod_version
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -40,7 +40,7 @@ sourceSets {
 base {
     archivesName = mod_id
 }
-tasks.named('jar') { archiveFileName = jarFileName(mod_id, apiVersion, 'neoforge') }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, mod_version, 'neoforge') }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
 
@@ -128,8 +128,8 @@ tasks.named('build') {
         if (!libs.isDirectory()) {
             return
         }
-        def keep = [jarFileName(mod_id, apiVersion, 'neoforge').toString(),
-                    jarFileName(mod_id, apiVersion, 'sources').toString()] as Set
+        def keep = [jarFileName(mod_id, mod_version, 'neoforge').toString(),
+                    jarFileName(mod_id, mod_version, 'sources').toString()] as Set
         libs.listFiles()?.each { f ->
             if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
                 f.delete()

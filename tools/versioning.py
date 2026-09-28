@@ -9,17 +9,21 @@ Scheme: ``<major>.<minor>.<patch>.<yymmddhh>`` — e.g. ``1.0.2.26091512``.
   never hand-edited, so the tooling stays the only thing that writes versions.properties;
 * the tag is ``v<major>.<minor>.<patch>.<stamp>`` (single series, e.g. ``v1.0.2.26091512``).
 
-Hosts depend on the API with a **floor range** derived from the API's first three components, so an
-older API can never silently satisfy a host:
-    gradle.properties   api_version=[<floor>,FLOOR_UPPER)
-    fabric.mod.json     "mc_storage_area_network": "~<floor>"
-    neoforge.mods.toml  versionRange="[<floor>,FLOOR_UPPER)"
+Modules depend on the library through a **floor range** derived from the library's first three
+components, so an older library can never silently satisfy a dependant. The range is computed at
+configuration time from versions.properties (see moduleFloor in gradle/versions.gradle) and the
+metadata carries it as a token the build substitutes:
+
+    fabric.mod.json     "mc_storage_area_network": "~${mc_storage_area_network_range}"
+    neoforge.mods.toml  versionRange="[${mc_storage_area_network_range},FLOOR_UPPER)"
+
+So there is nothing to rewrite on a bump, and no file in which a stale range can survive.
 
 CLI:
     python tools/versioning.py stamp
     python tools/versioning.py bump <value> <stamp>
-    python tools/versioning.py tag  --api <apiVersion> --stamp <stamp>
-    python tools/versioning.py floor --api <apiVersion> [--mc <mc>]   # apply to hosts when --mc given
+    python tools/versioning.py tag  --api <libraryVersion> --stamp <stamp>
+    python tools/versioning.py floor --api <libraryVersion> [--mc <mc>] [--lib <moduleId>]
 """
 
 import argparse
@@ -101,58 +105,81 @@ def tag(version: str, stamp: str) -> str:
     return f"v{floor(version)}.{stamp}"
 
 
-# --- host floor rewriting -----------------------------------------------------------
+# --- modules ---------------------------------------------------------------------------
+# Module identity lives in each module's versions/<mc>/<module>/module.properties, which is the same
+# file gradle/versions.gradle reads. A module's id is its versions.properties key, its release jar
+# name, its maven artifactId and its assets/data namespace, so nothing here needs to map between
+# those spellings.
 
 
-def _sub(path: Path, pattern: str, repl: str, dry: bool = False) -> bool:
-    text = path.read_text(encoding="utf-8")
-    new = re.sub(pattern, repl, text)
-    if new != text:
-        # dry: report the change without writing, so a dry run leaves the tree clean.
-        if not dry:
-            path.write_text(new, encoding="utf-8")
-        return True
-    return False
+def load_props(path: Path) -> dict:
+    """A .properties file as a dict. Comments and blank lines are dropped."""
+    props = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if "=" in line:
+            key, _, value = line.partition("=")
+            props[key.strip()] = value.strip()
+    return props
 
 
-def _rewrite_props(path: Path, f: str, dry: bool = False) -> bool:
-    return _sub(path, r"(?m)^api_version=.*$", f"api_version=[{f},{FLOOR_UPPER})", dry)
-
-
-def _rewrite_fabric(path: Path, f: str, dry: bool = False) -> bool:
-    return _sub(path, r'("mc_storage_area_network"\s*:\s*")[^"]*(")',
-                rf"\g<1>~{f}\g<2>", dry)
-
-
-def _rewrite_neoforge(path: Path, f: str, dry: bool = False) -> bool:
-    return _sub(path, r'(?s)(modId="mc_storage_area_network".*?versionRange=")[^"]*(")',
-                rf"\g<1>[{f},{FLOOR_UPPER})\g<2>", dry)
-
-
-def apply_floor(mc: str, api_version: str, dry: bool = False) -> list:
-    """Point every gameplay host in versions/<mc> at the API floor. Returns the changed paths."""
-    f = floor(api_version)
+def modules(mc: str) -> list:
+    """Every module under versions/<mc>/ as (dir, properties)."""
     base = ROOT / "versions" / mc
     if not base.is_dir():
-        sys.exit(f"versioning: versions/{mc} not found")
-    changed = []
-    for mod_dir in sorted(p for p in base.iterdir() if p.is_dir()):
+        return []
+    result = []
+    for module_dir in sorted(p for p in base.iterdir() if p.is_dir()):
+        props_file = module_dir / "module.properties"
+        if props_file.exists():
+            result.append((module_dir, load_props(props_file)))
+    return result
+
+
+def module_ids(mc: str) -> list:
+    return [props.get("id") for _, props in modules(mc) if props.get("id")]
+
+
+def libraries(mc: str) -> list:
+    """Modules marked library=true: (module id, directory, group)."""
+    out = []
+    for module_dir, props in modules(mc):
+        if (props.get("library") or "false").strip().lower() == "true":
+            out.append((props.get("id"), module_dir, props.get("group")))
+    return out
+
+
+# --- dependents ---------------------------------------------------------------------
+# A module asks for a library through a floor range computed at configuration time from
+# versions.properties (see gradle/versions.gradle's moduleFloor), and its metadata carries the floor
+# as a token the build substitutes. So there is nothing to rewrite on a bump, and nothing here that
+# could write a range matching nothing: versions.properties is the single source of truth.
+#
+# This replaces a set of regexes that rewrote the range into every dependant's fabric.mod.json,
+# neoforge.mods.toml and gradle.properties in place. Those rewrites were the one version constraint
+# in the project no build step checked, and a missing key produced "[,1.1)" rather than an error.
+
+
+def floor_paths(mc: str, lib_id: str) -> list:
+    """The metadata files that declare the library dependency, for reporting."""
+    paths = []
+    for module_dir, props in modules(mc):
+        if (props.get("id") or "").strip() == lib_id:
+            continue
+        depends = [d.strip() for d in (props.get("depends") or "").split(",") if d.strip()]
+        if lib_id not in depends:
+            continue
         for loader in ("fabric", "neoforge"):
-            loader_dir = mod_dir / loader
+            loader_dir = module_dir / loader
             if not loader_dir.is_dir():
                 continue
-            props = loader_dir / "gradle.properties"
-            if props.exists() and _rewrite_props(props, f, dry):
-                changed.append(str(props.relative_to(ROOT)))
-            if loader == "fabric":
-                meta = loader_dir / "src/main/resources/fabric.mod.json"
-                if meta.exists() and _rewrite_fabric(meta, f, dry):
-                    changed.append(str(meta.relative_to(ROOT)))
-            else:
-                meta = loader_dir / "src/main/resources/META-INF/neoforge.mods.toml"
-                if meta.exists() and _rewrite_neoforge(meta, f, dry):
-                    changed.append(str(meta.relative_to(ROOT)))
-    return changed
+            meta = (loader_dir / "src/main/resources/fabric.mod.json" if loader == "fabric"
+                    else loader_dir / "src/main/resources/META-INF/neoforge.mods.toml")
+            if meta.exists():
+                paths.append(str(meta.relative_to(ROOT)))
+    return paths
 
 
 def main() -> int:
@@ -172,19 +199,27 @@ def main() -> int:
     p_tag.set_defaults(func=lambda a: print(tag(a.api, a.stamp)))
 
     p_floor = sub.add_parser("floor")
-    p_floor.add_argument("--api", required=True)
+    p_floor.add_argument("--api", required=True, help="the library version to derive the floor from")
     p_floor.add_argument("--mc", default=None)
+    p_floor.add_argument("--lib", default=None, help="library module id (default: the only library)")
 
     def do_floor(a):
         f = floor(a.api)
-        if a.mc:
-            changed = apply_floor(a.mc, a.api)
-            for path in changed:
-                print(f"floor -> [{f},{FLOOR_UPPER})  {path}")
-            if not changed:
-                print(f"floor already [{f},{FLOOR_UPPER})")
-        else:
+        if a.mc is None:
             print(f)
+            return
+        libs = libraries(a.mc)
+        lib_id = a.lib
+        if lib_id is None:
+            if len(libs) != 1:
+                sys.exit(f"versioning: --lib is required when the project has "
+                         f"{len(libs)} libraries ({[x[0] for x in libs]})")
+            lib_id = libs[0][0]
+        # Nothing is rewritten: dependants resolve this floor at configuration time from
+        # versions.properties. Listing them makes the dependency visible in CI logs.
+        print(f"floor [{f},{FLOOR_UPPER}) for '{lib_id}'")
+        for path in floor_paths(a.mc, lib_id):
+            print(f"  dependant: {path}")
 
     p_floor.set_defaults(func=do_floor)
 

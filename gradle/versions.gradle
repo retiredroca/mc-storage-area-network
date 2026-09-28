@@ -12,6 +12,14 @@ def findUp = { String name ->
     d == null ? null : new File(d, name)
 }
 
+def loadProps = { File f ->
+    def p = new Properties()
+    if (f != null) {
+        f.withInputStream { p.load(it) }
+    }
+    return p
+}
+
 def versionsFile = findUp('versions.properties')
 if (versionsFile == null) {
     throw new GradleException("versions.properties not found above ${projectDir}")
@@ -117,23 +125,96 @@ ext.maxVersion = { List<String> versions ->
 }
 
 
-ext.apiVersion = stampVersion(componentVersions.getProperty('api'))
-ext.storageVersion = stampVersion(componentVersions.getProperty('storage'))
-ext.craftingVersion = stampVersion(componentVersions.getProperty('crafting'))
-ext.routingVersion = stampVersion(componentVersions.getProperty('routing'))
-ext.accessVersion = stampVersion(componentVersions.getProperty('access'))
+// Module identity (only present inside versions/<mc>/<module>/...). This is the single declaration
+// of a module's id, group and the modules it depends on: the root build discovers modules by the
+// presence of this file, the loader builds read it through findUp, and tools/versioning.py and
+// tools/release.py read the same file. It is its own file rather than gradle.properties entries
+// because a composite module's root build (versions/<mc>/<module>/build.gradle) is its own Gradle
+// build root and cannot see a sub-build's project properties -- a mod_id in gradle.properties was
+// invisible in exactly the place that needed it, which is why those roots hardcoded the id.
+ext.mod_depends = []      // a build with no module.properties above it has no dependencies
+def moduleFile = findUp('module.properties')
+if (moduleFile != null) {
+    def module = loadProps(moduleFile)
+    ext.moduleProperties = module
+    ext.mod_id = module.getProperty('id')
+    ext.mod_name = module.getProperty('name')
+    ext.mod_group_id = module.getProperty('group')
+    ext.mod_authors = module.getProperty('authors')
+    ext.mod_license = module.getProperty('license')
+    ext.mod_description = module.getProperty('description')
+    ext.mod_version = stampVersion(componentVersions.getProperty(ext.mod_id))
+    ext.mod_library = (module.getProperty('library') ?: 'false').toBoolean()
+    ext.mod_depends = (module.getProperty('depends') ?: '')
+            .tokenize(',').collect { it.trim() }.findAll { it }
+}
 
-// The API's version floor, and the two loader-specific dependency ranges built from it. These
-// were hand-written literals in every mod's metadata ("~1.0.2" and "[1.0.2,1.1)"), which made
-// them the one version constraint in the project that nothing kept in step with
-// versions.properties: bump the API's minor to 1.1 and every dependent mod stops matching it,
-// while the build stays green because Gradle pins the exact version. Deriving them here means
-// the API version is declared once, in versions.properties.
+// The library module is the release line: its version is what the tag is keyed on and what every
+// other module's floor is derived from. Modules find it through their own module.properties
+// (library=true, and mod_depends names it); the root project has no module.properties above it, so
+// the root build resolves the library from its own module scan instead.
 ext.floorUpper = pyConst('FLOOR_UPPER', '1.1')   // single source: tools/versioning.py
-ext.apiFloor = apiVersion.tokenize('.').take(3).join('.')
-ext.apiRangeFabric = "~${ext.apiFloor}"
-ext.apiRangeNeo = "[${ext.apiFloor},${ext.floorUpper})"
-// Selecting a bundle version is maxVersion over the member components, above. It is deliberately
+
+// Sibling modules. A module's build needs the group and version floor of each id in its
+// module.properties `depends=`, and those live in the dependency's own module.properties -- which is
+// not an ancestor of this build, so findUp cannot reach it. Scanning versions/<mc>/ here means the
+// root build, the composite module roots and the loader builds all resolve module identity the same
+// way, instead of each keeping its own idea of it.
+def mcSelected = providers.gradleProperty('mc').getOrElse('1.21.1')
+def versionsBase = new File(versionsFile.parentFile, "versions/${mcSelected}")
+ext.moduleProps = [:]
+ext.moduleDirById = [:]
+(versionsBase.listFiles() ?: new File[0]).sort { it.name }.each { d ->
+    if (!d.isDirectory()) {
+        return
+    }
+    def f = new File(d, 'module.properties')
+    if (!f.exists()) {
+        return
+    }
+    def p = loadProps(f)
+    def id = p.getProperty('id')
+    if (id) {
+        ext.moduleProps[id] = p
+        ext.moduleDirById[id] = d
+    }
+}
+
+ext.moduleGroup = { String id ->
+    def p = moduleProps[id]
+    if (p == null) {
+        throw new GradleException("No module '${id}' under versions/${mcSelected} (known: ${moduleProps.keySet().sort()})")
+    }
+    return p.getProperty('group')
+}
+
+ext.moduleFloorOf = { String id ->
+    def version = componentVersions.getProperty(id)
+    if (version == null) {
+        throw new GradleException("versions.properties has no '${id}=' entry (modules: ${moduleProps.keySet().sort()})")
+    }
+    return version.tokenize('.').take(3).join('.')
+}
+
+// A dependency's floor range: [<major.minor.patch>,<floorUpper>), read from versions.properties at
+// configuration time. This is what replaces the hand-written "~1.0.2" / "[1.0.2,1.1)" literals that
+// used to sit in every host's metadata and in every host's gradle.properties, maintained by
+// rewriting those files on each bump. Deriving it means the declared dependency is the one the build
+// actually resolves against, and a renamed or missing key stops the build instead of quietly
+// publishing a range that matches nothing.
+ext.moduleFloor = { String id -> "[${moduleFloorOf(id)},${floorUpper})" }
+
+// One token per dependency for processResources, so a metadata file can write
+// "~${mc_storage_area_network_range}" / versionRange="${mc_storage_area_network_range}" and have the
+// floor follow versions.properties. The range syntax stays visible in the metadata file, where a
+// reader expects it, and only the number is substituted.
+ext.dependencyTokens = { ->
+    def t = [:]
+    mod_depends.each { dep -> t["${dep}_range"] = moduleFloorOf(dep) }
+    return t
+}
+
+// Selecting a bundle version is maxVersion over the member modules, above. It is deliberately
 // not a "newest stamp wins" rule over a fixed prefix: a version is ordered as a whole, and a string
 // max over the stamp column would rank them lexically.
 

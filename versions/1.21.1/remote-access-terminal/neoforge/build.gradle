@@ -20,7 +20,7 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
 // Remote Access Terminal version from versions.properties (bumped only when it changed).
-version = accessVersion
+version = mod_version
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -90,7 +90,7 @@ sourceSets {
 base {
     archivesName = mod_id
 }
-tasks.named('jar') { archiveFileName = jarFileName(mod_id, accessVersion, 'neoforge') }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, mod_version, 'neoforge') }
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
@@ -164,7 +164,12 @@ dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
 
     // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
-    implementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-neoforge-${targetMc}:${api_version}"
+    // The modules this one depends on (module.properties `depends=`), resolved from the in-repo maven
+    // by an exact artifactId and a floor range taken from that module's versions.properties entry --
+    // the same floor this build writes into the module's own metadata below.
+    mod_depends.each { dep ->
+        implementation "${moduleGroup(dep)}:${dep}-neoforge-${targetMc}:${moduleFloor(dep)}"
+    }
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -194,6 +199,8 @@ dependencies {
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
 tasks.withType(ProcessResources).configureEach {
+    // One "<dep-id>_range" token per entry in module.properties `depends=`, carrying that
+    // dependency's floor. The "[<floor>,<upper>)" brackets stay in the metadata file.
     var replaceProperties = [
             minecraft_version      : minecraft_version,
             neo_version            : neo_version,
@@ -201,9 +208,8 @@ tasks.withType(ProcessResources).configureEach {
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            api_range              : apiRangeNeo,
-            mod_version            : accessVersion,
-    ]
+            mod_version            : mod_version,
+    ] + dependencyTokens()
     inputs.properties replaceProperties
 
     filesMatching(['META-INF/neoforge.mods.toml']) {
@@ -248,8 +254,8 @@ tasks.named('build') {
         if (!libs.isDirectory()) {
             return
         }
-        def keep = [jarFileName(mod_id, accessVersion, 'neoforge').toString(),
-                    jarFileName(mod_id, accessVersion, 'sources').toString()] as Set
+        def keep = [jarFileName(mod_id, mod_version, 'neoforge').toString(),
+                    jarFileName(mod_id, mod_version, 'sources').toString()] as Set
         libs.listFiles()?.each { f ->
             if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
                 f.delete()

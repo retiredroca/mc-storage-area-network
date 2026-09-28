@@ -10,7 +10,7 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
 // API version comes from versions.properties (bumped only when the API changed).
-version = apiVersion
+version = mod_version
 group = mod_group_id
 
 // Name the jar here rather than via archiveClassifier: a classifier is inherited by the maven
@@ -19,8 +19,8 @@ group = mod_group_id
 base {
     archivesName = mod_id
 }
-tasks.named('jar') { archiveFileName = jarFileName(mod_id, apiVersion, 'fabric') }
-tasks.named('remapJar') { archiveFileName = jarFileName(mod_id, apiVersion, 'fabric') }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, mod_version, 'fabric') }
+tasks.named('remapJar') { archiveFileName = jarFileName(mod_id, mod_version, 'fabric') }
 
 repositories {
 }
@@ -54,15 +54,20 @@ processResources {
     inputs.property "mod_name", mod_name
     inputs.property "mod_license", mod_license
     inputs.property "mod_authors", mod_authors
+    dependencyTokens().each { token, value -> inputs.property token, value }
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version,
-                "minecraft_version": minecraft_version,
-                "loader_version": loader_version,
-                "mod_id": mod_id,
-                "mod_name": mod_name,
-                "mod_license": mod_license,
-                "mod_authors": mod_authors
+        // dependencyTokens() adds one "<dep-id>_range" token per entry in module.properties
+        // `depends=`, carrying that dependency's floor. The "~" stays in the metadata file, so the
+        // range syntax a reader cares about is visible there and only the number is substituted.
+        def tokens = ["version"          : project.version,
+                      "minecraft_version": minecraft_version,
+                      "loader_version"   : loader_version,
+                      "mod_id"           : mod_id,
+                      "mod_name"         : mod_name,
+                      "mod_license"      : mod_license,
+                      "mod_authors"      : mod_authors] + dependencyTokens()
+        expand tokens
     }
 }
 
@@ -116,8 +121,8 @@ tasks.named('build') {
         if (!libs.isDirectory()) {
             return
         }
-        def keep = [jarFileName(mod_id, apiVersion, 'fabric').toString(),
-                    jarFileName(mod_id, apiVersion, 'sources').toString()] as Set
+        def keep = [jarFileName(mod_id, mod_version, 'fabric').toString(),
+                    jarFileName(mod_id, mod_version, 'sources').toString()] as Set
         libs.listFiles()?.each { f ->
             if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
                 f.delete()

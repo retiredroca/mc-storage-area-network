@@ -73,72 +73,68 @@ jobs:
 
       # Only the component(s) in the trigger get a new version (the trailing yymmddhh stamp is
       # replaced; the patch is manual). Everything else keeps its version.
-      - name: Bump component versions
+      - name: Bump module versions
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
-          mod='${{ inputs.mod }}'
-          stamp=$(python3 tools/versioning.py stamp)
+          PY
+          import os, re, sys
+          sys.path.insert(0, 'tools')
+          import versioning, release
 
-          # strip CR so a CRLF versions.properties cannot leak a trailing \r into the version
-          # strings (mc-publish then looks for "dist/....26091603\r.jar" and finds nothing).
-          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          access=$(grep -E '^access=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          mod = '${{ inputs.mod }}'
+          mc = '${MC_VERSION}'
+          stamp = versioning.stamp()
+          path = release.VERSIONS
+          # newline="\n": without it Windows text mode writes CRLF, and mc-publish then looks for
+          # "dist/....26091603\r.jar" and finds nothing.
+          text = path.read_text(encoding='utf-8')
+          current = release.read_props(path)
+          ids = release.module_ids(mc)
+          if mod == 'all':
+              targets = ids
+          elif mod in ids:
+              targets = [mod]
+          else:
+              sys.exit(f"unknown mod '{mod}' (known: {', '.join(ids)}, all)")
+          for comp in ids:
+              value = versioning.bump(current[comp], stamp) if comp in targets else current[comp]
+              text = re.sub(rf'(?m)^{re.escape(comp)}=[^\r\n]*', f'{comp}={value}', text)
+          path.write_text(text, encoding='utf-8', newline='\n')
 
-          api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
-          access_changed=false
-          case "$mod" in
-            api)      api=$(python3 tools/versioning.py bump "$api" "$stamp"); api_changed=true ;;
-            storage)  storage=$(python3 tools/versioning.py bump "$storage" "$stamp"); storage_changed=true ;;
-            crafting) crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp"); crafting_changed=true ;;
-            routing)  routing=$(python3 tools/versioning.py bump "$routing" "$stamp"); routing_changed=true ;;
-            access)   access=$(python3 tools/versioning.py bump "$access" "$stamp"); access_changed=true ;;
-            all)      api=$(python3 tools/versioning.py bump "$api" "$stamp")
-                      storage=$(python3 tools/versioning.py bump "$storage" "$stamp")
-                      crafting=$(python3 tools/versioning.py bump "$crafting" "$stamp")
-                      routing=$(python3 tools/versioning.py bump "$routing" "$stamp")
-                      access=$(python3 tools/versioning.py bump "$access" "$stamp")
-                      api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true
-                      access_changed=true ;;
-            *) echo "Unknown mod: $mod" >&2; exit 1 ;;
-          esac
+          # One env var per module, plus the library and the bundle gates, all derived here rather
+          # than parsed out of the file with a grep per module. The bundle gates come from
+          # bundles.properties, the same file the build reads to assemble the containers, so a
+          # publish step and the jar it uploads cannot be derived from different membership.
+          changed = {c: c in targets for c in ids}
+          (lib,) = release.library_ids(mc)
+          versions = {c: (versioning.bump(current[c], stamp) if c in targets else current[c]) for c in ids}
+          bundles = {n: max((versions[i] for i in m), key=release._version_key)
+                     for n, m in release.bundle_definitions(mc).items()}
+          cb = release.changed_bundles(mc, changed)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+              for c in ids:
+                  env.write(f"{c.upper()}_VERSION={versions[c]}\n")
+                  env.write(f"{c.upper()}_CHANGED={'true' if changed[c] else 'false'}\n")
+              env.write(f"LIBRARY={lib}\n")
+              env.write(f"LIBRARY_VERSION={versions[lib]}\n")
+              env.write(f"LIBRARY_CHANGED={'true' if changed[lib] else 'false'}\n")
+              env.write("GAMEPLAY_CHANGED=" + ('true' if any(changed[c] for c in release.gameplay_ids(mc)) else 'false') + "\n")
+              for n, v in sorted(bundles.items()):
+                  env.write(f"BUNDLE_{n.upper()}_VERSION={v}\n")
+                  env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
+              env.write("MODULE_IDS=" + ",".join(ids) + "\n")
+          print(text)
+          PY
 
-          sed -i -E "s/^api=.*/api=$api/" versions.properties
-          sed -i -E "s/^storage=.*/storage=$storage/" versions.properties
-          sed -i -E "s/^crafting=.*/crafting=$crafting/" versions.properties
-          sed -i -E "s/^routing=.*/routing=$routing/" versions.properties
-          sed -i -E "s/^access=.*/access=$access/" versions.properties
-          cat versions.properties
-
-          # Point the hosts at the (possibly new) API version floor.
-          python3 tools/versioning.py floor --api "$api" --mc "${MC_VERSION}"
-
-          # Release tag: v<api major.minor.patch>.<stamp> (an explicit input wins).
+          # Release tag: v<<library major.minor.patch>>.<stamp> (an explicit input wins).
           tag='${{ inputs.release_tag }}'
           if [ -z "$tag" ]; then
-            tag=$(python3 tools/versioning.py tag --api "$api" --stamp "$stamp")
+            tag=$(python3 tools/versioning.py tag --api "${LIBRARY_VERSION}" --stamp "$(python3 tools/versioning.py stamp)")
           fi
           echo "Release tag: $tag"
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
 
-          {
-            echo "API_VERSION=$api"
-            echo "STORAGE_VERSION=$storage"
-            echo "CRAFTING_VERSION=$crafting"
-            echo "ROUTING_VERSION=$routing"
-            echo "API_CHANGED=$api_changed"
-            echo "STORAGE_CHANGED=$storage_changed"
-            echo "CRAFTING_CHANGED=$crafting_changed"
-            echo "ROUTING_CHANGED=$routing_changed"
-            echo "ACCESS_VERSION=$access"
-            echo "ACCESS_CHANGED=$access_changed"
-            echo "RELEASE_TAG=$tag"
-          } >> "$GITHUB_ENV"
-
-      # The hosts require an API version floor, so the API artifact must be resolvable before
-      # they compile — publish it first.
       - name: Publish API (bootstrap)
         if: ${{ inputs.mode == 'build' }}
         run: |
@@ -216,52 +212,62 @@ jobs:
 
       # publish mode: read the versions from the released commit and infer which components changed
       # by diffing versions.properties against the previous tag (build mode set these when bumping).
-      - name: Resolve released versions + changed components
+      - name: Resolve released versions + changed modules
         if: ${{ inputs.mode == 'publish' }}
         run: |
           set -euo pipefail
-          tag='${{ inputs.release_tag }}'
-          # strip CR: build mode funnels these through tools/versioning.py, publish mode does not,
-          # and a trailing \r in the version makes mc-publish's file globs match nothing.
-          api=$(grep -E '^api=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          storage=$(grep -E '^storage=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          crafting=$(grep -E '^crafting=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          routing=$(grep -E '^routing=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
-          access=$(grep -E '^access=' versions.properties | head -1 | cut -d= -f2 | tr -d '\r')
+          PY
+          import os, re, subprocess, sys
+          sys.path.insert(0, 'tools')
+          import versioning, release
 
-          prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
-          api_changed=false; storage_changed=false; crafting_changed=false; routing_changed=false
-          access_changed=false
-          if [ -z "$prev" ]; then
-            echo "No previous tag; treating every component as changed."
-            api_changed=true; storage_changed=true; crafting_changed=true; routing_changed=true
-            access_changed=true
-          else
-            echo "Diffing versions.properties: ${prev}..${tag}"
-            diff=$(git diff "$prev" "$tag" -- versions.properties || true)
-            echo "$diff"
-            if echo "$diff" | grep -qE '^[-+]api='; then api_changed=true; fi
-            if echo "$diff" | grep -qE '^[-+]storage='; then storage_changed=true; fi
-            if echo "$diff" | grep -qE '^[-+]crafting='; then crafting_changed=true; fi
-            if echo "$diff" | grep -qE '^[-+]routing='; then routing_changed=true; fi
-            if echo "$diff" | grep -qE '^[-+]access='; then access_changed=true; fi
-          fi
+          tag = '${{ inputs.release_tag }}'
+          mc = '${MC_VERSION}'
+          # Read through release.read_props rather than a grep per module: a module added to
+          # versions.properties would otherwise be published with no version and no changed flag.
+          current = release.read_props(release.VERSIONS)
+          ids = release.module_ids(mc)
+          missing = [c for c in ids if c not in current]
+          if missing:
+              sys.exit(f"versions.properties is missing {missing}")
 
-          {
-            echo "API_VERSION=$api"
-            echo "STORAGE_VERSION=$storage"
-            echo "CRAFTING_VERSION=$crafting"
-            echo "ROUTING_VERSION=$routing"
-            echo "API_CHANGED=$api_changed"
-            echo "STORAGE_CHANGED=$storage_changed"
-            echo "CRAFTING_CHANGED=$crafting_changed"
-            echo "ROUTING_CHANGED=$routing_changed"
-            echo "ACCESS_VERSION=$access"
-            echo "ACCESS_CHANGED=$access_changed"
-            echo "RELEASE_TAG=$tag"
-          } >> "$GITHUB_ENV"
+          def git(*args):
+              return subprocess.run(['git', *args], capture_output=True, text=True).stdout
 
-      # The platform changelog: the last 3 commits, then a link to the full release notes.
+          prev = git('describe', '--tags', '--abbrev=0', f'{tag}^').strip()
+          if not prev:
+              print('No previous tag; treating every module as changed.')
+              changed = set(ids)
+          else:
+              print(f'Diffing versions.properties: {prev}..{tag}')
+              diff = git('diff', prev, tag, '--', 'versions.properties')
+              print(diff)
+              # One regex per module, built from the discovered ids, instead of a hand-written
+              # grep per module.
+              changed = {c for c in ids if re.search(rf'^[-+]{re.escape(c)}=', diff, re.M)}
+
+          flags = {c: c in changed for c in ids}
+          (lib,) = release.library_ids(mc)
+          bundles = {n: max((current[i] for i in m), key=release._version_key)
+                     for n, m in release.bundle_definitions(mc).items()}
+          cb = release.changed_bundles(mc, flags)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+              for c in ids:
+                  env.write(f"{c.upper()}_VERSION={current[c]}\n")
+                  env.write(f"{c.upper()}_CHANGED={'true' if flags[c] else 'false'}\n")
+              env.write(f"LIBRARY={lib}\n")
+              env.write(f"LIBRARY_VERSION={current[lib]}\n")
+              env.write(f"LIBRARY_CHANGED={'true' if flags[lib] else 'false'}\n")
+              env.write("GAMEPLAY_CHANGED=" + ('true' if any(flags[c] for c in release.gameplay_ids(mc)) else 'false') + "\n")
+              for n, v in sorted(bundles.items()):
+                  env.write(f"BUNDLE_{n.upper()}_VERSION={v}\n")
+                  env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
+              env.write("MODULE_IDS=" + ",".join(ids) + "\n")
+              env.write(f"RELEASE_TAG={tag}\n")
+          PY
+        env:
+          MC_VERSION: ${{ env.MC_VERSION }}
+
       - name: Generate changelog
         run: |
           set -euo pipefail
@@ -276,26 +282,20 @@ jobs:
       - name: Resolve bundle versions
         run: |
           set -euo pipefail
-          ba=$(basename dist/bundle-all-*-universal.jar | sed -E 's/^bundle-all-(.*)-universal\.jar$/\1/')
-          bs=$(basename dist/bundle-storage-*-universal.jar | sed -E 's/^bundle-storage-(.*)-universal\.jar$/\1/')
-          bc=$(basename dist/bundle-crafting-*-universal.jar | sed -E 's/^bundle-crafting-(.*)-universal\.jar$/\1/')
-          br=$(basename dist/bundle-routing-*-universal.jar | sed -E 's/^bundle-routing-(.*)-universal\.jar$/\1/')
-          bx=$(basename dist/bundle-access-*-universal.jar | sed -E 's/^bundle-access-(.*)-universal\.jar$/\1/')
-          {
-            echo "BUNDLE_ALL_VERSION=$ba"
-            echo "BUNDLE_STORAGE_VERSION=$bs"
-            echo "BUNDLE_CRAFTING_VERSION=$bc"
-            echo "BUNDLE_ROUTING_VERSION=$br"
-            echo "BUNDLE_ACCESS_VERSION=$bx"
-          } >> "$GITHUB_ENV"
+          # The bundle containers were already named and written by the build; their versions are
+          # recomputed from versions.properties + bundles.properties and checked against dist/,
+          # rather than recovered by slicing a substring out of each jar's filename.
+          PY
+          import sys
+          sys.path.insert(0, 'tools')
+          import release
+          mc = '${MC_VERSION}'
+          versions = release.read_props(release.VERSIONS)
+          bundles = release.bundle_versions(mc, versions)
+          for name in sorted(bundles):
+              print(f"bundle-{name}: {bundles[name]}")
+          PY
 
-      - uses: actions/upload-artifact@v4
-        if: ${{ inputs.mode == 'build' }}
-        with:
-          name: release-jars
-          path: dist/*.jar
-
-      # --- GitHub release: every jar, including the unchanged API at its current version ------
       - name: Publish GitHub release
         if: ${{ inputs.mode == 'build' }}
         uses: Kir-Antipov/mc-publish@v3.3
@@ -316,19 +316,19 @@ jobs:
       # A new API version creates the "SAN API" entry (API primary, storage/crafting additional).
       - name: CurseForge - new SAN API entry
         id: cf_api
-        if: ${{ env.API_CHANGED == 'true' }}
+        if: ${{ env.LIBRARY_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/mc_storage_area_network-${{ env.API_VERSION }}-universal.jar
-            dist/storage_network-${{ env.STORAGE_VERSION }}-universal.jar
-            dist/crafting_network-${{ env.CRAFTING_VERSION }}-universal.jar
-            dist/network_routing-${{ env.ROUTING_VERSION }}-universal.jar
-            dist/remote_access_terminal-${{ env.ACCESS_VERSION }}-universal.jar
-          name: SAN API ${{ env.API_VERSION }}
-          version: san-api-${{ env.API_VERSION }}
+            dist/mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
+            dist/storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
+            dist/crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
+            dist/network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
+            dist/remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
+          name: SAN API ${{ env.LIBRARY_VERSION }}
+          version: san-api-${{ env.LIBRARY_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
           changelog-file: dist/changelog.md
@@ -343,7 +343,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - remember the SAN API file id
-        if: ${{ env.API_CHANGED == 'true' }}
+        if: ${{ env.LIBRARY_CHANGED == 'true' }}
         run: |
           set -euo pipefail
           file_id=$(echo '${{ steps.cf_api.outputs.curseforge-files }}' | jq -r '.[0].id // empty')
@@ -362,25 +362,25 @@ jobs:
       # API unchanged: attach the updated mod(s) under the existing SAN API entry instead of
       # re-uploading the API. Superseded child files must be archived on the CurseForge website.
       - name: CurseForge - attach updated mods to the existing SAN API entry
-        if: ${{ env.API_CHANGED == 'false' && (env.STORAGE_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true' || env.ROUTING_CHANGED == 'true' || env.ACCESS_CHANGED == 'true') }}
+        if: ${{ env.LIBRARY_CHANGED == 'false' && env.GAMEPLAY_CHANGED == 'true' }}
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_API_KEY }}
         run: |
           set -euo pipefail
           parent=$(grep -E "^cf\.api\.file\.${MC_VERSION}=" release-state.properties | head -1 | cut -d= -f2)
+          # Which modules changed is a fact the bump step already computed; this walks the module
+          # list rather than naming four modules, so a new one is attached with no edit here.
           files=()
-          if [ "$STORAGE_CHANGED" = true ]; then
-            files+=("dist/storage_network-${STORAGE_VERSION}-universal.jar")
-          fi
-          if [ "$CRAFTING_CHANGED" = true ]; then
-            files+=("dist/crafting_network-${CRAFTING_VERSION}-universal.jar")
-          fi
-          if [ "$ROUTING_CHANGED" = true ]; then
-            files+=("dist/network_routing-${ROUTING_VERSION}-universal.jar")
-          fi
-          if [ "$ACCESS_CHANGED" = true ]; then
-            files+=("dist/remote_access_terminal-${ACCESS_VERSION}-universal.jar")
-          fi
+          IFS=',' read -ra ids <<< "$MODULE_IDS"
+          for id in "${ids[@]}"; do
+            if [ "$id" = "$LIBRARY" ]; then continue; fi
+            var="$(printf '%s' "$id" | tr '[:lower:]' '[:upper:]')"
+            eval "changed=\${${var}_CHANGED}"
+            eval "version=\${${var}_VERSION}"
+            if [ "$changed" = true ]; then
+              files+=("dist/${id}-${version}-universal.jar")
+            fi
+          done
           ./.github/scripts/curseforge-upload.sh "$parent" "${files[@]}"
 
       # Bundles are their own CurseForge files. bundle-all always changes; the others only when
@@ -407,7 +407,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - Bundle Storage
-        if: ${{ env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' }}
+        if: ${{ env.PUBLISH_BUNDLE_STORAGE == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
@@ -429,7 +429,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - Bundle Crafting
-        if: ${{ env.API_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true' }}
+        if: ${{ env.PUBLISH_BUNDLE_CRAFTING == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
@@ -451,7 +451,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - Bundle Routing
-        if: ${{ env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' || env.ROUTING_CHANGED == 'true' }}
+        if: ${{ env.PUBLISH_BUNDLE_ROUTING == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
@@ -473,7 +473,7 @@ jobs:
           fail-mode: warn
 
       - name: CurseForge - Bundle Access
-        if: ${{ env.API_CHANGED == 'true' || env.ACCESS_CHANGED == 'true' }}
+        if: ${{ env.PUBLISH_BUNDLE_ACCESS == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1690770
@@ -503,58 +503,58 @@ jobs:
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
-            mr.api.version.${MC_VERSION} "$API_VERSION" "SAN API $API_VERSION" \
-            "dist/mc_storage_area_network-${API_VERSION}-universal.jar" \
+            mr.api.version.${MC_VERSION} "$LIBRARY_VERSION" "SAN API $LIBRARY_VERSION" \
+            "dist/mc_storage_area_network-${LIBRARY_VERSION}-universal.jar" \
             "dist/bundle-all-${BUNDLE_ALL_VERSION}-universal.jar"
 
       - name: Modrinth - Storage Network + Bundle Storage
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true') }}
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_STORAGE == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
-            mr.storage.version.${MC_VERSION} "$STORAGE_VERSION" "Storage Network $STORAGE_VERSION" \
-            "dist/storage_network-${STORAGE_VERSION}-universal.jar" \
+            mr.storage.version.${MC_VERSION} "$STORAGE_NETWORK_VERSION" "Storage Network $STORAGE_NETWORK_VERSION" \
+            "dist/storage_network-${STORAGE_NETWORK_VERSION}-universal.jar" \
             "dist/bundle-storage-${BUNDLE_STORAGE_VERSION}-universal.jar"
 
       - name: Modrinth - Crafting Network + Bundle Crafting
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.CRAFTING_CHANGED == 'true') }}
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_CRAFTING == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
-            mr.crafting.version.${MC_VERSION} "$CRAFTING_VERSION" "Crafting Network $CRAFTING_VERSION" \
-            "dist/crafting_network-${CRAFTING_VERSION}-universal.jar" \
+            mr.crafting.version.${MC_VERSION} "$CRAFTING_NETWORK_VERSION" "Crafting Network $CRAFTING_NETWORK_VERSION" \
+            "dist/crafting_network-${CRAFTING_NETWORK_VERSION}-universal.jar" \
             "dist/bundle-crafting-${BUNDLE_CRAFTING_VERSION}-universal.jar"
 
       - name: Modrinth - Network Routing + Bundle Routing
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.STORAGE_CHANGED == 'true' || env.ROUTING_CHANGED == 'true') }}
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_ROUTING == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ROUTING_ID || 'network-routing' }}" \
-            mr.routing.version.${MC_VERSION} "$ROUTING_VERSION" "Network Routing $ROUTING_VERSION" \
-            "dist/network_routing-${ROUTING_VERSION}-universal.jar" \
+            mr.routing.version.${MC_VERSION} "$NETWORK_ROUTING_VERSION" "Network Routing $NETWORK_ROUTING_VERSION" \
+            "dist/network_routing-${NETWORK_ROUTING_VERSION}-universal.jar" \
             "dist/bundle-routing-${BUNDLE_ROUTING_VERSION}-universal.jar"
 
       # Remote Access Terminal shares the suite's Modrinth project, so it has no project variable of
       # its own; only the state key (which version to archive) is per-component.
       - name: Modrinth - Remote Access Terminal + Bundle Access
-        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.API_CHANGED == 'true' || env.ACCESS_CHANGED == 'true') }}
+        if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_ACCESS == 'true') }}
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
-            mr.access.version.${MC_VERSION} "$ACCESS_VERSION" "Remote Access Terminal $ACCESS_VERSION" \
-            "dist/remote_access_terminal-${ACCESS_VERSION}-universal.jar" \
+            mr.access.version.${MC_VERSION} "$REMOTE_ACCESS_TERMINAL_VERSION" "Remote Access Terminal $REMOTE_ACCESS_TERMINAL_VERSION" \
+            "dist/remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal.jar" \
             "dist/bundle-access-${BUNDLE_ACCESS_VERSION}-universal.jar"
 
       # --- Persist the bumped versions / learned platform ids back to main ---------------------

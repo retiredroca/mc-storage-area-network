@@ -10,7 +10,7 @@ while (repoRoot != null && !new File(repoRoot, 'gradle/versions.gradle').exists(
 apply from: new File(repoRoot, 'gradle/versions.gradle')
 
 // Remote Access Terminal version from versions.properties (bumped only when it changed).
-version = accessVersion
+version = mod_version
 group = mod_group_id
 
 // Name the jar here rather than via archiveClassifier: a classifier is inherited by the maven
@@ -19,8 +19,8 @@ group = mod_group_id
 base {
     archivesName = mod_id
 }
-tasks.named('jar') { archiveFileName = jarFileName(mod_id, accessVersion, 'fabric') }
-tasks.named('remapJar') { archiveFileName = jarFileName(mod_id, accessVersion, 'fabric') }
+tasks.named('jar') { archiveFileName = jarFileName(mod_id, mod_version, 'fabric') }
+tasks.named('remapJar') { archiveFileName = jarFileName(mod_id, mod_version, 'fabric') }
 
 repositories {
     maven {
@@ -88,8 +88,13 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-    // MC Storage Area Network API (standalone mod; resolved from mavenLocal / the mc-storage-area-network maven).
-    modImplementation "com.retiredroca.mcstorageareanetwork:mc_storage_area_network-fabric-${targetMc}:${api_version}"
+    // The modules this one depends on (module.properties `depends=`), resolved from the in-repo maven
+    // by an exact artifactId and a floor range taken from that module's versions.properties entry.
+    // The range is derived rather than declared here, so the version this build resolves against and
+    // the version this mod declares at runtime cannot drift apart.
+    mod_depends.each { dep ->
+        modImplementation "${moduleGroup(dep)}:${dep}-fabric-${targetMc}:${moduleFloor(dep)}"
+    }
 }
 
 processResources {
@@ -100,17 +105,20 @@ processResources {
     inputs.property "mod_name", mod_name
     inputs.property "mod_license", mod_license
     inputs.property "mod_authors", mod_authors
-    inputs.property "api_floor", apiRangeFabric
+    dependencyTokens().each { token, value -> inputs.property token, value }
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version,
-                "minecraft_version": minecraft_version,
-                "loader_version": loader_version,
-                "mod_id": mod_id,
-                "mod_name": mod_name,
-                "mod_license": mod_license,
-                "mod_authors": mod_authors,
-                "api_floor": apiRangeFabric
+        // dependencyTokens() adds one "<dep-id>_range" token per entry in module.properties
+        // `depends=`, carrying that dependency's floor. The "~" stays in the metadata file, so the
+        // range syntax a reader cares about is visible there and only the number is substituted.
+        def tokens = ["version"          : project.version,
+                      "minecraft_version": minecraft_version,
+                      "loader_version"   : loader_version,
+                      "mod_id"           : mod_id,
+                      "mod_name"         : mod_name,
+                      "mod_license"      : mod_license,
+                      "mod_authors"      : mod_authors] + dependencyTokens()
+        expand tokens
     }
 }
 
@@ -150,8 +158,8 @@ tasks.named('build') {
         if (!libs.isDirectory()) {
             return
         }
-        def keep = [jarFileName(mod_id, accessVersion, 'fabric').toString(),
-                    jarFileName(mod_id, accessVersion, 'sources').toString()] as Set
+        def keep = [jarFileName(mod_id, mod_version, 'fabric').toString(),
+                    jarFileName(mod_id, mod_version, 'sources').toString()] as Set
         libs.listFiles()?.each { f ->
             if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
                 f.delete()
