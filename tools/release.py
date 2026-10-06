@@ -120,29 +120,36 @@ def bundle_jobs(mc, changed, bundles):
     return [bundle_name(n, bundles[n]) for n in sorted(names) if n in bundles]
 
 
+# The project abbreviation (abbrev in versions.properties), prepended to every release jar name so
+# jars from different projects cannot collide side by side. Matches jarFileName in gradle/versions.gradle.
+ABBREV = (versioning.load_props(VERSIONS).get("abbrev") or "").strip()
+
+
 def jar_name(mod_id, version, kind):
-    """Release jar name, matching jarFileName in gradle/versions.gradle: <id>-<version>-<kind>.jar.
+    """Release jar name, matching jarFileName in gradle/versions.gradle: [<abbrev>-]<id>-<version>-<kind>.jar.
 
     The id is the module's own, straight from module.properties, so this needs no table: a module's
     name in versions.properties, in its jar, and in its maven coordinate is one string.
     """
-    return f"{mod_id}-{version}-{kind}.jar"
+    prefix = f"{ABBREV}-" if ABBREV else ""
+    return f"{prefix}{mod_id}-{version}-{kind}.jar"
 
 
 def bundle_name(key, version):
-    """Bundle container jar name: bundle-<key>-<version>-universal.jar.
+    """Bundle container jar name: [<abbrev>-]bundle-<key>-<version>-universal.jar.
 
     Same convention as jar_name(), with the bundle key in the id position and the universal loader
     last. Every bundle upload path goes through here so the shape is defined once.
     """
-    return f"bundle-{key}-{version}-universal.jar"
+    prefix = f"{ABBREV}-" if ABBREV else ""
+    return f"{prefix}bundle-{key}-{version}-universal.jar"
 
 
-# A release jar is <id>-<version>-<kind>.jar, matching jarFileName in gradle/versions.gradle: the
-# version is numeric and the kind is one of the three loaders. Matching the shape rather than listing
+# A release jar is [<abbrev>-]<id>-<version>-<kind>.jar, matching jarFileName in gradle/versions.gradle:
+# the version is numeric and the kind is one of the three loaders. Matching the shape rather than listing
 # every id means an added module needs no edit here, and it rejects every pre-rename shape (a leading
-# loader, or a dot before the version), which a count check cannot. The id group allows dashes so a
-# `bundle-` prefix matches. Identical to the same guard in redstone-pcbs and both templates.
+# loader, or a dot before the version), which a count check cannot. The id group allows dashes so an
+# abbrev or a `bundle-` prefix matches. Identical to the same guard in redstone-pcbs and both templates.
 ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)\.jar$")
 
 
@@ -352,9 +359,9 @@ def bundle_versions(mc, versions):
     out = {}
     for key, ids in bundle_definitions(mc).items():
         version = max((versions[i] for i in ids), key=_version_key)
-        expected = DIST / f"bundle-{key}-{version}-universal.jar"
+        expected = DIST / bundle_name(key, version)
         if not expected.exists():
-            built = sorted(DIST.glob(f"bundle-{key}-*-universal.jar"))
+            built = sorted(DIST.glob(bundle_name(key, "*")))
             die(f"bundle '{key}' should be {expected.name} but dist/ has "
                 + (", ".join(b.name for b in built) if built else "no such bundle jar"))
         out[key] = version

@@ -35,7 +35,13 @@ ext.componentVersions = componentVersions
 // the convention, and it is applied when *staging* the release set, deliberately NOT to
 // archivesName: the per-module build/libs names feed the in-repo maven publications whose
 // filenames hosts resolve, so renaming those would break every dependent module.
-ext.jarFileName = { String id, String version, String loader -> "${id}-${version}-${loader}.jar" }
+//
+// The project abbreviation (abbrev in versions.properties) is prepended so jars from different
+// projects cannot collide when installed side by side. It is empty for a single-module project.
+def abbrev = (componentVersions.getProperty('abbrev') ?: '').trim()
+ext.jarFileName = { String id, String version, String loader ->
+    "${abbrev ? abbrev + '-' : ''}${id}-${version}-${loader}.jar"
+}
 
 // Build-time version stamp. versions.properties may hold a bare "<major>.<minor>.<patch>" (before a
 // release) or an already-stamped "<major>.<minor>.<patch>.<yymmddhh>" (after one). A bare value is
