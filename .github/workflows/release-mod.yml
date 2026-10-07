@@ -452,7 +452,12 @@ jobs:
             exit 0
           fi
 
-          git stash push -- versions.properties release-state.properties
+          # The checkout is at the release tag, so the tree can differ from origin/main by more than
+          # the two files stashed here. Stashing only those two leaves e.g. an updated script as a
+          # working-tree change, and `git checkout -B main origin/main` then aborts:
+          #   error: Your local changes to the following files would be overwritten by checkout
+          # Stash the whole tree instead, so the branch switch has nothing to carry over.
+          git stash push --include-untracked
           git fetch origin main
           git checkout -B main origin/main
           git stash pop
