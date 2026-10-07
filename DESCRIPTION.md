@@ -67,7 +67,7 @@ Label containers with item filters so the ones you care about win.
   - **Trim** cleans labeled containers only: stacks that do not match a container's filter are moved out to the nearest unlabeled container, or failing that to an Output Terminal anywhere in the network, and it stops if there is nowhere to put them. Containers without a filter are never touched.
 - **Filter autocomplete** — the filter box suggests items you could actually obtain as you type, matching anywhere in the name or id (`ingot` finds `gold_ingot`), and offering item tags as `#namespace:path`. Suggestions already covered by the container's current filters are skipped, so the list stays useful.
 - **Distinct look** — the terminal is a copper-and-steel console with a green readout, and the handheld **Routing Linker** matches it.
-- **Requires Storage Network** — Network Routing does not run without it, which is why `universal-bundle-routing` contains both.
+- **Requires Storage Network** — Network Routing does not run without it, which is why `mcsan-bundle-routing` contains both.
 
 ### Remote Access Terminal
 
@@ -152,25 +152,25 @@ Higher tiers also make processor terminals work faster.
 Every jar below is **universal** — the same file works on both Fabric and NeoForge (it holds the
 loader-specific builds inside and each loader loads only its own copy).
 
-**It is best to use the bundle.** `universal-bundle-all.<version>.jar` is the whole suite in one
-file — drop it in `mods/` and you are done. Want only part of it? `universal-bundle-storage`,
-`universal-bundle-crafting`, `universal-bundle-routing` and `universal-bundle-access` are the same
+**It is best to use the bundle.** `mcsan-bundle-all-<version>-universal.jar` is the whole suite in one
+file — drop it in `mods/` and you are done. Want only part of it? `mcsan-bundle-storage`,
+`mcsan-bundle-crafting`, `mcsan-bundle-routing` and `mcsan-bundle-access` are the same
 idea for one gameplay mod each, and they always bring the API along.
 
 **But if you want separate mods, here are the correct combinations:**
 
 | You want | Install these jars |
 |----------|--------------------|
-| Storage only | `universal_mc_san_api` + `universal-storage-network` |
-| Crafting only | `universal_mc_san_api` + `universal-crafting-network` |
-| Remote Access Terminal only | `universal_mc_san_api` + `universal-remote-access-terminal` |
-| Storage + Crafting | `universal_mc_san_api` + `universal-storage-network` + `universal-crafting-network` |
-| Storage + Routing | `universal_mc_san_api` + `universal-storage-network` + `universal-network-routing` |
-| Everything | `universal-bundle-all` (or all five jars) |
+| Storage only | `mcsan-mc_storage_area_network` + `mcsan-storage_network` |
+| Crafting only | `mcsan-mc_storage_area_network` + `mcsan-crafting_network` |
+| Remote Access Terminal only | `mcsan-mc_storage_area_network` + `mcsan-remote_access_terminal` |
+| Storage + Crafting | `mcsan-mc_storage_area_network` + `mcsan-storage_network` + `mcsan-crafting_network` |
+| Storage + Routing | `mcsan-mc_storage_area_network` + `mcsan-storage_network` + `mcsan-network_routing` |
+| Everything | `mcsan-bundle-all` (or all five jars) |
 
-- **Every gameplay mod needs the API jar** (`universal_mc_san_api.<version>.jar`).
+- **Every gameplay mod needs the API jar** (`mcsan-mc_storage_area_network-<version>-universal.jar`).
 - **Network Routing does not run without Storage Network** — installing the routing jar on its own
-  will not load. That is why `universal-bundle-routing` contains both.
+  will not load. That is why `mcsan-bundle-routing` contains both.
 - **Remote Access Terminal needs only the API** — its Routing Linker trip appears when Network
   Routing is installed, but the terminals work without it.
 - **Never mix a bundle with individual jars** — the same mods would load twice.

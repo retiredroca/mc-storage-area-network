@@ -133,6 +133,12 @@ java {
     withSourcesJar()
 }
 
+// The sources jar is a release-shaped artifact too, so it takes the same name as the others -- with
+// the project abbreviation. Without this it keeps the bare archivesName, and the keep-set below
+// (which already expects jarFileName(..., 'sources')) would delete it.
+tasks.named('sourcesJar') { archiveFileName = jarFileName(mod_id, mod_version, 'sources') }
+tasks.named('remapSourcesJar') { archiveFileName = jarFileName(mod_id, mod_version, 'sources') }
+
 jar {
     from("LICENSE") {
         rename { "${it}_${mod_id}" }

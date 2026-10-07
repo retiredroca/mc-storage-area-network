@@ -50,13 +50,11 @@ tasks.register('universalJar', Jar) {
     }
 }
 
-tasks.named('build') {
-    dependsOn 'universalJar'
-
-    // This module's build/libs also accumulates every version ever built, including
-    // jars left under the old hyphenated names. A root lookup pointing at one of those
-    // would resolve a stale jar while the build reports success. .toString() is
-    // required: a GString never equals the String that File.name returns.
+// Prune this module's build/libs whenever the universal jar is produced. The release reaches this
+// module through :universalJar (not :build), so a sweep on :build alone never ran and every version
+// ever built accumulated here. Hanging it on the task that writes the directory means it runs for
+// both callers. .toString(): a GString never equals the String that File.name returns.
+tasks.named('universalJar') {
     doLast {
         def libs = layout.buildDirectory.dir('libs').get().asFile
         if (!libs.isDirectory()) {
@@ -69,6 +67,10 @@ tasks.named('build') {
             }
         }
     }
+}
+
+tasks.named('build') {
+    dependsOn 'universalJar'
 }
 
 // Thin aliases so a parent build can request one loader half of this mod without building both.

@@ -76,8 +76,8 @@ Automatic passes run about every 2 seconds while their toggle is on.
 | Side | Client & Server |
 | Dependencies | MC Storage Area Network (`mc_storage_area_network`) — **required**. **Storage Network** (`storage_network`) — **required** (it provides the Storage Terminal the Routing Terminal binds to). Crafting Network is optional and adds crafted-output routing. |
 
-> Easiest install: the **bundle** `universal-bundle-routing.<version>.jar` (API + Storage Network +
-> Network Routing); for the whole suite use `universal-bundle-all`. To install this mod on its own,
+> Easiest install: the **bundle** `mcsan-bundle-routing-<version>-universal.jar` (API + Storage Network +
+> Network Routing); for the whole suite use `mcsan-bundle-all`. To install this mod on its own,
 > also drop in the universal API jar and Storage Network.
 
 ## Configuration

@@ -91,6 +91,7 @@ jobs:
           text = path.read_text(encoding='utf-8')
           current = release.read_props(path)
           ids = release.module_ids(mc)
+          abbrev = (current.get('abbrev') or '').strip()   # project setting, not a module
           if mod == 'all':
               targets = ids
           elif mod in ids:
@@ -124,6 +125,7 @@ jobs:
                   env.write(f"BUNDLE_{n.upper()}_VERSION={v}\n")
                   env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
               env.write("MODULE_IDS=" + ",".join(ids) + "\n")
+              env.write(f"ABBREV={abbrev}\n")
           print(text)
           PY
 
@@ -227,6 +229,7 @@ jobs:
           # versions.properties would otherwise be published with no version and no changed flag.
           current = release.read_props(release.VERSIONS)
           ids = release.module_ids(mc)
+          abbrev = (current.get('abbrev') or '').strip()   # project setting, not a module
           missing = [c for c in ids if c not in current]
           if missing:
               sys.exit(f"versions.properties is missing {missing}")
@@ -263,6 +266,7 @@ jobs:
                   env.write(f"BUNDLE_{n.upper()}_VERSION={v}\n")
                   env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
               env.write("MODULE_IDS=" + ",".join(ids) + "\n")
+              env.write(f"ABBREV={abbrev}\n")
               env.write(f"RELEASE_TAG={tag}\n")
           PY
         env:
@@ -322,11 +326,11 @@ jobs:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
-            dist/storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
-            dist/crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
-            dist/network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
-            dist/remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
           name: SAN API ${{ env.LIBRARY_VERSION }}
           version: san-api-${{ env.LIBRARY_VERSION }}
           dependencies: |
@@ -367,6 +371,7 @@ jobs:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_API_KEY }}
         run: |
           set -euo pipefail
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           parent=$(grep -E "^cf\.api\.file\.${MC_VERSION}=" release-state.properties | head -1 | cut -d= -f2)
           # Which modules changed is a fact the bump step already computed; this walks the module
           # list rather than naming four modules, so a new one is attached with no edit here.
@@ -378,7 +383,7 @@ jobs:
             eval "changed=\${${var}_CHANGED}"
             eval "version=\${${var}_VERSION}"
             if [ "$changed" = true ]; then
-              files+=("dist/${id}-${version}-universal.jar")
+              files+=("dist/${A}${id}-${version}-universal.jar")
             fi
           done
           ./.github/scripts/curseforge-upload.sh "$parent" "${files[@]}"
@@ -390,7 +395,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
           dependencies: |
@@ -412,7 +417,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
           dependencies: |
@@ -434,7 +439,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
           dependencies: |
@@ -456,7 +461,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
           dependencies: |
@@ -478,7 +483,7 @@ jobs:
         with:
           curseforge-id: 1690770
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
           name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
           version: bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}
           dependencies: |
@@ -501,11 +506,12 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
             mr.api.version.${MC_VERSION} "$LIBRARY_VERSION" "SAN API $LIBRARY_VERSION" \
-            "dist/mc_storage_area_network-${LIBRARY_VERSION}-universal.jar" \
-            "dist/bundle-all-${BUNDLE_ALL_VERSION}-universal.jar"
+            "dist/${A}mc_storage_area_network-${LIBRARY_VERSION}-universal.jar" \
+            "dist/${A}bundle-all-${BUNDLE_ALL_VERSION}-universal.jar"
 
       - name: Modrinth - Storage Network + Bundle Storage
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_STORAGE == 'true') }}
@@ -513,11 +519,12 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
             mr.storage.version.${MC_VERSION} "$STORAGE_NETWORK_VERSION" "Storage Network $STORAGE_NETWORK_VERSION" \
-            "dist/storage_network-${STORAGE_NETWORK_VERSION}-universal.jar" \
-            "dist/bundle-storage-${BUNDLE_STORAGE_VERSION}-universal.jar"
+            "dist/${A}storage_network-${STORAGE_NETWORK_VERSION}-universal.jar" \
+            "dist/${A}bundle-storage-${BUNDLE_STORAGE_VERSION}-universal.jar"
 
       - name: Modrinth - Crafting Network + Bundle Crafting
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_CRAFTING == 'true') }}
@@ -525,11 +532,12 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
             mr.crafting.version.${MC_VERSION} "$CRAFTING_NETWORK_VERSION" "Crafting Network $CRAFTING_NETWORK_VERSION" \
-            "dist/crafting_network-${CRAFTING_NETWORK_VERSION}-universal.jar" \
-            "dist/bundle-crafting-${BUNDLE_CRAFTING_VERSION}-universal.jar"
+            "dist/${A}crafting_network-${CRAFTING_NETWORK_VERSION}-universal.jar" \
+            "dist/${A}bundle-crafting-${BUNDLE_CRAFTING_VERSION}-universal.jar"
 
       - name: Modrinth - Network Routing + Bundle Routing
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_ROUTING == 'true') }}
@@ -537,11 +545,12 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ROUTING_ID || 'network-routing' }}" \
             mr.routing.version.${MC_VERSION} "$NETWORK_ROUTING_VERSION" "Network Routing $NETWORK_ROUTING_VERSION" \
-            "dist/network_routing-${NETWORK_ROUTING_VERSION}-universal.jar" \
-            "dist/bundle-routing-${BUNDLE_ROUTING_VERSION}-universal.jar"
+            "dist/${A}network_routing-${NETWORK_ROUTING_VERSION}-universal.jar" \
+            "dist/${A}bundle-routing-${BUNDLE_ROUTING_VERSION}-universal.jar"
 
       # Remote Access Terminal shares the suite's Modrinth project, so it has no project variable of
       # its own; only the state key (which version to archive) is per-component.
@@ -551,11 +560,12 @@ jobs:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_GAME_VERSIONS: ${{ env.MC_VERSION }}
         run: |
+          A="${ABBREV:+${ABBREV}-}"   # project abbreviation, prepended to every release jar name
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
             mr.access.version.${MC_VERSION} "$REMOTE_ACCESS_TERMINAL_VERSION" "Remote Access Terminal $REMOTE_ACCESS_TERMINAL_VERSION" \
-            "dist/remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal.jar" \
-            "dist/bundle-access-${BUNDLE_ACCESS_VERSION}-universal.jar"
+            "dist/${A}remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal.jar" \
+            "dist/${A}bundle-access-${BUNDLE_ACCESS_VERSION}-universal.jar"
 
       # --- Persist the bumped versions / learned platform ids back to main ---------------------
       # Runs on failure as well as success, but not on cancellation. A platform upload can fail

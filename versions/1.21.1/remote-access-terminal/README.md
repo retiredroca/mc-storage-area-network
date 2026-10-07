@@ -29,7 +29,7 @@ scoreboard-team permissions. Other mods in the suite are optional.
 ./gradlew -p versions/1.21.1/remote-access-terminal build
 ```
 
-The mod root also assembles the universal jar (`build/libs/remote-access-terminal-<version>-universal.jar`)
+The mod root also assembles the universal jar (`build/libs/mcsan-remote_access_terminal-<version>-universal.jar`)
 containing both loader builds.
 
 ## Credits
