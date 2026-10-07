@@ -193,11 +193,11 @@ jobs:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/${{ env.ABBREV }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}-mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}-storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}-crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}-network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
+            dist/${{ env.ABBREV }}-remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
           name: SAN API ${{ env.LIBRARY_VERSION }}
           version: san-api-${{ env.LIBRARY_VERSION }}
           dependencies: |
@@ -262,7 +262,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}-bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
           dependencies: |
@@ -284,7 +284,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}-bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
           dependencies: |
@@ -306,7 +306,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}-bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
           dependencies: |
@@ -328,7 +328,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}-bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
           dependencies: |
@@ -350,7 +350,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV }}-bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
           name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
           version: bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}
           dependencies: |
