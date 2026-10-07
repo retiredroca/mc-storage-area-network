@@ -97,7 +97,10 @@ jobs:
           import versioning, release
 
           tag = '${{ inputs.release_tag }}'
-          mc = '${MC_VERSION}'
+          # Read from the environment, not '${MC_VERSION}': this heredoc is quoted (<<'PY'), so bash
+          # does not expand shell variables inside it and mc would be that literal string. Every
+          # lookup under versions/<mc>/ would then find nothing and library_ids() would return empty.
+          mc = os.environ['MC_VERSION']
           # Read through release.read_props rather than a grep per module: a module added to
           # versions.properties would otherwise be published with no version and no changed flag.
           current = release.read_props(release.VERSIONS)
@@ -163,15 +166,19 @@ jobs:
           # recomputed from versions.properties + bundles.properties and checked against dist/,
           # rather than recovered by slicing a substring out of each jar's filename.
           python3 - <<'PY'
-          import sys
+          import os, sys
           sys.path.insert(0, 'tools')
           import release
-          mc = '${MC_VERSION}'
+          # os.environ, not '${MC_VERSION}': the heredoc is quoted (<<'PY'), so bash does not
+          # expand it and mc would be that literal string.
+          mc = os.environ['MC_VERSION']
           versions = release.read_props(release.VERSIONS)
           bundles = release.bundle_versions(mc, versions)
           for name in sorted(bundles):
               print(f"bundle-{name}: {bundles[name]}")
           PY
+        env:
+          MC_VERSION: ${{ env.MC_VERSION }}
 
       # --- CurseForge -------------------------------------------------------------------------
       # mc-publish resolves its default `files` glob (build/libs/*.jar) for every step, even the
