@@ -21,7 +21,8 @@ if [ "$#" -eq 0 ]; then
   exit 0
 fi
 
-project_id="${CURSEFORGE_PROJECT_ID:-1690770}"
+: "${CURSEFORGE_PROJECT_ID:?CURSEFORGE_PROJECT_ID is required}"
+project_id="${CURSEFORGE_PROJECT_ID}"
 upload_url="https://minecraft.curseforge.com/api/projects/${project_id}/upload-file"
 # The changelog: the last few commits plus a link to the full release notes.
 changelog="$(cat dist/changelog.md 2>/dev/null || echo '')"

@@ -190,7 +190,7 @@ jobs:
         if: ${{ env.LIBRARY_CHANGED == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
             dist/${{ env.ABBREV }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
@@ -260,7 +260,7 @@ jobs:
       - name: CurseForge - Bundle All
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: dist/${{ env.ABBREV }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
@@ -282,7 +282,7 @@ jobs:
         if: ${{ env.PUBLISH_BUNDLE_STORAGE == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: dist/${{ env.ABBREV }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
@@ -304,7 +304,7 @@ jobs:
         if: ${{ env.PUBLISH_BUNDLE_CRAFTING == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: dist/${{ env.ABBREV }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
@@ -326,7 +326,7 @@ jobs:
         if: ${{ env.PUBLISH_BUNDLE_ROUTING == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: dist/${{ env.ABBREV }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
@@ -348,7 +348,7 @@ jobs:
         if: ${{ env.PUBLISH_BUNDLE_ACCESS == 'true' }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: 1690770
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: dist/${{ env.ABBREV }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
           name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
