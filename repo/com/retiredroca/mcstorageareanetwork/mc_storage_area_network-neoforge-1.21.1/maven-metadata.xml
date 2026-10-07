@@ -3,13 +3,13 @@
   <groupId>com.retiredroca.mcstorageareanetwork</groupId>
   <artifactId>mc_storage_area_network-neoforge-1.21.1</artifactId>
   <versioning>
-    <latest>1.0.2.26100618</latest>
-    <release>1.0.2.26100618</release>
+    <latest>1.0.2.26100620</latest>
+    <release>1.0.2.26100620</release>
     <versions>
-      <version>1.0.2.26092501</version>
       <version>1.0.2.26092712</version>
       <version>1.0.2.26100618</version>
+      <version>1.0.2.26100620</version>
     </versions>
-    <lastUpdated>20261006184511</lastUpdated>
+    <lastUpdated>20261006205846</lastUpdated>
   </versioning>
 </metadata>
