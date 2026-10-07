@@ -3,8 +3,7 @@ name: Publish Release to Platforms
 # Publishes an existing GitHub release's jars to CurseForge/Modrinth (no build). Normally started by
 # tools/release.py, which dispatches this workflow after creating the release locally (GitHub has
 # never fired the `release: published` event for this repository, so that trigger is only a
-# fallback). Releases created by the build-mode workflow are skipped (author is github-actions[bot]);
-# releases the local tool already published are skipped too (marker in the body).
+# fallback). Releases the local tool already published are skipped (marker in the body).
 on:
   release:
     types: [published]
@@ -58,7 +57,6 @@ jobs:
     needs: resolve
     uses: ./.github/workflows/release-mod.yml
     with:
-      mode: publish
       release_tag: ${{ needs.resolve.outputs.tag }}
       minecraft: ${{ github.event.inputs.minecraft || '1.21.1' }}
     secrets: inherit

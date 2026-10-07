@@ -3,18 +3,8 @@ name: Release Mod (reusable)
 on:
   workflow_call:
     inputs:
-      mode:
-        description: 'build = bump + build + GitHub release + publish; publish = download an existing GitHub release and publish it'
-        required: false
-        type: string
-        default: 'build'
-      mod:
-        description: 'Components to re-version (build mode): api | storage | crafting | routing | access | all. Only the named component gets a new version and nothing infers it from the files changed, so use "all" whenever a change spans the API and one or more hosts - a narrow release leaves the other components at their old versions and mixes them into the bundles.'
-        required: false
-        type: string
-        default: ''
       release_tag:
-        description: 'Tag for this release (publish mode: required; build mode: blank to auto-compute v<api>.<stamp>)'
+        description: 'Release tag whose jars to publish (the GitHub release made locally).'
         required: false
         type: string
         default: ''
@@ -28,19 +18,18 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
-          # build mode: the triggering commit. publish mode: the released tag (so versions.properties
-          # and the changelog match the jars we're about to publish).
-          ref: ${{ inputs.mode == 'publish' && inputs.release_tag || github.sha }}
+          # The released tag, so versions.properties and the changelog match the jars being published.
+          ref: ${{ inputs.release_tag }}
           # History + tags so the changelog can list recent commits and diff versions.properties.
           fetch-depth: 0
 
       # Read the selected Minecraft version's pins (bash only); the Java version feeds the CF
-      # metadata and, in build mode, the setup-java step.
+      # metadata.
       - name: Resolve version pins
         run: |
           set -euo pipefail
@@ -57,127 +46,13 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Minecraft ${mc} (Java ${java_ver:-21})"
 
-      - uses: actions/setup-java@v5
-        if: ${{ inputs.mode == 'build' }}
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      # Drop the committed local Windows JDK path (build mode) and make the provider scripts
-      # executable (both modes).
+      # Make the provider scripts executable.
       - name: Prepare
         run: |
-          find . -name gradle.properties -not -path '*/build/*' -exec sed -i '/org.gradle.java.home/d' {} +
-          chmod +x ./gradlew
           chmod +x .github/scripts/*.sh
 
-      # Only the component(s) in the trigger get a new version (the trailing yymmddhh stamp is
-      # replaced; the patch is manual). Everything else keeps its version.
-      - name: Bump module versions
-        if: ${{ inputs.mode == 'build' }}
-        run: |
-          set -euo pipefail
-          PY
-          import os, re, sys
-          sys.path.insert(0, 'tools')
-          import versioning, release
-
-          mod = '${{ inputs.mod }}'
-          mc = '${MC_VERSION}'
-          stamp = versioning.stamp()
-          path = release.VERSIONS
-          # newline="\n": without it Windows text mode writes CRLF, and mc-publish then looks for
-          # "dist/....26091603\r.jar" and finds nothing.
-          text = path.read_text(encoding='utf-8')
-          current = release.read_props(path)
-          ids = release.module_ids(mc)
-          abbrev = (current.get('abbrev') or '').strip()   # project setting, not a module
-          if mod == 'all':
-              targets = ids
-          elif mod in ids:
-              targets = [mod]
-          else:
-              sys.exit(f"unknown mod '{mod}' (known: {', '.join(ids)}, all)")
-          for comp in ids:
-              value = versioning.bump(current[comp], stamp) if comp in targets else current[comp]
-              text = re.sub(rf'(?m)^{re.escape(comp)}=[^\r\n]*', f'{comp}={value}', text)
-          path.write_text(text, encoding='utf-8', newline='\n')
-
-          # One env var per module, plus the library and the bundle gates, all derived here rather
-          # than parsed out of the file with a grep per module. The bundle gates come from
-          # bundles.properties, the same file the build reads to assemble the containers, so a
-          # publish step and the jar it uploads cannot be derived from different membership.
-          changed = {c: c in targets for c in ids}
-          (lib,) = release.library_ids(mc)
-          versions = {c: (versioning.bump(current[c], stamp) if c in targets else current[c]) for c in ids}
-          bundles = {n: max((versions[i] for i in m), key=release._version_key)
-                     for n, m in release.bundle_definitions(mc).items()}
-          cb = release.changed_bundles(mc, changed)
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
-              for c in ids:
-                  env.write(f"{c.upper()}_VERSION={versions[c]}\n")
-                  env.write(f"{c.upper()}_CHANGED={'true' if changed[c] else 'false'}\n")
-              env.write(f"LIBRARY={lib}\n")
-              env.write(f"LIBRARY_VERSION={versions[lib]}\n")
-              env.write(f"LIBRARY_CHANGED={'true' if changed[lib] else 'false'}\n")
-              env.write("GAMEPLAY_CHANGED=" + ('true' if any(changed[c] for c in release.gameplay_ids(mc)) else 'false') + "\n")
-              for n, v in sorted(bundles.items()):
-                  env.write(f"BUNDLE_{n.upper()}_VERSION={v}\n")
-                  env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
-              env.write("MODULE_IDS=" + ",".join(ids) + "\n")
-              env.write(f"ABBREV={abbrev}\n")
-          print(text)
-          PY
-
-          # Release tag: v<<library major.minor.patch>>.<stamp> (an explicit input wins).
-          tag='${{ inputs.release_tag }}'
-          if [ -z "$tag" ]; then
-            tag=$(python3 tools/versioning.py tag --api "${LIBRARY_VERSION}" --stamp "$(python3 tools/versioning.py stamp)")
-          fi
-          echo "Release tag: $tag"
-          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
-
-      - name: Publish API (bootstrap)
-        if: ${{ inputs.mode == 'build' }}
-        run: |
-          set -euo pipefail
-          ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/fabric" publishMavenJavaPublicationToRepoRepository
-          ./gradlew --no-daemon -p "versions/${MC_VERSION}/api/neoforge" publishMavenJavaPublicationToRepoRepository
-
-      # Staged build so a failure names the layer that broke: loader jars, loader bundles,
-      # universal jars, universal bundles. The collect step then unions them into build/release/.
-      - name: Build loader jars
-        if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" --refresh-dependencies releaseLoaderJars
-
-      - name: Build loader bundles
-        if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseLoaderBundles
-
-      - name: Build universal jars
-        if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseUniversal
-
-      - name: Build universal bundles
-        if: ${{ inputs.mode == 'build' }}
-        run: ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseUniversalBundles
-
-      - name: Collect release jars
-        if: ${{ inputs.mode == 'build' }}
-        run: |
-          set -euo pipefail
-          # Assemble the union (build/release/) from the staged groups and republish the API to
-          # ./repo; the build steps above only staged their own output directories.
-          ./gradlew --no-daemon -Pmc="${MC_VERSION}" releaseJars publishRepo
-          # Clear any pre-existing dist/ so a reused/self-hosted workspace can't leak a stale jar.
-          rm -rf dist
-          mkdir -p dist
-          cp build/release/*.jar dist/
-          ls -la dist
-
-      # publish mode: the jars come from the GitHub release the local (or a previous) run made.
+      # The jars come from the GitHub release the local run made.
       - name: Download release assets
-        if: ${{ inputs.mode == 'publish' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -186,9 +61,8 @@ jobs:
           mkdir -p dist
           gh release download '${{ inputs.release_tag }}' --dir dist --pattern '*.jar' --clobber
           ls -la dist
-          # mc-publish defaults its `files` glob to build/libs/*.jar (see its action.yml). A real
-          # build leaves jars there, which is why the CurseForge steps worked before; publish mode
-          # never builds, so stage the downloaded release jars there too.
+          # mc-publish defaults its `files` glob to build/libs/*.jar (see its action.yml), so stage
+          # the downloaded release jars there too.
           mkdir -p build/libs
           cp dist/*.jar build/libs/
 
@@ -212,13 +86,12 @@ jobs:
           fi
           echo "Release jar set OK ($count files)"
 
-      # publish mode: read the versions from the released commit and infer which components changed
-      # by diffing versions.properties against the previous tag (build mode set these when bumping).
+      # Read the versions from the released commit and infer which components changed by diffing
+      # versions.properties against the previous tag.
       - name: Resolve released versions + changed modules
-        if: ${{ inputs.mode == 'publish' }}
         run: |
           set -euo pipefail
-          PY
+          python3 - <<'PY'
           import os, re, subprocess, sys
           sys.path.insert(0, 'tools')
           import versioning, release
@@ -289,7 +162,7 @@ jobs:
           # The bundle containers were already named and written by the build; their versions are
           # recomputed from versions.properties + bundles.properties and checked against dist/,
           # rather than recovered by slicing a substring out of each jar's filename.
-          PY
+          python3 - <<'PY'
           import sys
           sys.path.insert(0, 'tools')
           import release
@@ -300,23 +173,10 @@ jobs:
               print(f"bundle-{name}: {bundles[name]}")
           PY
 
-      - name: Publish GitHub release
-        if: ${{ inputs.mode == 'build' }}
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: ${{ env.RELEASE_TAG }}
-          github-generate-changelog: true
-          files: dist/*.jar
-          name: MC Storage Area Network ${{ env.RELEASE_TAG }}
-          version: ${{ env.RELEASE_TAG }}
-          version-type: release
-
       # --- CurseForge -------------------------------------------------------------------------
       # mc-publish resolves its default `files` glob (build/libs/*.jar) for every step, even the
-      # CurseForge-only ones. A build used to leave jars there, so publish mode stages the
-      # downloaded release jars into build/libs/ (see "Download release assets") rather than
-      # overriding `files` on each CurseForge step.
+      # CurseForge-only ones, so the downloaded release jars are staged there (see "Download release
+      # assets") rather than overriding `files` on each CurseForge step.
       # A new API version creates the "SAN API" entry (API primary, storage/crafting additional).
       - name: CurseForge - new SAN API entry
         id: cf_api
