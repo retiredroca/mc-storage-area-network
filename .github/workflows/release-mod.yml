@@ -211,7 +211,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       - name: CurseForge - remember the SAN API file id
         if: ${{ env.LIBRARY_CHANGED == 'true' }}
@@ -276,7 +276,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       - name: CurseForge - Bundle Storage
         if: ${{ env.PUBLISH_BUNDLE_STORAGE == 'true' }}
@@ -298,7 +298,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       - name: CurseForge - Bundle Crafting
         if: ${{ env.PUBLISH_BUNDLE_CRAFTING == 'true' }}
@@ -320,7 +320,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       - name: CurseForge - Bundle Routing
         if: ${{ env.PUBLISH_BUNDLE_ROUTING == 'true' }}
@@ -342,7 +342,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       - name: CurseForge - Bundle Access
         if: ${{ env.PUBLISH_BUNDLE_ACCESS == 'true' }}
@@ -364,7 +364,7 @@ jobs:
           java: ${{ env.JAVA_VERSION }}
           retry-attempts: 5
           retry-delay: 15000
-          fail-mode: warn
+          fail-mode: fail
 
       # --- Modrinth (per-project versions; the previous version is archived) -------------------
       - name: Modrinth - SAN API + Bundle All
