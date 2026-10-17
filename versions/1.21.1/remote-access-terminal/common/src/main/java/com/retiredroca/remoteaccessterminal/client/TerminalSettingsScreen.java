@@ -1,5 +1,7 @@
 package com.retiredroca.remoteaccessterminal.client;
 
+import org.lwjgl.glfw.GLFW;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +46,8 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
     private int page;
     private int lastVersion = -1;
     private EditBox nameBox;
+    private String draftName;
+    private boolean nameHadFocus;
     private Button chunkLoaderButton;
     private long labelMinute;
     private int labelQueue = -1;
@@ -70,8 +74,14 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
         nameBox = new EditBox(this.font, x + 8, y + NAME_Y, 200, 20, Component.empty());
         nameBox.setMaxLength(32);
         nameBox.setHint(Component.translatable("gui.remote_access_terminal.name"));
-        nameBox.setValue(menu.getName() == null ? "" : menu.getName());
+        nameBox.setValue(draftName != null ? draftName : (menu.getName() == null ? "" : menu.getName()));
+        // Attach the responder only after the initial value: setValue fires it, and marking the name
+        // dirty there would mask later server-side renames behind the stale draft.
+        nameBox.setResponder(value -> draftName = value);
         addRenderableWidget(nameBox);
+        if (nameHadFocus) {
+            setFocused(nameBox);
+        }
         addRenderableWidget(Button.builder(Component.translatable("gui.remote_access_terminal.rename"),
                 button -> RemoteAccessTerminalCommon.platform().sendRename(menu.getDimension(), menu.getPos(),
                         menu.getColor(), nameBox.getValue()))
@@ -204,7 +214,7 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
                 if (!selectedInvites.remove(id)) {
                     selectedInvites.add(id);
                 }
-                rebuildWidgets();
+                rebuildKeepingNameFocus();
             }).bounds(x + 8, y + INVITE_Y + i * INVITE_STEP, 300, 20).build());
         }
     }
@@ -223,7 +233,34 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
 
     private void changePage(int delta) {
         page += delta;
+        rebuildKeepingNameFocus();
+    }
+
+    /**
+     * Rebuilds the widgets while preserving the rename box's focus and text. rebuildWidgets()
+     * clears focus and init() refills the box, so a server sync arriving mid-rename would otherwise
+     * drop both the typed name and the focus (and an unfocused box lets the inventory key close the
+     * screen).
+     */
+    private void rebuildKeepingNameFocus() {
+        nameHadFocus = nameBox != null && nameBox.isFocused();
         rebuildWidgets();
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (nameBox != null && nameBox.isFocused()) {
+            if (nameBox.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+            // EditBox does not consume ordinary characters (they arrive through charTyped), so
+            // without this the inventory keybind matches "E" and closes the screen mid-rename.
+            // ESC is left to the default path so the screen still closes.
+            if (keyCode != GLFW.GLFW_KEY_ESCAPE && nameBox.canConsumeInput()) {
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -231,7 +268,7 @@ public class TerminalSettingsScreen extends AbstractContainerScreen<TerminalMenu
         super.containerTick();
         if (menu.getVersion() != lastVersion) {
             lastVersion = menu.getVersion();
-            rebuildWidgets();
+            rebuildKeepingNameFocus();
             return;
         }
         refreshChunkLoaderLabel();

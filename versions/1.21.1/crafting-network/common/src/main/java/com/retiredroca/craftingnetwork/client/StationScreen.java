@@ -1,5 +1,7 @@
 package com.retiredroca.craftingnetwork.client;
 
+import org.lwjgl.glfw.GLFW;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -763,6 +765,12 @@ public class StationScreen extends AbstractContainerScreen<AbstractContainerMenu
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (this.searchBox != null && this.searchBox.isFocused()) {
             if (this.searchBox.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+            // EditBox does not consume ordinary characters (they arrive through charTyped), so
+            // without this the inventory keybind matches "E" and closes the screen while searching.
+            // ESC is left to the default path so the screen still closes.
+            if (keyCode != GLFW.GLFW_KEY_ESCAPE && this.searchBox.canConsumeInput()) {
                 return true;
             }
         } else if (recipeBookComponent != null && recipeBookComponent.keyPressed(keyCode, scanCode, modifiers)) {

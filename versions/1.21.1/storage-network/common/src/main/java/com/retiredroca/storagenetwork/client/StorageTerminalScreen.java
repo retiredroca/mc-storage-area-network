@@ -414,6 +414,11 @@ public class StorageTerminalScreen extends AbstractContainerScreen<StorageTermin
                 searchBox.setFocused(false);
                 return true;
             }
+            // EditBox does not consume ordinary characters (they arrive through charTyped), so
+            // without this the inventory keybind matches "E" and closes the screen while searching.
+            if (searchBox.canConsumeInput()) {
+                return true;
+            }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }

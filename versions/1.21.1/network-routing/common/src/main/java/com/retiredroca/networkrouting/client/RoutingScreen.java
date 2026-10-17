@@ -170,6 +170,15 @@ public class RoutingScreen extends AbstractContainerScreen<RoutingMenu> {
                 return true;
             }
             typing = true;
+            if (tokenBox.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+            // EditBox does not consume ordinary characters (they arrive through charTyped), so
+            // without this the inventory keybind matches "E" and closes the screen while typing a
+            // filter. ESC is left to the default path so the screen still closes.
+            if (keyCode != GLFW.GLFW_KEY_ESCAPE && tokenBox.canConsumeInput()) {
+                return true;
+            }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
