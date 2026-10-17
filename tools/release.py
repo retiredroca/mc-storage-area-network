@@ -450,16 +450,22 @@ def gh_request(method, url, token, data=None, content_type="application/vnd.gith
 
 
 def github_release(token, tag, target, body, dry):
+    """Create the release as a draft; publish_release() flips it once the jars are attached.
+
+    A published release fires `release: published` immediately, which starts the publish workflow
+    while the asset upload is still running - the workflow then downloads a partial jar set and
+    fails its count check. Drafting defers that event until the release is complete.
+    """
     url = f"https://api.github.com/repos/{repo_slug()}/releases"
     if dry:
-        print(f"  [dry-run] POST {url} tag={tag} target={target} generate_release_notes=true")
+        print(f"  [dry-run] POST {url} tag={tag} target={target} generate_release_notes=true draft=true")
         return None
     status, resp = gh_request("POST", url, token, {
         "tag_name": tag,
         "target_commitish": target,
         "name": f"MC Storage Area Network {tag}",
         "body": body,
-        "draft": False,
+        "draft": True,
         "prerelease": False,
         "generate_release_notes": True,
     })
@@ -486,26 +492,21 @@ def upload_assets(token, release_id, dry):
             die(f"asset upload failed for {jar.name} ({exc.code}): {exc.read().decode()}")
 
 
-def dispatch_publish_ci(token, tag, mc, dry):
-    """Ask the publish-only workflow to upload this release to CurseForge/Modrinth.
+def publish_release(token, release_id, dry):
+    """Flip the draft release to published, now that every jar is attached.
 
-    GitHub has never fired `release: published` for this repository, so the local release starts
-    the workflow explicitly. Best-effort: by now the release is public, so a failure warns and
-    prints the manual fallback instead of aborting the whole run.
+    This is the single trigger for the platform publish: un-drafting fires `release: published`,
+    which starts publish-release.yml. Nothing else dispatches it, so a release cannot be published
+    twice.
     """
-    workflow = "publish-release.yml"
-    url = f"https://api.github.com/repos/{repo_slug()}/actions/workflows/{workflow}/dispatches"
-    page = f"https://github.com/{repo_slug()}/actions/workflows/{workflow}"
-    ref = current_branch()
+    url = f"https://api.github.com/repos/{repo_slug()}/releases/{release_id}"
     if dry:
-        print(f"  [dry-run] POST {url} ref={ref} tag={tag} minecraft={mc}")
+        print(f"  [dry-run] PATCH {url} draft=false")
         return
-    status, resp = gh_request("POST", url, token, {"ref": ref, "inputs": {"tag": tag, "minecraft": mc}})
-    if status in (200, 204):
-        log(f"CI will publish {tag} to CurseForge/Modrinth: {page}")
-    else:
-        log(f"could not start the publish workflow ({status}): {resp}")
-        log(f"  publish by hand instead: {page} -> Run workflow -> tag {tag}")
+    status, resp = gh_request("PATCH", url, token, {"draft": False})
+    if status != 200:
+        die(f"GitHub release publish failed ({status}): {resp}")
+    log("published the GitHub release; the release event starts the platform publish")
 
 
 # --- CurseForge ---------------------------------------------------------------------
@@ -749,18 +750,19 @@ def main():
     if not args.no_push:
         run(["git", "push", "origin", tag], dry=dry)
 
-    # GitHub release against the tag we just pushed.
+    # GitHub release against the tag we just pushed. Created as a draft and published only after the
+    # jars are attached, so the `release: published` event - the single trigger for the CI platform
+    # publish - never sees a half-uploaded release.
     token = github_token()
     target = capture(["git", "rev-parse", "HEAD"]).strip()
-    marker = "<!-- mc-san:published -->" if (args.curseforge or args.modrinth) else ""
+    # The marker tells the publish workflow to skip this release. It is set when the platforms are
+    # published from here (--curseforge/--modrinth) or when they must not be published at all
+    # (--no-ci-publish); otherwise the release event publishes them.
+    marker = "<!-- mc-san:published -->" if (args.curseforge or args.modrinth or args.no_ci_publish) else ""
     release = github_release(token, tag, target, marker, dry)
     if release:
         upload_assets(token, release["id"], dry)
-
-    # CurseForge/Modrinth are published by CI by default. A local upload (--curseforge /
-    # --modrinth) also marks the release body, so a stray CI run would skip it anyway.
-    if not (args.no_ci_publish or args.curseforge or args.modrinth):
-        dispatch_publish_ci(token, tag, args.mc, dry)
+        publish_release(token, release["id"], dry)
 
     bundles = bundle_versions(args.mc, versions)
 
