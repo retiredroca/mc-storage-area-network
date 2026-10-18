@@ -547,6 +547,39 @@ tasks.register('releaseJars', Sync) {
             tasks.named('releaseUniversal'), tasks.named('releaseUniversalBundles'))
 }
 
+// Sweep the root build/libs down to this build's jars. The merged jars and the bundles stage here, and
+// nothing else prunes it: the module and per-loader builds sweep their own directories, but this one is
+// written by the release groups themselves. It hangs off those groups rather than off `build`, because
+// the release path - tools/release.py, deploy.sh, the staged tasks - never runs `build`, so a guard
+// attached there never ran for a release and every stamp's set stayed behind.
+tasks.register('sweepRootLibs') {
+    group = 'build'
+    description = 'Deletes jars in the root build/libs that this build did not produce.'
+    doLast {
+        def keep = moduleDirById.keySet().collect { id ->
+            jarFileName(id, moduleVersion(id), 'universal').toString()
+        } as Set
+        bundleDefs.each { name, spec ->
+            def bundleVersion = bundleVersionFor(spec.ids)
+            ['universal', 'fabric', 'neoforge'].each { kind ->
+                keep.add(jarFileName("bundle-${name}", bundleVersion, kind).toString())
+            }
+        }
+        def libs = layout.buildDirectory.dir('libs').get().asFile
+        libs.listFiles()?.each { f ->
+            if (f.isFile() && f.name.endsWith('.jar') && !keep.contains(f.name)) {
+                f.delete()
+            }
+        }
+    }
+}
+
+// Before anything writes into that directory, whichever group is invoked.
+['releaseLoaderJars', 'releaseLoaderBundles', 'releaseUniversal',
+ 'releaseUniversalBundles'].each { name ->
+    tasks.named(name) { dependsOn 'sweepRootLibs' }
+}
+
 // Targeted rebuilds: wipe just the loader or the universal stage outputs.
 tasks.register('cleanLoader', Delete) {
     group = 'build'
