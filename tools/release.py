@@ -76,15 +76,17 @@ def bundle_definitions(mc):
 
 
 def expected_jars(mc):
-    """How many jars the release set must contain: per-loader + universal + bundle variants.
+    """How many jars the release set must contain: per-loader + sources + universal + bundles.
 
-    Each module contributes one jar per loader plus one universal jar; each bundle contributes a
-    universal container plus one per-loader container, so three files per bundle. Derived from the
-    module and bundle counts rather than written down, because a hand-written number stops being
-    checked the moment a module is added or removed.
+    Each module contributes one jar per loader, one sources jar per loader, and one universal jar;
+    each bundle contributes a universal container plus one per-loader container, so three files per
+    bundle. A bundle has no sources of its own: its sources are its members', which are already here.
+    Derived from the module and bundle counts rather than written down, because a hand-written number
+    stops being checked the moment a module is added or removed.
     """
     loaders = ["fabric", "neoforge"]
-    return len(module_ids(mc)) * (len(loaders) + 1) + len(bundle_definitions(mc)) * (1 + len(loaders))
+    sources = len(module_ids(mc)) * len(loaders)
+    return len(module_ids(mc)) * (len(loaders) + 1) + sources + len(bundle_definitions(mc)) * (1 + len(loaders))
 
 
 def changed_bundles(mc, changed):
@@ -149,8 +151,11 @@ def bundle_name(key, version):
 # the version is numeric and the kind is one of the three loaders. Matching the shape rather than listing
 # every id means an added module needs no edit here, and it rejects every pre-rename shape (a leading
 # loader, or a dot before the version), which a count check cannot. The id group allows dashes so an
-# abbrev or a `bundle-` prefix matches. Identical to the same guard in redstone-pcbs and both templates.
-ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)\.jar$")
+# abbrev or a `bundle-` prefix matches. A sources jar is the same shape with `-sources` after its
+# loader: that suffix exists only in the release, because both builds name their sources jar
+# <id>-<version>-sources.jar for a maven consumer, and flattening the two into one directory would
+# collide. Identical to the same guard in redstone-pcbs and both templates.
+ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?\.jar$")
 
 
 def log(msg):

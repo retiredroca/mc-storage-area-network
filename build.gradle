@@ -95,6 +95,12 @@ def perLoaderJar = { String id, String loader ->
     def dir = moduleDirById[id]
     versionedJar("${versionRoot}/${dir.name}/${loader}/build/libs/${jarFileName(id, moduleVersion(id), loader)}")
 }
+// The sources jar for one loader. The same loader build produces it, under the same naming
+// convention, so it is read back off the disk the same way rather than predicted from anything.
+def perLoaderSourcesJar = { String id, String loader ->
+    def dir = moduleDirById[id]
+    versionedJar("${versionRoot}/${dir.name}/${loader}/build/libs/${jarFileName(id, moduleVersion(id), 'sources')}")
+}
 // The merged universal jar lives in a composite module's own build/libs; a split module has no root
 // of its own, so the root build merges it (see libraryUniversalJar below).
 def perUniversalJar = { String id ->
@@ -446,6 +452,13 @@ tasks.register('releaseLoaderJars', Sync) {
             from({ def f = perLoaderJar(m, l); f == null ? [] : f }) {
                 rename { jarFileName(m, moduleVersion(m), l) }
             }
+            // The sources jar travels with the mod jar it belongs to. It is renamed to carry its
+            // loader here, and only here: both loaders name it <id>-<version>-sources.jar because
+            // that is what a maven consumer looks for, so flattening the two into one directory
+            // would collide. The release is the only place they sit side by side.
+            from({ def f = perLoaderSourcesJar(m, l); f == null ? [] : f }) {
+                rename { jarFileName(m, moduleVersion(m), "${l}-sources") }
+            }
         }
     }
 }
@@ -534,6 +547,7 @@ tasks.register('releaseJars', Sync) {
         moduleDirById.keySet().sort().each { m ->
             ['fabric', 'neoforge'].each { l ->
                 if (perLoaderJar(m, l) == null) { missing << "${m}-${l}" }
+                if (perLoaderSourcesJar(m, l) == null) { missing << "${m}-${l}-sources" }
             }
             if (isComposite(m) && perUniversalJar(m) == null) { missing << "${m}-universal" }
         }
