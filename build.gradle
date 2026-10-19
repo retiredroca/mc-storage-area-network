@@ -323,6 +323,8 @@ def generateLibraryUniversalMetadata = tasks.register('generateLibraryUniversalM
     def props = loadModule(libraryId)
     inputs.property 'libraryVersion', libVersion
     inputs.property 'libraryId', libraryId
+    // The library's module.properties too: its licence and authors go into this metadata as well.
+    inputs.files(new File(moduleDirById[libraryId], 'module.properties'))
     def outDir = layout.buildDirectory.dir('generated/bundles/library/universal')
     outputs.dir outDir
     doLast {
@@ -389,6 +391,10 @@ def registerBundle = { String taskName, String bundleName, String kind, String b
         def outDir = layout.buildDirectory.dir("generated/bundles/${bundleName}/${kind}")
         inputs.property 'bundleVersion', bundleVersion
         inputs.property 'memberVersions', ids.collectEntries { [(it): moduleVersion(it)] }
+        // The members' module.properties as well, because the metadata is built from them - the name, the
+        // authors and the licence as much as the versions. Declaring only the versions meant a rename or a
+        // licence change left the generated metadata exactly as it was.
+        inputs.files(ids.collect { new File(moduleDirById[it], 'module.properties') })
         outputs.dir outDir
         doLast {
             generatedMetadata(bundleName, kind, ids, bundleVersion)
