@@ -95,7 +95,7 @@ the `mc_storage_area_network` config.
 
 ## License
 
-[Apache-2.0](LICENSE)
+[All Rights Reserved](LICENSE)
 
 ## Author
 

@@ -120,7 +120,7 @@ The API's ownership options (`ownershipEnabled`, `teamSharing`) live in the `mc_
 
 ## License
 
-[Apache-2.0](LICENSE)
+[All Rights Reserved](LICENSE)
 
 ## Author
 

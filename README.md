@@ -225,7 +225,7 @@ See **[API-README.md](API-README.md)** for the full API reference.
 
 ## License
 
-This project's own source code is licensed under [Apache-2.0](LICENSE).
+This project's own source code is **All Rights Reserved** — see [LICENSE](LICENSE).
 
 ## Credits & third-party notices
 

@@ -41,4 +41,4 @@ Inspired by **Jake Teleports** by **Neurlimon**:
 
 The original mod's source is not available; this is an independent implementation.
 
-All other code in this module is part of MC Storage Area Network (Apache-2.0).
+All other code in this module is part of MC Storage Area Network (All Rights Reserved).
