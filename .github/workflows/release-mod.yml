@@ -71,11 +71,19 @@ jobs:
             cp "$jar" build/libs/
           done
 
-      # Safety net: only the expected release jars may be published. Anything else (for example a
-      # leftover jar with an old name) fails the run instead of being uploaded.
+      # Safety net: only the expected release jars may be published, and all of them must be there.
+      # The count is computed from the project's own modules and bundles, never hardcoded: a literal
+      # stops being checked the moment a module is added, and this one went stale when the release
+      # began shipping a sources jar per module per loader.
       - name: Verify release jar set
         run: |
           set -euo pipefail
+          expected=$(python3 -c "
+          import sys
+          sys.path.insert(0, 'tools')
+          import release
+          print(release.expected_jars('${MC_VERSION}'))
+          ")
           allowed='^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?\.jar$'
           bad=$(ls -1 dist | grep -vE "$allowed" || true)
           if [ -n "$bad" ]; then
@@ -84,8 +92,8 @@ jobs:
             exit 1
           fi
           count=$(ls -1 dist/*.jar | wc -l)
-          if [ "$count" -ne 30 ]; then
-            echo "Expected 30 release jars, found $count:" >&2
+          if [ "$count" -ne "$expected" ]; then
+            echo "Expected ${expected} release jars, found ${count}:" >&2
             ls -la dist >&2
             exit 1
           fi
@@ -148,6 +156,10 @@ jobs:
                   env.write(f"PUBLISH_BUNDLE_{n.upper()}={'true' if n in cb else 'false'}\n")
               env.write("MODULE_IDS=" + ",".join(ids) + "\n")
               env.write(f"ABBREV={abbrev}\n")
+              # The abbreviation with its trailing hyphen, so an mc-publish glob cannot gain a
+              # leading '-' when the project has no abbreviation. release.py's jar_name/bundle_name
+              # build the same prefix, so the glob and the built name cannot drift apart.
+              env.write(f"ABBREV_PREFIX={abbrev + '-' if abbrev else ''}\n")
               env.write(f"RELEASE_TAG={tag}\n")
           PY
         env:
@@ -198,11 +210,11 @@ jobs:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/${{ env.ABBREV }}-mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}-storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}-crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}-network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
-            dist/${{ env.ABBREV }}-remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
+            dist/${{ env.ABBREV_PREFIX }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
+            dist/${{ env.ABBREV_PREFIX }}storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV_PREFIX }}crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.ABBREV_PREFIX }}network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
+            dist/${{ env.ABBREV_PREFIX }}remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
           name: SAN API ${{ env.LIBRARY_VERSION }}
           version: san-api-${{ env.LIBRARY_VERSION }}
           dependencies: |
@@ -267,7 +279,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}-bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
           dependencies: |
@@ -289,7 +301,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}-bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
           dependencies: |
@@ -311,7 +323,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}-bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
           dependencies: |
@@ -333,7 +345,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}-bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
           dependencies: |
@@ -355,7 +367,7 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV }}-bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
           name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
           version: bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}
           dependencies: |
