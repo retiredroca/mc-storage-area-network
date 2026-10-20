@@ -443,7 +443,7 @@ bundleDefs.each { bundleName, spec ->
  *   2. releaseLoaderBundles     the per-loader bundle containers
  *   3. releaseUniversal         the API universal container + universal gameplay mod jars
  *   4. releaseUniversalBundles  the universal bundle containers
- * `releaseJars` unions all four into build/release/ so a release always yields the full set.
+ * `releaseJars` unions all four into build/release/<mc>/ so a release always yields the full set.
  */
 tasks.register('releaseLoaderJars', Sync) {
     def staged = delegate
@@ -536,15 +536,15 @@ tasks.named('releaseUniversalBundles') { mustRunAfter 'releaseUniversal' }
 }
 
 /**
- * Collects every release jar under build/release/ from the four staged dirs. Still the union, so a
+ * Collects every release jar under build/release/<mc>/ from the four staged dirs. Still the union, so a
  * release always yields the complete set regardless of how the individual stages were invoked.
  */
 tasks.register('releaseJars', Sync) {
     group = 'release'
-    description = 'Assemble the complete release jar set into build/release from the four stages.'
+    description = 'Assemble the complete release jar set into build/release/<mc> from the four stages.'
     dependsOn 'ensureLibrary'
     dependsOn 'releaseLoaderJars', 'releaseLoaderBundles', 'releaseUniversal', 'releaseUniversalBundles'
-    into layout.buildDirectory.dir('release')
+    into layout.buildDirectory.dir("release/${mc}")
 
     // Fail loudly if any version-pinned module jar is missing, rather than silently assembling a
     // bundle without it. Derived from the discovered modules, so a new module is covered by this.

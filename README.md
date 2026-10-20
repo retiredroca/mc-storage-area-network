@@ -116,7 +116,8 @@ python tools/release.py --mod all --dry-run      # preview; no changes
 
 `--mod` is `api` / `storage` / `crafting` / `routing` / `access` / `all`; pass `all` (or run
 **Release All**) whenever several components changed together, so no old version ends up inside a
-bundle. The tag is a single series `v1.0.<patch>.<stamp>` (e.g. `v1.0.2.26091512`). The local run
+bundle. The tag is a single series per Minecraft version `v1.0.<patch>.<stamp>-<mc>` (e.g.
+`v1.0.2.26091512-1.21.1`). The local run
 publishes the API to `repo/` first (hosts require an API version **floor**, so the artifact must be
 resolvable before they compile), builds the four groups in order, commits/tags, creates the release,
 and optionally uploads to the platforms. Creating the release triggers the publish-only workflow —

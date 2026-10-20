@@ -7,7 +7,8 @@ Scheme: ``<major>.<minor>.<patch>.<yymmddhh>`` — e.g. ``1.0.2.26091512``.
 * the semantic line (first three components) moves via `bump_semantic` -- run it through
   `tools/release.py --bump patch|minor|major`, or let the branch/merge workflow do it; it is
   never hand-edited, so the tooling stays the only thing that writes versions.properties;
-* the tag is ``v<major>.<minor>.<patch>.<stamp>`` (single series, e.g. ``v1.0.2.26091512``).
+* the tag is ``v<major>.<minor>.<patch>.<stamp>-<mc>`` (one series per Minecraft version,
+  e.g. ``v1.0.2.26091512-1.21.1``).
 
 Modules depend on the library through a **floor range** derived from the library's first three
 components, so an older library can never silently satisfy a dependant. The range is computed at
@@ -22,7 +23,7 @@ So there is nothing to rewrite on a bump, and no file in which a stale range can
 CLI:
     python tools/versioning.py stamp
     python tools/versioning.py bump <value> <stamp>
-    python tools/versioning.py tag  --api <libraryVersion> --stamp <stamp>
+    python tools/versioning.py tag  --api <libraryVersion> --stamp <stamp> --mc <mc>
     python tools/versioning.py floor --api <libraryVersion> [--mc <mc>] [--lib <moduleId>]
 """
 
@@ -101,8 +102,8 @@ def floor(version: str) -> str:
     return ".".join(parts[:3])
 
 
-def tag(version: str, stamp: str) -> str:
-    return f"v{floor(version)}.{stamp}"
+def tag(version: str, stamp: str, mc: str) -> str:
+    return f"v{floor(version)}.{stamp}-{mc}"
 
 
 # --- modules ---------------------------------------------------------------------------
@@ -196,7 +197,8 @@ def main() -> int:
     p_tag = sub.add_parser("tag")
     p_tag.add_argument("--api", required=True)
     p_tag.add_argument("--stamp", required=True)
-    p_tag.set_defaults(func=lambda a: print(tag(a.api, a.stamp)))
+    p_tag.add_argument("--mc", required=True, help="Minecraft version folder under versions/")
+    p_tag.set_defaults(func=lambda a: print(tag(a.api, a.stamp, a.mc)))
 
     p_floor = sub.add_parser("floor")
     p_floor.add_argument("--api", required=True, help="the library version to derive the floor from")

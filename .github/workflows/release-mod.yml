@@ -57,16 +57,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          rm -rf dist
-          mkdir -p dist
-          gh release download '${{ inputs.release_tag }}' --dir dist --pattern '*.jar' --clobber
-          ls -la dist
+          rm -rf "dist/${MC_VERSION}"
+          mkdir -p "dist/${MC_VERSION}"
+          gh release download '${{ inputs.release_tag }}' --dir "dist/${MC_VERSION}" --pattern '*.jar' --clobber
+          ls -la "dist/${MC_VERSION}"
           # mc-publish defaults its `files` glob to build/libs/*.jar (see its action.yml), so stage
           # the downloaded release jars there too.
           mkdir -p build/libs
           # Only the mod jars: a sources jar is not a platform artifact, and mc-publish's
           # default `files` glob over build/libs would pick one up.
-          for jar in dist/*.jar; do
+          for jar in "dist/${MC_VERSION}"/*.jar; do
             case "$jar" in *-sources.jar) continue ;; esac
             cp "$jar" build/libs/
           done
@@ -85,16 +85,16 @@ jobs:
           print(release.expected_jars('${MC_VERSION}'))
           ")
           allowed='^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?\.jar$'
-          bad=$(ls -1 dist | grep -vE "$allowed" || true)
+          bad=$(ls -1 "dist/${MC_VERSION}" | grep -vE "$allowed" || true)
           if [ -n "$bad" ]; then
-            echo "Unexpected file(s) in dist/ (refusing to publish):" >&2
+            echo "Unexpected file(s) in dist/${MC_VERSION}/ (refusing to publish):" >&2
             echo "$bad" >&2
             exit 1
           fi
-          count=$(ls -1 dist/*.jar | wc -l)
+          count=$(ls -1 "dist/${MC_VERSION}"/*.jar | wc -l)
           if [ "$count" -ne "$expected" ]; then
             echo "Expected ${expected} release jars, found ${count}:" >&2
-            ls -la dist >&2
+            ls -la "dist/${MC_VERSION}" >&2
             exit 1
           fi
           echo "Release jar set OK ($count files)"
@@ -126,9 +126,9 @@ jobs:
           def git(*args):
               return subprocess.run(['git', *args], capture_output=True, text=True).stdout
 
-          prev = git('describe', '--tags', '--abbrev=0', f'{tag}^').strip()
+          prev = git('describe', '--tags', '--abbrev=0', '--match', f'v*-{mc}', f'{tag}^').strip()
           if not prev:
-              print('No previous tag; treating every module as changed.')
+              print(f'No previous tag for Minecraft {mc}; treating every module as changed.')
               changed = set(ids)
           else:
               print(f'Diffing versions.properties: {prev}..{tag}')
@@ -173,14 +173,14 @@ jobs:
             echo
             echo
             echo "Full changelog: https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}"
-          } > dist/changelog.md
-          cat dist/changelog.md
+          } > "dist/${MC_VERSION}/changelog.md"
+          cat "dist/${MC_VERSION}/changelog.md"
 
       - name: Resolve bundle versions
         run: |
           set -euo pipefail
           # The bundle containers were already named and written by the build; their versions are
-          # recomputed from versions.properties + bundles.properties and checked against dist/,
+          # recomputed from versions.properties + bundles.properties and checked against dist/<mc>/,
           # rather than recovered by slicing a substring out of each jar's filename.
           python3 - <<'PY'
           import os, sys
@@ -210,16 +210,16 @@ jobs:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
           curseforge-files: |
-            dist/${{ env.ABBREV_PREFIX }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
-            dist/${{ env.ABBREV_PREFIX }}storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV_PREFIX }}crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
-            dist/${{ env.ABBREV_PREFIX }}network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
-            dist/${{ env.ABBREV_PREFIX }}remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
+            dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}mc_storage_area_network-${{ env.LIBRARY_VERSION }}-universal.jar
+            dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}storage_network-${{ env.STORAGE_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}crafting_network-${{ env.CRAFTING_NETWORK_VERSION }}-universal.jar
+            dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}network_routing-${{ env.NETWORK_ROUTING_VERSION }}-universal.jar
+            dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}remote_access_terminal-${{ env.REMOTE_ACCESS_TERMINAL_VERSION }}-universal.jar
           name: SAN API ${{ env.LIBRARY_VERSION }}
           version: san-api-${{ env.LIBRARY_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -267,7 +267,7 @@ jobs:
             eval "changed=\${${var}_CHANGED}"
             eval "version=\${${var}_VERSION}"
             if [ "$changed" = true ]; then
-              files+=("dist/${A}${id}-${version}-universal.jar")
+              files+=("dist/${MC_VERSION}/${A}${id}-${version}-universal.jar")
             fi
           done
           ./.github/scripts/curseforge-upload.sh "$parent" "${files[@]}"
@@ -279,12 +279,12 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}bundle-all-${{ env.BUNDLE_ALL_VERSION }}-universal.jar
           name: Bundle All ${{ env.BUNDLE_ALL_VERSION }}
           version: bundle-all-${{ env.BUNDLE_ALL_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -301,12 +301,12 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}-universal.jar
           name: Bundle Storage ${{ env.BUNDLE_STORAGE_VERSION }}
           version: bundle-storage-${{ env.BUNDLE_STORAGE_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -323,12 +323,12 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}-universal.jar
           name: Bundle Crafting ${{ env.BUNDLE_CRAFTING_VERSION }}
           version: bundle-crafting-${{ env.BUNDLE_CRAFTING_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -345,12 +345,12 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}-universal.jar
           name: Bundle Routing ${{ env.BUNDLE_ROUTING_VERSION }}
           version: bundle-routing-${{ env.BUNDLE_ROUTING_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -367,12 +367,12 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_API_KEY }}
-          curseforge-files: dist/${{ env.ABBREV_PREFIX }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
+          curseforge-files: dist/${{ env.MC_VERSION }}/${{ env.ABBREV_PREFIX }}bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}-universal.jar
           name: Bundle Access ${{ env.BUNDLE_ACCESS_VERSION }}
           version: bundle-access-${{ env.BUNDLE_ACCESS_VERSION }}
           dependencies: |
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
-          changelog-file: dist/changelog.md
+          changelog-file: dist/${{ env.MC_VERSION }}/changelog.md
           version-type: release
           game-versions: ${{ env.MC_VERSION }}
           loaders: |
@@ -394,8 +394,8 @@ jobs:
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
             mr.api.version.${MC_VERSION} "$LIBRARY_VERSION" "SAN API $LIBRARY_VERSION" \
-            "dist/${A}mc_storage_area_network-${LIBRARY_VERSION}-universal.jar" \
-            "dist/${A}bundle-all-${BUNDLE_ALL_VERSION}-universal.jar"
+            "dist/${MC_VERSION}/${A}mc_storage_area_network-${LIBRARY_VERSION}-universal.jar" \
+            "dist/${MC_VERSION}/${A}bundle-all-${BUNDLE_ALL_VERSION}-universal.jar"
 
       - name: Modrinth - Storage Network + Bundle Storage
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_STORAGE == 'true') }}
@@ -407,8 +407,8 @@ jobs:
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_STORAGE_ID || 'storage-network' }}" \
             mr.storage.version.${MC_VERSION} "$STORAGE_NETWORK_VERSION" "Storage Network $STORAGE_NETWORK_VERSION" \
-            "dist/${A}storage_network-${STORAGE_NETWORK_VERSION}-universal.jar" \
-            "dist/${A}bundle-storage-${BUNDLE_STORAGE_VERSION}-universal.jar"
+            "dist/${MC_VERSION}/${A}storage_network-${STORAGE_NETWORK_VERSION}-universal.jar" \
+            "dist/${MC_VERSION}/${A}bundle-storage-${BUNDLE_STORAGE_VERSION}-universal.jar"
 
       - name: Modrinth - Crafting Network + Bundle Crafting
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_CRAFTING == 'true') }}
@@ -420,8 +420,8 @@ jobs:
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_CRAFTING_ID || 'crafting-network' }}" \
             mr.crafting.version.${MC_VERSION} "$CRAFTING_NETWORK_VERSION" "Crafting Network $CRAFTING_NETWORK_VERSION" \
-            "dist/${A}crafting_network-${CRAFTING_NETWORK_VERSION}-universal.jar" \
-            "dist/${A}bundle-crafting-${BUNDLE_CRAFTING_VERSION}-universal.jar"
+            "dist/${MC_VERSION}/${A}crafting_network-${CRAFTING_NETWORK_VERSION}-universal.jar" \
+            "dist/${MC_VERSION}/${A}bundle-crafting-${BUNDLE_CRAFTING_VERSION}-universal.jar"
 
       - name: Modrinth - Network Routing + Bundle Routing
         if: ${{ vars.PUBLISH_MODRINTH == 'true' && (env.PUBLISH_BUNDLE_ROUTING == 'true') }}
@@ -433,8 +433,8 @@ jobs:
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ROUTING_ID || 'network-routing' }}" \
             mr.routing.version.${MC_VERSION} "$NETWORK_ROUTING_VERSION" "Network Routing $NETWORK_ROUTING_VERSION" \
-            "dist/${A}network_routing-${NETWORK_ROUTING_VERSION}-universal.jar" \
-            "dist/${A}bundle-routing-${BUNDLE_ROUTING_VERSION}-universal.jar"
+            "dist/${MC_VERSION}/${A}network_routing-${NETWORK_ROUTING_VERSION}-universal.jar" \
+            "dist/${MC_VERSION}/${A}bundle-routing-${BUNDLE_ROUTING_VERSION}-universal.jar"
 
       # Remote Access Terminal shares the suite's Modrinth project, so it has no project variable of
       # its own; only the state key (which version to archive) is per-component.
@@ -448,8 +448,8 @@ jobs:
           ./.github/scripts/modrinth-sync.sh \
             "${{ vars.MODRINTH_ID || 'mc-storage-area-network' }}" \
             mr.access.version.${MC_VERSION} "$REMOTE_ACCESS_TERMINAL_VERSION" "Remote Access Terminal $REMOTE_ACCESS_TERMINAL_VERSION" \
-            "dist/${A}remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal.jar" \
-            "dist/${A}bundle-access-${BUNDLE_ACCESS_VERSION}-universal.jar"
+            "dist/${MC_VERSION}/${A}remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal.jar" \
+            "dist/${MC_VERSION}/${A}bundle-access-${BUNDLE_ACCESS_VERSION}-universal.jar"
 
       # --- Persist the bumped versions / learned platform ids back to main ---------------------
       # Runs on failure as well as success, but not on cancellation. A platform upload can fail

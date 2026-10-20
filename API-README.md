@@ -296,7 +296,7 @@ CrafterAutomation.toggle(player, crafterPos);    // crafter ↔ network link
 ./gradlew -Pmc=1.21.1 releaseLoaderBundles     # per-loader bundles
 ./gradlew -Pmc=1.21.1 releaseUniversal         # universal API + mod jars
 ./gradlew -Pmc=1.21.1 releaseUniversalBundles  # universal bundles
-./gradlew -Pmc=1.21.1 releaseJars              # everything -> build/release/ (final file names)
+./gradlew -Pmc=1.21.1 releaseJars              # everything -> build/release/<mc>/ (final file names)
 
 ./gradlew publishApi      # per-loader jars -> mavenLocal (for local host builds)
 ./gradlew publishRepo     # per-loader jars + universal API -> ./repo (committed maven for distribution)

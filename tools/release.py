@@ -38,7 +38,7 @@ import versioning
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = ROOT / "versions.properties"
 STATE = ROOT / "release-state.properties"
-DIST = ROOT / "dist"
+DIST_ROOT = ROOT / "dist"
 UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
 
 # Default Minecraft version, used where the module set is needed before argparse has parsed
@@ -204,6 +204,14 @@ def read_props(path):
     return props
 
 
+def default_mc():
+    return (read_props(ROOT / "gradle.properties").get("mc") or "1.21.1").strip()
+
+
+def dist_dir(mc):
+    return DIST_ROOT / mc
+
+
 def set_prop(text, key, value):
     # [^\r\n]* rather than .* so a CRLF file gets a clean LF-terminated replacement.
     pattern = re.compile(rf"(?m)^{re.escape(key)}=[^\r\n]*")
@@ -295,7 +303,7 @@ def build(mc, dry, no_daemon=False, stamp=None):
              "publishMavenJavaPublicationToRepoRepository"], dry=dry)
     # Staged build (loader jars -> loader bundles -> universal -> universal bundles) as four
     # invocations, so a failure names the layer that broke. The last one also unions the staged
-    # dirs into build/release/ and republishes the API to ./repo.
+    # dirs into build/release/<mc>/ and republishes the API to ./repo.
     # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
     run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
         dry=dry)
@@ -307,44 +315,45 @@ def build(mc, dry, no_daemon=False, stamp=None):
 
 def collect(mc, dry):
     if not dry:
-        # Clear stale artifacts, but keep the tracked dist/.gitkeep.
-        DIST.mkdir(exist_ok=True)
-        for path in DIST.iterdir():
-            if path.name == ".gitkeep":
-                continue
+        # Clear this version's staged artifacts; the tracked dist/.gitkeep stays at the root.
+        out = dist_dir(mc)
+        out.mkdir(parents=True, exist_ok=True)
+        for path in out.iterdir():
             if path.is_dir():
                 shutil.rmtree(path)
             else:
                 path.unlink()
-        release = ROOT / "build" / "release"
+        release = ROOT / "build" / "release" / mc
         jars = sorted(release.glob("*.jar"))
         if not jars:
             die(f"no jars in {release}; did the build run?")
         for jar in jars:
-            shutil.copy2(jar, DIST)
+            shutil.copy2(jar, out)
     verify(mc, dry)
 
 
 def verify(mc, dry):
     if dry:
         return
-    jars = sorted(p.name for p in DIST.glob("*.jar"))
+    jars = sorted(p.name for p in dist_dir(mc).glob("*.jar"))
     bad = [j for j in jars if not ALLOWED_JAR.match(j)]
     if bad:
-        die(f"unexpected files in dist/: {bad}")
+        die(f"unexpected files in dist/{mc}/: {bad}")
     expected = expected_jars(mc)
     if len(jars) != expected:
         die(f"expected {expected} release jars, found {len(jars)}: {jars}")
     log(f"release jar set OK ({len(jars)} files)")
 
 
-def changelog(tag, dry):
+def changelog(tag, mc, dry):
     if dry:
         return
     lines = capture(["git", "log", "-3", "--no-merges", "--pretty=format:- %s (`%h`)"])
     link = f"https://github.com/{repo_slug()}/releases/tag/{tag}"
-    (DIST / "changelog.md").write_text(f"{lines}\n\nFull changelog: {link}\n", encoding="utf-8")
-    log("wrote dist/changelog.md")
+    dest = dist_dir(mc)
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "changelog.md").write_text(f"{lines}\n\nFull changelog: {link}\n", encoding="utf-8")
+    log(f"wrote dist/{mc}/changelog.md")
 
 
 def _version_key(v):
@@ -364,9 +373,9 @@ def bundle_versions(mc, versions):
     out = {}
     for key, ids in bundle_definitions(mc).items():
         version = max((versions[i] for i in ids), key=_version_key)
-        expected = DIST / bundle_name(key, version)
+        expected = dist_dir(mc) / bundle_name(key, version)
         if not expected.exists():
-            built = sorted(DIST.glob(bundle_name(key, "*")))
+            built = sorted(dist_dir(mc).glob(bundle_name(key, "*")))
             die(f"bundle '{key}' should be {expected.name} but dist/ has "
                 + (", ".join(b.name for b in built) if built else "no such bundle jar"))
         out[key] = version
@@ -479,8 +488,8 @@ def github_release(token, tag, target, body, dry):
     return resp
 
 
-def upload_assets(token, release_id, dry):
-    for jar in sorted(DIST.glob("*.jar")):
+def upload_assets(token, release_id, mc, dry):
+    for jar in sorted(dist_dir(mc).glob("*.jar")):
         url = f"https://uploads.github.com/repos/{repo_slug()}/releases/{release_id}/assets?name={jar.name}"
         if dry:
             print(f"  [dry-run] upload {jar.name}")
@@ -560,21 +569,21 @@ def cf_upload(token, project_id, file_path, metadata, dry, attempt_retries=5):
 def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
     version_ids = cf_game_version_ids(token, mc, dry)
     common = {"releaseType": "release", "gameVersions": version_ids,
-              "changelog": (DIST / "changelog.md").read_text(encoding="utf-8") if (DIST / "changelog.md").exists() else "",
+              "changelog": (dist_dir(mc) / "changelog.md").read_text(encoding="utf-8") if (dist_dir(mc) / "changelog.md").exists() else "",
               "changelogType": "markdown"}
     parent_key = f"cf.api.file.{mc}"
     (lib,) = library_ids(mc)
     others = gameplay_ids(mc)
 
     if changed[lib]:
-        lib_jar = DIST / jar_name(lib, versions[lib], "universal")
+        lib_jar = dist_dir(mc) / jar_name(lib, versions[lib], "universal")
         result = cf_upload(token, project_id, lib_jar, {**common, "displayName": lib_jar.name}, dry)
         file_id = (result or {}).get("id")
         if file_id:
             set_state(parent_key, str(file_id))
             log(f"{parent_key}={file_id}")
             for comp in others:
-                jar = DIST / jar_name(comp, versions[comp], "universal")
+                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal")
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
     else:
@@ -583,12 +592,12 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
             for comp in others:
                 if not changed[comp]:
                     continue
-                jar = DIST / jar_name(comp, versions[comp], "universal")
+                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal")
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
 
     for filename in bundle_jobs(mc, changed, bundles):
-        jar = DIST / filename
+        jar = dist_dir(mc) / filename
         if not jar.exists():
             # Do not skip silently: a missing jar here means the name or the version is wrong, and
             # that is a bug, not a reason to publish a partial set.
@@ -604,7 +613,7 @@ def modrinth_sync(token, project, state_key, version_number, version_name, mc, p
         "project_id": project,
         "name": version_name,
         "version_number": version_number,
-        "changelog": (DIST / "changelog.md").read_text(encoding="utf-8") if (DIST / "changelog.md").exists() else "",
+        "changelog": (dist_dir(mc) / "changelog.md").read_text(encoding="utf-8") if (dist_dir(mc) / "changelog.md").exists() else "",
         "version_type": "release",
         "status": "listed",
         "featured": False,
@@ -675,8 +684,9 @@ def main():
     ap = argparse.ArgumentParser(description="Build and publish a release locally.")
     ap.add_argument("--mod", required=True,
                     choices=versioning.module_ids(ARGS_MC_DEFAULT) + ["all"],
-                    help="which module is changing (the tag is always v<library>.<stamp>)")
-    ap.add_argument("--mc", default="1.21.1")
+                    help="which module is changing (the tag is always v<library>.<stamp>-<mc>)")
+    ap.add_argument("--mc", default=None,
+                    help="Minecraft version folder under versions/ (default: mc in gradle.properties)")
     ap.add_argument("--tag", default=None)
     ap.add_argument("--curseforge", action="store_true", help="also upload to CurseForge")
     ap.add_argument("--modrinth", action="store_true", help="also upload to Modrinth")
@@ -686,7 +696,8 @@ def main():
     ap.add_argument("--unsigned", action="store_true", help="do not GPG-sign the commit and tag")
     ap.add_argument("--allow-dirty", action="store_true")
     ap.add_argument("--no-push", action="store_true")
-    ap.add_argument("--skip-build", action="store_true", help="reuse the existing dist/")
+    ap.add_argument("--skip-build", action="store_true",
+                    help="reuse the existing dist/<mc>/")
     ap.add_argument("--no-daemon", action="store_true",
                     help="do not reuse a Gradle daemon (slower; reproduces a CI-like cold build)")
     ap.add_argument("--local-only", action="store_true",
@@ -702,6 +713,7 @@ def main():
     args = ap.parse_args()
 
     dry = args.dry_run
+    args.mc = args.mc or default_mc()
     ensure_clean(args.allow_dirty)
 
     # --bump is a standalone, version-only operation: it writes versions.properties and stops. It
@@ -728,7 +740,12 @@ def main():
         for path in versioning.floor_paths(args.mc, lib):
             log(f"floor dependant of {lib} {versions[lib]}: {path}")
 
-    tag = args.tag or versioning.tag(versions[lib], stamp)
+    if args.tag:
+        tag = args.tag
+        if not tag.endswith(f"-{args.mc}"):
+            die(f"tag {tag!r} must end with -{args.mc} (the Minecraft version)")
+    else:
+        tag = versioning.tag(versions[lib], stamp, args.mc)
     log(f"tag: {tag}")
 
     if not args.skip_build:
@@ -736,10 +753,10 @@ def main():
         collect(args.mc, dry)
     else:
         verify(args.mc, dry)
-    changelog(tag, dry)
+    changelog(tag, args.mc, dry)
 
     if args.local_only:
-        log(f"local-only: built the {tag} jars into build/release/ and dist/")
+        log(f"local-only: built the {tag} jars into build/release/{args.mc}/ and dist/{args.mc}/")
         log("no commit, tag, push, GitHub release or platform publishing was performed")
         log("versions.properties was bumped; undo with: git checkout -- versions.properties")
         return
@@ -766,7 +783,7 @@ def main():
     marker = "<!-- mc-san:published -->" if (args.curseforge or args.modrinth or args.no_ci_publish) else ""
     release = github_release(token, tag, target, marker, dry)
     if release:
-        upload_assets(token, release["id"], dry)
+        upload_assets(token, release["id"], args.mc, dry)
         publish_release(token, release["id"], dry)
 
     bundles = bundle_versions(args.mc, versions)
@@ -783,8 +800,8 @@ def main():
             die("--modrinth needs MODRINTH_TOKEN (use tools/secrets.py run)")
         modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
                       f"mr.api.version.{args.mc}", versions[lib], f"SAN API {versions[lib]}", args.mc,
-                      DIST / jar_name(lib, versions[lib], "universal"),
-                      [DIST / bundle_name("all", bundles["all"])], dry)
+                      dist_dir(args.mc) / jar_name(lib, versions[lib], "universal"),
+                      [dist_dir(args.mc) / bundle_name("all", bundles["all"])], dry)
 
     if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
         run(["git", "push", "origin", current_branch()], dry=dry)
