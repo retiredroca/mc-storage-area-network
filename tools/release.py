@@ -119,7 +119,7 @@ def bundle_jobs(mc, changed, bundles):
     if "all" in bundles:
         names.add("all")
     names |= changed_bundles(mc, changed)
-    return [bundle_name(n, bundles[n]) for n in sorted(names) if n in bundles]
+    return [bundle_name(n, bundles[n], mc) for n in sorted(names) if n in bundles]
 
 
 # The project abbreviation (abbrev in versions.properties), prepended to every release jar name so
@@ -127,24 +127,24 @@ def bundle_jobs(mc, changed, bundles):
 ABBREV = (versioning.load_props(VERSIONS).get("abbrev") or "").strip()
 
 
-def jar_name(mod_id, version, kind):
-    """Release jar name, matching jarFileName in gradle/versions.gradle: [<abbrev>-]<id>-<version>-<kind>.jar.
+def jar_name(mod_id, version, kind, mc):
+    """Release jar name: [<abbrev>-]<id>-<version>-<kind>-<mc>.jar, matching jarFileName.
 
     The id is the module's own, straight from module.properties, so this needs no table: a module's
     name in versions.properties, in its jar, and in its maven coordinate is one string.
     """
     prefix = f"{ABBREV}-" if ABBREV else ""
-    return f"{prefix}{mod_id}-{version}-{kind}.jar"
+    return f"{prefix}{mod_id}-{version}-{kind}-{mc}.jar"
 
 
-def bundle_name(key, version):
-    """Bundle container jar name: [<abbrev>-]bundle-<key>-<version>-universal.jar.
+def bundle_name(key, version, mc):
+    """Bundle container jar name: [<abbrev>-]bundle-<key>-<version>-universal-<mc>.jar.
 
     Same convention as jar_name(), with the bundle key in the id position and the universal loader
-    last. Every bundle upload path goes through here so the shape is defined once.
+    before the Minecraft version. Every bundle upload path goes through here.
     """
     prefix = f"{ABBREV}-" if ABBREV else ""
-    return f"{prefix}bundle-{key}-{version}-universal.jar"
+    return f"{prefix}bundle-{key}-{version}-universal-{mc}.jar"
 
 
 # A release jar is [<abbrev>-]<id>-<version>-<kind>.jar, matching jarFileName in gradle/versions.gradle:
@@ -155,7 +155,7 @@ def bundle_name(key, version):
 # loader: that suffix exists only in the release, because both builds name their sources jar
 # <id>-<version>-sources.jar for a maven consumer, and flattening the two into one directory would
 # collide. Identical to the same guard in redstone-pcbs and both templates.
-ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?\.jar$")
+ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?-[0-9][0-9.]*\.jar$")
 
 
 def log(msg):
@@ -373,9 +373,9 @@ def bundle_versions(mc, versions):
     out = {}
     for key, ids in bundle_definitions(mc).items():
         version = max((versions[i] for i in ids), key=_version_key)
-        expected = dist_dir(mc) / bundle_name(key, version)
+        expected = dist_dir(mc) / bundle_name(key, version, mc)
         if not expected.exists():
-            built = sorted(dist_dir(mc).glob(bundle_name(key, "*")))
+            built = sorted(dist_dir(mc).glob(bundle_name(key, "*", mc)))
             die(f"bundle '{key}' should be {expected.name} but dist/ has "
                 + (", ".join(b.name for b in built) if built else "no such bundle jar"))
         out[key] = version
@@ -576,14 +576,14 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
     others = gameplay_ids(mc)
 
     if changed[lib]:
-        lib_jar = dist_dir(mc) / jar_name(lib, versions[lib], "universal")
+        lib_jar = dist_dir(mc) / jar_name(lib, versions[lib], "universal", mc)
         result = cf_upload(token, project_id, lib_jar, {**common, "displayName": lib_jar.name}, dry)
         file_id = (result or {}).get("id")
         if file_id:
             set_state(parent_key, str(file_id))
             log(f"{parent_key}={file_id}")
             for comp in others:
-                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal")
+                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal", mc)
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
     else:
@@ -592,7 +592,7 @@ def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
             for comp in others:
                 if not changed[comp]:
                     continue
-                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal")
+                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal", mc)
                 if jar.exists():
                     cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
 
@@ -799,9 +799,10 @@ def main():
         if not mr:
             die("--modrinth needs MODRINTH_TOKEN (use tools/secrets.py run)")
         modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
-                      f"mr.api.version.{args.mc}", versions[lib], f"SAN API {versions[lib]}", args.mc,
-                      dist_dir(args.mc) / jar_name(lib, versions[lib], "universal"),
-                      [dist_dir(args.mc) / bundle_name("all", bundles["all"])], dry)
+                      f"mr.api.version.{args.mc}", f"{versions[lib]}-{args.mc}",
+                      f"SAN API {versions[lib]}-{args.mc}", args.mc,
+                      dist_dir(args.mc) / jar_name(lib, versions[lib], "universal", args.mc),
+                      [dist_dir(args.mc) / bundle_name("all", bundles["all"], args.mc)], dry)
 
     if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
         run(["git", "push", "origin", current_branch()], dry=dry)

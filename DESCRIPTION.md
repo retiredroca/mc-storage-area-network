@@ -152,7 +152,7 @@ Higher tiers also make processor terminals work faster.
 Every jar below is **universal** — the same file works on both Fabric and NeoForge (it holds the
 loader-specific builds inside and each loader loads only its own copy).
 
-**It is best to use the bundle.** `mcsan-bundle-all-<version>-universal.jar` is the whole suite in one
+**It is best to use the bundle.** `mcsan-bundle-all-<version>-universal-<mc>.jar` is the whole suite in one
 file — drop it in `mods/` and you are done. Want only part of it? `mcsan-bundle-storage`,
 `mcsan-bundle-crafting`, `mcsan-bundle-routing` and `mcsan-bundle-access` are the same
 idea for one gameplay mod each, and they always bring the API along.
@@ -168,7 +168,7 @@ idea for one gameplay mod each, and they always bring the API along.
 | Storage + Routing | `mcsan-mc_storage_area_network` + `mcsan-storage_network` + `mcsan-network_routing` |
 | Everything | `mcsan-bundle-all` (or all five jars) |
 
-- **Every gameplay mod needs the API jar** (`mcsan-mc_storage_area_network-<version>-universal.jar`).
+- **Every gameplay mod needs the API jar** (`mcsan-mc_storage_area_network-<version>-universal-<mc>.jar`).
 - **Network Routing does not run without Storage Network** — installing the routing jar on its own
   will not load. That is why `mcsan-bundle-routing` contains both.
 - **Remote Access Terminal needs only the API** — its Routing Linker trip appears when Network

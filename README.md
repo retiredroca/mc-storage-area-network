@@ -40,14 +40,14 @@ A single jar works on **Fabric** and **NeoForge**.
 2. Drop the **universal** API jar into your `mods/` folder:
 
    ```
-   mcsan-mc_storage_area_network-<version>-universal.jar
+   mcsan-mc_storage_area_network-<version>-universal-<mc>.jar
    ```
 
    One jar for both loaders — a thin container holding the Fabric and NeoForge builds, where each
    loader loads only its own nested copy.
 
 > This API is a **required dependency** of every gameplay mod. For the whole suite, use a
-> **bundle**: `mcsan-bundle-all-<version>-universal.jar` (API + all gameplay mods), or one of the
+> **bundle**: `mcsan-bundle-all-<version>-universal-<mc>.jar` (API + all gameplay mods), or one of the
 > per-mod bundles — `mcsan-bundle-storage` / `-crafting` / `-access` (API + that mod), or
 > `mcsan-bundle-routing` for Storage Network + Network Routing.
 
@@ -55,14 +55,14 @@ A single jar works on **Fabric** and **NeoForge**.
 
 | File | Loader | Contents |
 |------|--------|----------|
-| `mcsan-mc_storage_area_network-<version>-universal.jar` | Fabric + NeoForge | This API |
-| `mcsan-storage_network-<version>-universal.jar` | Fabric + NeoForge | Storage Network (needs the API) |
-| `mcsan-crafting_network-<version>-universal.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
-| `mcsan-network_routing-<version>-universal.jar` | Fabric + NeoForge | Network Routing (needs the API) |
-| `mcsan-remote_access_terminal-<version>-universal.jar` | Fabric + NeoForge | Remote Access Terminal (needs the API) |
-| `mcsan-bundle-all-<version>-universal.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing + Remote Access Terminal |
+| `mcsan-mc_storage_area_network-<version>-universal-<mc>.jar` | Fabric + NeoForge | This API |
+| `mcsan-storage_network-<version>-universal-<mc>.jar` | Fabric + NeoForge | Storage Network (needs the API) |
+| `mcsan-crafting_network-<version>-universal-<mc>.jar` | Fabric + NeoForge | Crafting Network (needs the API) |
+| `mcsan-network_routing-<version>-universal-<mc>.jar` | Fabric + NeoForge | Network Routing (needs the API) |
+| `mcsan-remote_access_terminal-<version>-universal-<mc>.jar` | Fabric + NeoForge | Remote Access Terminal (needs the API) |
+| `mcsan-bundle-all-<version>-universal-<mc>.jar` | Fabric + NeoForge | API + Storage Network + Crafting Network + Network Routing + Remote Access Terminal |
 | `mcsan-bundle-storage` / `-crafting` / `-routing` / `-access` | Fabric + NeoForge | API + one gameplay mod (routing also includes Storage Network) |
-| `mcsan-<id>-<version>-fabric.jar` / `-neoforge.jar` | single loader | any of the above, loader-specific |
+| `mcsan-<id>-<version>-fabric-<mc>.jar` / `-neoforge-<mc>.jar` | single loader | any of the above, loader-specific |
 
 Universal jars are published to **CurseForge / Modrinth**; the loader-specific (`fabric-*` /
 `neoforge-*`) builds are on
