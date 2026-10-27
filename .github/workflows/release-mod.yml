@@ -452,33 +452,14 @@ jobs:
             "dist/${MC_VERSION}/${A}remote_access_terminal-${REMOTE_ACCESS_TERMINAL_VERSION}-universal-${MC_VERSION}.jar" \
             "dist/${MC_VERSION}/${A}bundle-access-${BUNDLE_ACCESS_VERSION}-universal-${MC_VERSION}.jar"
 
-      # --- Persist the bumped versions / learned platform ids back to main ---------------------
-      # Runs on failure as well as success, but not on cancellation. A platform upload can fail
-      # after another platform has already learned new ids (e.g. CurseForge creates the "SAN API"
-      # entry and records its file id before Modrinth runs), and without this the job would stop at
-      # the failed upload and silently discard those ids, so the next release would create yet
-      # another entry instead of reusing the one just uploaded.
-      - name: Commit version + release state
-        if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          if git diff --quiet -- versions.properties release-state.properties; then
-            echo "No version/state changes to commit."
-            exit 0
-          fi
-
-          # The checkout is at the release tag, so the tree can differ from origin/main by more than
-          # the two files stashed here. Stashing only those two leaves e.g. an updated script as a
-          # working-tree change, and `git checkout -B main origin/main` then aborts:
-          #   error: Your local changes to the following files would be overwritten by checkout
-          # Stash the whole tree instead, so the branch switch has nothing to carry over.
-          git stash push --include-untracked
-          git fetch origin main
-          git checkout -B main origin/main
-          git stash pop
-          git add versions.properties release-state.properties
-          git commit -m "Release ${{ env.RELEASE_TAG }}: update release state"
-          git push origin main
+      # --- Preserve release-state for the maintainer to commit manually -----------------------
+      # No workflow may create commits. Upload the updated state (including ids learned by a
+      # platform before another platform failed) so the maintainer can commit it when instructed.
+      - name: Upload release state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-state-${{ env.RELEASE_TAG }}-${{ env.MC_VERSION }}
+          path: release-state.properties
+          if-no-files-found: ignore
+          retention-days: 30

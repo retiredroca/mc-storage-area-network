@@ -1,160 +1,38 @@
 #!/usr/bin/env python3
-"""Local release driver.
+"""Local release preparation.
 
-Builds the release jars, commits the version bump, creates the GitHub tag + release, and then asks
-CI to publish that release to CurseForge/Modrinth.
+This script no longer commits, pushes, creates GitHub releases or publishes to CurseForge/Modrinth.
+It has two local phases:
 
-Typical use:
+    python tools/release.py --mod all              # stamp versions and build/verify every version
+    # commit and push the prepared files yourself
+    python tools/release.py --create-tags          # create the local v<version>-<mc> tags
 
-    python tools/release.py --mod all                 # build here, CI publishes it
-    python tools/release.py --mod all --dry-run
-    python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
+Pushing those tags triggers the GitHub workflow that builds the release, creates the GitHub release
+with every jar and sources jar, and publishes only the universal jars to CurseForge/Modrinth.
 
-By default the GitHub release happens and then the publish-only workflow
-(.github/workflows/publish-release.yml) is dispatched to upload the jars to CurseForge/Modrinth;
---no-ci-publish skips that. Passing --curseforge / --modrinth uploads from this machine instead
-(reading CURSEFORGE_API_KEY / MODRINTH_TOKEN from the environment - use secrets.py run to supply
-them from the encrypted vault) and marks the release, so a CI run would skip it. The tag is a
-single series `v<api 3 parts>.<stamp>` (e.g. `v1.0.2.26091512`).
-
-The build reuses a warm Gradle daemon (the 12G one configured in the root gradle.properties), so
-the six Gradle invocations do not each pay cold-start and reconfiguration of every included build.
-Pass --no-daemon to reproduce a CI-like cold build instead.
+Without --mc, both phases operate on every version under versions/. --mc <mc> restricts them to one.
+--local-only stops after the build phase and never creates tags. --bump moves the semantic version
+line and stops; it never commits.
 """
 
 import argparse
-import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 import versioning
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = ROOT / "versions.properties"
-STATE = ROOT / "release-state.properties"
 DIST_ROOT = ROOT / "dist"
-UA = "retiredroca-release (github.com/retiredroca/mc-storage-area-network)"
 
-# Default Minecraft version, used where the module set is needed before argparse has parsed
-# --mc. Kept here so the default lives in one place rather than in each call site.
-ARGS_MC_DEFAULT = "1.21.1"
-
-def module_ids(mc):
-    """Every module id under versions/<mc>/, in directory order."""
-    return versioning.module_ids(mc)
-
-
-def library_ids(mc):
-    return [lib_id for lib_id, _, _ in versioning.libraries(mc)]
-
-
-def bundle_definitions(mc):
-    """bundles.properties as an ordered {name: [module ids]} map, skipping empty bundles.
-
-    Only bare `bundle.<name>` keys are membership. `bundle.<name>.title` and
-    `bundle.<name>.description` are the container's display strings and must not be counted as
-    bundles: a startswith("bundle.") filter picks them up, and each then looks like a bundle with one
-    bogus member, which doubles expected_jars and puts a publish gate on a bundle that does not exist.
-    gradle/versions.gradle and build.gradle use the same pattern.
-    """
-    path = ROOT / "bundles.properties"
-    if not path.exists():
-        return {}
-    props = read_props(path)
-    out = {}
-    for key in sorted(k for k in props if re.fullmatch(r"bundle\.[^.]+", k)):
-        ids = [i.strip() for i in props[key].split(",") if i.strip()]
-        if ids:
-            out[key[len("bundle."):]] = ids
-    return out
-
-
-def expected_jars(mc):
-    """How many jars the release set must contain: per-loader + sources + universal + bundles.
-
-    Each module contributes one jar per loader, one sources jar per loader, and one universal jar;
-    each bundle contributes a universal container plus one per-loader container, so three files per
-    bundle. A bundle has no sources of its own: its sources are its members', which are already here.
-    Derived from the module and bundle counts rather than written down, because a hand-written number
-    stops being checked the moment a module is added or removed.
-    """
-    loaders = ["fabric", "neoforge"]
-    sources = len(module_ids(mc)) * len(loaders)
-    return len(module_ids(mc)) * (len(loaders) + 1) + sources + len(bundle_definitions(mc)) * (1 + len(loaders))
-
-
-def changed_bundles(mc, changed):
-    """Bundles a release actually changed: any whose members include a changed module.
-
-    Derived from bundles.properties, the same file the build reads, so the publish gate and the
-    container can never be built from different membership. The four conditions this replaces
-    ("api or storage", "api or crafting", ...) each restated one bundle's member list by hand.
-    """
-    out = set()
-    for name, ids in bundle_definitions(mc).items():
-        if any(changed.get(i) for i in ids):
-            out.add(name)
-    return out
-
-
-def gameplay_ids(mc):
-    """Every module id except the library, in directory order."""
-    libs = set(library_ids(mc))
-    return [i for i in module_ids(mc) if i not in libs]
-
-
-def bundle_jobs(mc, changed, bundles):
-    """The bundle containers this release publishes.
-
-    bundle-all is unconditional: it is the CurseForge parent entry the other bundles hang off, so it
-    has to exist even when only one module moved.
-    """
-    names = set()
-    if "all" in bundles:
-        names.add("all")
-    names |= changed_bundles(mc, changed)
-    return [bundle_name(n, bundles[n], mc) for n in sorted(names) if n in bundles]
-
-
-# The project abbreviation (abbrev in versions.properties), prepended to every release jar name so
-# jars from different projects cannot collide side by side. Matches jarFileName in gradle/versions.gradle.
-ABBREV = (versioning.load_props(VERSIONS).get("abbrev") or "").strip()
-
-
-def jar_name(mod_id, version, kind, mc):
-    """Release jar name: [<abbrev>-]<id>-<version>-<kind>-<mc>.jar, matching jarFileName.
-
-    The id is the module's own, straight from module.properties, so this needs no table: a module's
-    name in versions.properties, in its jar, and in its maven coordinate is one string.
-    """
-    prefix = f"{ABBREV}-" if ABBREV else ""
-    return f"{prefix}{mod_id}-{version}-{kind}-{mc}.jar"
-
-
-def bundle_name(key, version, mc):
-    """Bundle container jar name: [<abbrev>-]bundle-<key>-<version>-universal-<mc>.jar.
-
-    Same convention as jar_name(), with the bundle key in the id position and the universal loader
-    before the Minecraft version. Every bundle upload path goes through here.
-    """
-    prefix = f"{ABBREV}-" if ABBREV else ""
-    return f"{prefix}bundle-{key}-{version}-universal-{mc}.jar"
-
-
-# A release jar is [<abbrev>-]<id>-<version>-<kind>.jar, matching jarFileName in gradle/versions.gradle:
-# the version is numeric and the kind is one of the three loaders. Matching the shape rather than listing
-# every id means an added module needs no edit here, and it rejects every pre-rename shape (a leading
-# loader, or a dot before the version), which a count check cannot. The id group allows dashes so an
-# abbrev or a `bundle-` prefix matches. A sources jar is the same shape with `-sources` after its
-# loader: that suffix exists only in the release, because both builds name their sources jar
-# <id>-<version>-sources.jar for a maven consumer, and flattening the two into one directory would
-# collide. Identical to the same guard in redstone-pcbs and both templates.
+# A release jar is [<abbrev>-]<id>-<version>-<kind>-<mc>.jar, matching jarFileName in
+# gradle/versions.gradle. The id group allows dashes so a `bundle-` prefix matches. A sources jar
+# carries -sources before the Minecraft suffix.
 ALLOWED_JAR = re.compile(r"^[A-Za-z0-9_-]+-[0-9][0-9.]*-(fabric|neoforge|universal)(-sources)?-[0-9][0-9.]*\.jar$")
 
 
@@ -192,20 +70,18 @@ def gradlew():
     return [str(ROOT / "gradlew")]
 
 
-# --- versions.properties ------------------------------------------------------------
+# --- versions and modules -----------------------------------------------------------
 
 
 def read_props(path):
     props = {}
+    if not path.exists():
+        return props
     for line in path.read_text(encoding="utf-8").splitlines():
         if "=" in line and not line.lstrip().startswith("#"):
             key, _, value = line.partition("=")
             props[key.strip()] = value.strip()
     return props
-
-
-def default_mc():
-    return (read_props(ROOT / "gradle.properties").get("mc") or "1.21.1").strip()
 
 
 def dist_dir(mc):
@@ -220,102 +96,188 @@ def set_prop(text, key, value):
     return pattern.sub(f"{key}={value}", text)
 
 
-def bump(mc, mod, stamp, dry=False):
-    text = VERSIONS.read_text(encoding="utf-8")
-    current = read_props(VERSIONS)
+def all_versions():
+    """Every versions/<mc> directory that contains at least one module, sorted."""
+    base = ROOT / "versions"
+    if not base.is_dir():
+        return []
+    out = []
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir():
+            continue
+        if not (entry / "version.properties").is_file():
+            continue
+        if versioning.modules(entry.name):
+            out.append(entry.name)
+    return out
+
+
+def selected_versions(args):
+    if args.mc:
+        if args.mc not in all_versions():
+            die(f"unknown Minecraft version '{args.mc}' under versions/")
+        return [args.mc]
+    versions = all_versions()
+    if not versions:
+        die("no versions found under versions/")
+    return versions
+
+
+def module_ids(mc):
+    return [props.get("id") for _, props in versioning.modules(mc) if props.get("id")]
+
+
+def library_ids(mc):
+    return [lib_id for lib_id, _, _ in versioning.libraries(mc)]
+
+
+def primary_id(mc):
+    libs = library_ids(mc)
     ids = module_ids(mc)
+    if not ids:
+        die(f"no modules found under versions/{mc}")
+    return libs[0] if libs else ids[0]
+
+
+def union_ids(versions):
+    ordered = []
+    for mc in versions:
+        for mod_id in module_ids(mc):
+            if mod_id not in ordered:
+                ordered.append(mod_id)
+    return ordered
+
+
+def bump_all(versions, mod, stamp, dry=False):
+    """Stamp the named component(s) once, across all selected versions."""
+    ids = union_ids(versions)
     if mod == "all":
         targets = ids
     elif mod in ids:
         targets = [mod]
     else:
         die(f"unknown mod '{mod}' (known: {', '.join(ids)}, all)")
-    changed = {c: False for c in ids}
+    text = VERSIONS.read_text(encoding="utf-8")
+    current = read_props(VERSIONS)
+    new_versions = dict(current)
     for comp in targets:
-        current[comp] = versioning.bump(current[comp], stamp)
-        text = set_prop(text, comp, current[comp])
-        changed[comp] = True
-    # newline="\n": without it Windows text mode writes CRLF, and CI then reads the version
-    # values with a trailing \r (which breaks mc-publish's file paths).
-    # dry: report the bump without writing, so a dry run leaves the tree clean and the caller can
-    # still show the versions and tag it would have used.
-    if dry:
-        log(f"[dry-run] would bump {', '.join(targets)} to stamp {stamp}")
-    else:
+        if comp not in current:
+            die(f"versions.properties has no '{comp}=' entry")
+        new_versions[comp] = versioning.bump(current[comp], stamp)
+        text = set_prop(text, comp, new_versions[comp])
+    if not dry:
         VERSIONS.write_text(text, encoding="utf-8", newline="\n")
-        log(f"bumped {', '.join(targets)} to stamp {stamp}")
-    return changed, current
+    log(f"stamped {', '.join(targets)} with {stamp}")
+    return new_versions
 
 
-def bump_semantic(mc, mod, part, dry=False):
-    """Move the semantic version line, dropping the stamp so the build re-stamps it.
+def bump_semantic_all(versions, mod, part, dry=False):
+    """Move the semantic version line for the named component(s), without a stamp or a commit."""
+    ids = union_ids(versions)
+    if mod == "all":
+        targets = ids
+    elif mod in ids:
+        targets = [mod]
+    else:
+        die(f"unknown mod '{mod}' (known: {', '.join(ids)}, all)")
+    text = VERSIONS.read_text(encoding="utf-8")
+    current = read_props(VERSIONS)
+    new_versions = dict(current)
+    for comp in targets:
+        if comp not in current:
+            die(f"versions.properties has no '{comp}=' entry")
+        new_versions[comp] = versioning.bump_semantic(current[comp], part)
+        text = set_prop(text, comp, new_versions[comp])
+    if not dry:
+        VERSIONS.write_text(text, encoding="utf-8", newline="\n")
+    log(f"bumped {', '.join(targets)} to the {part} line")
+    return new_versions
 
-    This is the only supported way to change <major>.<minor>.<patch>: the tooling stays the sole
-    writer of versions.properties, so a hand edit cannot drift from what the build and the tag
-    expect. A feature branch takes the next patch so its jars are distinguishable from the released
-    line by filename; a release that needs more asks for minor or major explicitly.
+
+# --- jars ---------------------------------------------------------------------------
+
+
+def bundle_definitions(mc=None):
+    """bundles.properties as an ordered {name: [module ids]} map.
+
+    Only bare bundle.<name> keys are membership; bundle.<name>.title and .description are display
+    strings and must not be counted as bundles. The mc argument is accepted for the multi-module
+    workflows and ignored: bundles.properties is project-wide.
     """
-    text = VERSIONS.read_text(encoding="utf-8")
-    current = read_props(VERSIONS)
+    bundles_file = ROOT / "bundles.properties"
+    if not bundles_file.exists():
+        return {}
+    props = read_props(bundles_file)
+    out = {}
+    for key in sorted(k for k in props if re.fullmatch(r"bundle\.[^.]+", k)):
+        ids = [i.strip() for i in props[key].split(",") if i.strip()]
+        if ids:
+            out[key[len("bundle."):]] = ids
+    return out
+
+
+def bundle_name(key, version, mc):
+    abbrev = (read_props(VERSIONS).get("abbrev") or "").strip()
+    prefix = f"{abbrev}-" if abbrev else ""
+    return f"{prefix}bundle-{key}-{version}-universal-{mc}.jar"
+
+
+def _version_key(value):
+    return [int(part) if part.isdigit() else 0 for part in value.split(".")]
+
+
+def changed_bundles(mc, changed):
+    """Bundles whose member modules changed."""
+    return {name for name, ids in bundle_definitions(mc).items()
+            if any(changed.get(module) for module in ids)}
+
+
+def gameplay_ids(mc):
+    """Every module id except the library, in directory order."""
+    libs = set(library_ids(mc))
+    return [module for module in module_ids(mc) if module not in libs]
+
+
+def bundle_versions(mc, versions):
+    """The highest version among each bundle's modules, checked against the built jar."""
+    out = {}
+    for key, ids in bundle_definitions(mc).items():
+        version = max((versions[module] for module in ids), key=_version_key)
+        expected = dist_dir(mc) / bundle_name(key, version, mc)
+        if not expected.exists():
+            built = sorted(dist_dir(mc).glob(bundle_name(key, "*", mc)))
+            die(f"bundle '{key}' should be {expected.name} but dist/ has "
+                + (", ".join(path.name for path in built) if built else "no such bundle jar"))
+        out[key] = version
+    return out
+
+
+def expected_jars(mc):
+    """Per-loader + sources + universal jars for every module, plus three jars per bundle."""
     ids = module_ids(mc)
-    if mod == "all":
-        targets = ids
-    elif mod in ids:
-        targets = [mod]
-    else:
-        die(f"unknown mod '{mod}' (known: {', '.join(ids)}, all)")
-    changed = {c: False for c in ids}
-    for comp in targets:
-        current[comp] = versioning.bump_semantic(current[comp], part)
-        text = set_prop(text, comp, current[comp])
-        changed[comp] = True
+    loaders = ["fabric", "neoforge"]
+    loader_jars = len(ids) * len(loaders)
+    sources = len(ids) * len(loaders)
+    universal = len(ids)
+    bundles = len(bundle_definitions())
+    return loader_jars + sources + universal + bundles * (1 + len(loaders))
+
+
+def verify(mc, dry):
     if dry:
-        log(f"[dry-run] would bump {', '.join(targets)} to {part}: "
-            + ", ".join(f"{c}={current[c]}" for c in targets))
-    else:
-        VERSIONS.write_text(text, encoding="utf-8", newline="\n")
-        log(f"bumped {', '.join(targets)} to {part}: "
-            + ", ".join(f"{c}={current[c]}" for c in targets))
-    return changed, current
-
-
-# --- build --------------------------------------------------------------------------
-
-
-def build(mc, dry, no_daemon=False, stamp=None):
-    g = gradlew()
-    # Reuse the warm 12G daemon across these invocations by default: each one used to start a cold
-    # JVM and reconfigure all 12 included builds. --no-daemon is available to reproduce a CI-like
-    # cold build (CI always passes it, where each run is a fresh container).
-    daemon = ["--no-daemon"] if no_daemon else []
-    # One stamp, computed once, by versioning.stamp() and written into versions.properties for the
-    # component being released. Gradle would otherwise compute its own at build time, and the two can
-    # disagree: an hour boundary between this call and the build, or a component still holding a bare
-    # "1.0.0" (a project generated from the template), which stampVersion() stamps at build time.
-    # Then the jar names built from the python value do not match the jars on disk, and every upload
-    # path misses and skips silently. Passing the stamp in makes the two agree by construction.
-    pin = [f"-PversionStamp={stamp}"] if stamp else []
-    # Bootstrap: the API artifacts must be in repo/ before the hosts compile, because hosts
-    # require an API version floor ([<api>,1.1)).
-    run(g + daemon + pin + ["-p", f"versions/{mc}/api/fabric",
-             "publishMavenJavaPublicationToRepoRepository"], dry=dry)
-    run(g + daemon + pin + ["-p", f"versions/{mc}/api/neoforge",
-             "publishMavenJavaPublicationToRepoRepository"], dry=dry)
-    # Staged build (loader jars -> loader bundles -> universal -> universal bundles) as four
-    # invocations, so a failure names the layer that broke. The last one also unions the staged
-    # dirs into build/release/<mc>/ and republishes the API to ./repo.
-    # --refresh-dependencies: the floor range was just republished, so don't use a cached resolution.
-    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies", "releaseLoaderJars"],
-        dry=dry)
-    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseLoaderBundles"], dry=dry)
-    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseUniversal"], dry=dry)
-    run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "releaseUniversalBundles", "releaseJars",
-             "publishRepo"], dry=dry)
+        return
+    jars = sorted(p.name for p in dist_dir(mc).glob("*.jar"))
+    expected = expected_jars(mc)
+    if len(jars) != expected:
+        die(f"expected {expected} release jars for {mc}, found {len(jars)}: {jars}")
+    bad = [j for j in jars if not ALLOWED_JAR.match(j)]
+    if bad:
+        die(f"unexpected files in dist/{mc}/: {bad}")
+    log(f"{mc}: release jar set OK ({len(jars)} files)")
 
 
 def collect(mc, dry):
     if not dry:
-        # Clear this version's staged artifacts; the tracked dist/.gitkeep stays at the root.
         out = dist_dir(mc)
         out.mkdir(parents=True, exist_ok=True)
         for path in out.iterdir():
@@ -332,493 +294,197 @@ def collect(mc, dry):
     verify(mc, dry)
 
 
-def verify(mc, dry):
-    if dry:
-        return
-    jars = sorted(p.name for p in dist_dir(mc).glob("*.jar"))
-    bad = [j for j in jars if not ALLOWED_JAR.match(j)]
-    if bad:
-        die(f"unexpected files in dist/{mc}/: {bad}")
-    expected = expected_jars(mc)
-    if len(jars) != expected:
-        die(f"expected {expected} release jars, found {len(jars)}: {jars}")
-    log(f"release jar set OK ({len(jars)} files)")
+# --- build --------------------------------------------------------------------------
+
+
+def build(mc, dry, no_daemon=False, stamp=None):
+    g = gradlew()
+    daemon = ["--no-daemon"] if no_daemon else []
+    pin = [f"-PversionStamp={stamp}"] if stamp else []
+    # Library artifacts must be in repo/ before dependents compile.
+    for lib_id in library_ids(mc):
+        for loader in ("fabric", "neoforge"):
+            run(g + daemon + pin + ["-p", f"versions/{mc}/{lib_id}/{loader}",
+                     "publishMavenJavaPublicationToRepoRepository"], dry=dry)
+    steps = [
+        ["releaseLoaderJars"],
+        ["releaseLoaderBundles"],
+        ["releaseUniversal"],
+        ["releaseUniversalBundles", "releaseJars"],
+    ]
+    for step in steps:
+        run(g + daemon + pin + ["--console=plain", f"-Pmc={mc}", "--refresh-dependencies"] + step, dry=dry)
 
 
 def changelog(tag, mc, dry):
     if dry:
         return
-    lines = capture(["git", "log", "-3", "--no-merges", "--pretty=format:- %s (`%h`)"])
-    link = f"https://github.com/{repo_slug()}/releases/tag/{tag}"
     dest = dist_dir(mc)
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / "changelog.md").write_text(f"{lines}\n\nFull changelog: {link}\n", encoding="utf-8")
+    try:
+        prev = capture(["git", "describe", "--tags", "--abbrev=0",
+                        "--match", f"v*-{mc}", "HEAD^"]).strip()
+    except subprocess.CalledProcessError:
+        prev = ""
+    if prev:
+        log_range = [f"{prev}..HEAD", f"..HEAD"]
+        header = f"Changes since {prev}"
+    else:
+        log_range = ["HEAD"]
+        header = f"Initial release for Minecraft {mc}"
+    lines = [header, ""]
+    for rng in log_range:
+        out = capture(["git", "log", rng, "--no-merges", "--pretty=format:- %s (`%h`)"])
+        if out.strip():
+            lines.append(out.strip())
+            break
+    (dest / "changelog.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     log(f"wrote dist/{mc}/changelog.md")
 
 
-def _version_key(v):
-    return [int(p) if p.isdigit() else 0 for p in v.split(".")]
+# --- tags ---------------------------------------------------------------------------
 
 
-def bundle_versions(mc, versions):
-    """Version of each bundle: the highest version among its modules, as gradle/versions.gradle's
-    maxVersion computes it.
-
-    Computed here from versions.properties and bundles.properties rather than read back out of the
-    built jar's filename. Reading it back meant the publish paths trusted a substring slice of an
-    artifact name, and a change to the naming convention would have mangled a version rather than
-    failed. The built file is still checked against this value, so a divergence between what was
-    computed here and what the build actually produced is an error, not a silently wrong upload.
-    """
-    out = {}
-    for key, ids in bundle_definitions(mc).items():
-        version = max((versions[i] for i in ids), key=_version_key)
-        expected = dist_dir(mc) / bundle_name(key, version, mc)
-        if not expected.exists():
-            built = sorted(dist_dir(mc).glob(bundle_name(key, "*", mc)))
-            die(f"bundle '{key}' should be {expected.name} but dist/ has "
-                + (", ".join(b.name for b in built) if built else "no such bundle jar"))
-        out[key] = version
-    return out
+def tag_for(target, versions, explicit):
+    ids = module_ids(target)
+    if not ids:
+        die(f"no modules found under versions/{target}")
+    primary = primary_id(target)
+    version = versions.get(primary)
+    if not version:
+        die(f"versions.properties has no version for '{primary}'")
+    if explicit:
+        if not explicit.endswith(f"-{target}"):
+            die(f"tag {explicit!r} must end with -{target}")
+        return explicit
+    if len(version.split(".")) < 4:
+        die(f"version {version} for {primary} is not stamped; run the prepare phase first")
+    return f"v{version}-{target}"
 
 
-# --- git ----------------------------------------------------------------------------
-
-
-def repo_slug():
-    url = capture(["git", "remote", "get-url", "origin"]).strip()
-    m = re.search(r"github\.com[:/](?P<slug>[^/]+/[^/.]+?)(?:\.git)?$", url)
-    if not m:
-        die(f"cannot parse origin URL: {url}")
-    return m.group("slug")
-
-
-def current_branch():
-    return capture(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
-
-
-def ensure_clean(allow_dirty):
+def ensure_clean(allow_dirty=False):
     if allow_dirty:
         return
     if capture(["git", "status", "--porcelain"]).strip():
-        die("working tree is dirty; commit/stash first or pass --allow-dirty")
+        die("working tree is dirty; commit or stash first")
 
 
-def commit(paths, message, dry, sign=True):
-    run(["git", "add", "--"] + [str(p) for p in paths], dry=dry)
-    if not dry and capture(["git", "diff", "--cached", "--name-only"]).strip() == "":
-        log("nothing staged; skipping commit")
-        return False
-    cmd = ["git"]
-    if not sign:
-        cmd += ["-c", "commit.gpgsign=false"]
-    cmd += ["commit", "-m", message]
-    run(cmd, dry=dry)
-    return True
-
-
-def tag_release(tag, message, sign, dry):
-    """Create the release tag locally (signed unless --unsigned) so it carries a GPG signature."""
-    if not dry and capture(["git", "tag", "--list", tag]).strip():
-        die(f"tag {tag} already exists; delete it or release with --tag")
-    cmd = ["git"]
-    if sign:
-        cmd += ["tag", "-s", tag, "-m", message]
-    else:
-        cmd += ["-c", "tag.gpgSign=false", "tag", tag, "-m", message]
-    run(cmd, dry=dry)
-
-
-# --- GitHub API ---------------------------------------------------------------------
-
-
-def github_token():
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        return token
-    out = subprocess.run(
-        ["git", "credential", "fill"],
-        input=b"protocol=https\nhost=github.com\n\n",
-        capture_output=True,
-    ).stdout.decode()
-    for line in out.splitlines():
-        if line.startswith("password="):
-            return line[len("password="):]
-    die("no GITHUB_TOKEN and no stored github.com credential")
-
-
-def gh_request(method, url, token, data=None, content_type="application/vnd.github+json"):
-    body = json.dumps(data).encode() if data is not None else None
-    req = urllib.request.Request(url, data=body, method=method)
-    req.add_header("Authorization", f"token {token}")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("User-Agent", UA)
-    if body is not None:
-        req.add_header("Content-Type", content_type)
+def ensure_pushed():
     try:
-        with urllib.request.urlopen(req) as resp:
-            payload = resp.read().decode()
-            return resp.status, (json.loads(payload) if payload else None)
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read().decode()
+        upstream = capture(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).strip()
+    except subprocess.CalledProcessError:
+        die("no upstream branch; push the prepared commit first")
+    if not upstream:
+        die("no upstream branch; push the prepared commit first")
+    ahead = capture(["git", "rev-list", "--count", "@{u}..HEAD"]).strip()
+    if ahead != "0":
+        die(f"{ahead} commit(s) are not pushed; push the prepared commit first")
 
 
-def github_release(token, tag, target, body, dry):
-    """Create the release as a draft; publish_release() flips it once the jars are attached.
-
-    A published release fires `release: published` immediately, which starts the publish workflow
-    while the asset upload is still running - the workflow then downloads a partial jar set and
-    fails its count check. Drafting defers that event until the release is complete.
-    """
-    url = f"https://api.github.com/repos/{repo_slug()}/releases"
-    if dry:
-        print(f"  [dry-run] POST {url} tag={tag} target={target} generate_release_notes=true draft=true")
-        return None
-    status, resp = gh_request("POST", url, token, {
-        "tag_name": tag,
-        "target_commitish": target,
-        "name": f"MC Storage Area Network {tag}",
-        "body": body,
-        "draft": True,
-        "prerelease": False,
-        "generate_release_notes": True,
-    })
-    if status not in (200, 201):
-        die(f"GitHub release create failed ({status}): {resp}")
-    return resp
-
-
-def upload_assets(token, release_id, mc, dry):
-    for jar in sorted(dist_dir(mc).glob("*.jar")):
-        url = f"https://uploads.github.com/repos/{repo_slug()}/releases/{release_id}/assets?name={jar.name}"
-        if dry:
-            print(f"  [dry-run] upload {jar.name}")
-            continue
-        req = urllib.request.Request(url, data=jar.read_bytes(), method="POST")
-        req.add_header("Authorization", f"token {token}")
-        req.add_header("Accept", "application/vnd.github+json")
-        req.add_header("User-Agent", UA)
-        req.add_header("Content-Type", "application/octet-stream")
-        try:
-            with urllib.request.urlopen(req) as resp:
-                log(f"uploaded {jar.name} ({resp.status})")
-        except urllib.error.HTTPError as exc:
-            die(f"asset upload failed for {jar.name} ({exc.code}): {exc.read().decode()}")
-
-
-def publish_release(token, release_id, dry):
-    """Flip the draft release to published, now that every jar is attached.
-
-    This is the single trigger for the platform publish: un-drafting fires `release: published`,
-    which starts publish-release.yml. Nothing else dispatches it, so a release cannot be published
-    twice.
-    """
-    url = f"https://api.github.com/repos/{repo_slug()}/releases/{release_id}"
-    if dry:
-        print(f"  [dry-run] PATCH {url} draft=false")
+def create_tags(versions, args):
+    ensure_clean()
+    ensure_pushed()
+    current = read_props(VERSIONS)
+    tags = []
+    for target in versions:
+        tag = tag_for(target, current, args.tag)
+        if tag in tags:
+            die(f"duplicate tag {tag}")
+        if not args.dry_run and capture(["git", "tag", "--list", tag]).strip():
+            die(f"tag {tag} already exists")
+        tags.append(tag)
+    if args.dry_run:
+        for tag in tags:
+            print(f"  [dry-run] git tag {tag}")
         return
-    status, resp = gh_request("PATCH", url, token, {"draft": False})
-    if status != 200:
-        die(f"GitHub release publish failed ({status}): {resp}")
-    log("published the GitHub release; the release event starts the platform publish")
+    for tag in tags:
+        cmd = ["git"]
+        if args.unsigned:
+            cmd += ["-c", "tag.gpgSign=false", "tag", tag, "-m", f"Release {tag}"]
+        else:
+            cmd += ["tag", "-s", tag, "-m", f"Release {tag}"]
+        run(cmd)
+    log("created local tags: " + ", ".join(tags))
+    for tag in tags:
+        log(f"push it to trigger the release workflow: git push origin {tag}")
 
 
-# --- CurseForge ---------------------------------------------------------------------
-
-def cf_headers(token):
-    return {"X-Api-Token": token, "Accept": "application/json", "User-Agent": UA}
-
-
-def cf_game_version_ids(token, mc, dry):
-    url = "https://minecraft.curseforge.com/api/game/versions"
-    if dry:
-        print(f"  [dry-run] GET {url}")
-        return []
-    req = urllib.request.Request(url, headers=cf_headers(token))
-    with urllib.request.urlopen(req) as resp:
-        rows = json.load(resp)
-    wanted = {mc: True, "Fabric": True, "NeoForge": True}
-    ids = [r["id"] for r in rows if r.get("name") in wanted]
-    log(f"CurseForge game version ids for {mc}: {ids}")
-    return ids
-
-
-def cf_upload(token, project_id, file_path, metadata, dry, attempt_retries=5):
-    url = f"https://minecraft.curseforge.com/api/projects/{project_id}/upload-file"
-    if dry:
-        print(f"  [dry-run] POST {url} <- {file_path.name}")
-        return None
-    for attempt in range(1, attempt_retries + 1):
-        proc = subprocess.run(
-            ["curl", "-fsS", "-X", "POST", url, "-H", f"X-Api-Token: {token}",
-             "-F", f"metadata={json.dumps(metadata)};type=application/json",
-             "-F", f"file=@{file_path}"],
-            cwd=ROOT, capture_output=True, text=True,
-        )
-        if proc.returncode == 0:
-            try:
-                return json.loads(proc.stdout)
-            except json.JSONDecodeError:
-                die(f"CurseForge returned non-JSON: {proc.stdout[:200]}")
-        log(f"CurseForge upload attempt {attempt} failed: {proc.stderr.strip()[:160]}")
-        import time
-        time.sleep(15)
-    die(f"CurseForge upload gave up on {file_path.name}")
-
-
-def cf_publish(token, project_id, mc, changed, versions, bundles, dry):
-    version_ids = cf_game_version_ids(token, mc, dry)
-    common = {"releaseType": "release", "gameVersions": version_ids,
-              "changelog": (dist_dir(mc) / "changelog.md").read_text(encoding="utf-8") if (dist_dir(mc) / "changelog.md").exists() else "",
-              "changelogType": "markdown"}
-    parent_key = f"cf.api.file.{mc}"
-    (lib,) = library_ids(mc)
-    others = gameplay_ids(mc)
-
-    if changed[lib]:
-        lib_jar = dist_dir(mc) / jar_name(lib, versions[lib], "universal", mc)
-        result = cf_upload(token, project_id, lib_jar, {**common, "displayName": lib_jar.name}, dry)
-        file_id = (result or {}).get("id")
-        if file_id:
-            set_state(parent_key, str(file_id))
-            log(f"{parent_key}={file_id}")
-            for comp in others:
-                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal", mc)
-                if jar.exists():
-                    cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": file_id}, dry)
-    else:
-        parent = read_props(STATE).get(parent_key) if STATE.exists() else None
-        if parent:
-            for comp in others:
-                if not changed[comp]:
-                    continue
-                jar = dist_dir(mc) / jar_name(comp, versions[comp], "universal", mc)
-                if jar.exists():
-                    cf_upload(token, project_id, jar, {**common, "displayName": jar.name, "parentFileID": int(parent)}, dry)
-
-    for filename in bundle_jobs(mc, changed, bundles):
-        jar = dist_dir(mc) / filename
-        if not jar.exists():
-            # Do not skip silently: a missing jar here means the name or the version is wrong, and
-            # that is a bug, not a reason to publish a partial set.
-            die(f"bundle jar missing from dist/: {filename}")
-        cf_upload(token, project_id, jar, {**common, "displayName": jar.name}, dry)
-
-
-# --- Modrinth -----------------------------------------------------------------------
-
-
-def modrinth_sync(token, project, state_key, version_number, version_name, mc, primary, extras, dry):
-    data = {
-        "project_id": project,
-        "name": version_name,
-        "version_number": version_number,
-        "changelog": (dist_dir(mc) / "changelog.md").read_text(encoding="utf-8") if (dist_dir(mc) / "changelog.md").exists() else "",
-        "version_type": "release",
-        "status": "listed",
-        "featured": False,
-        "environment": "client_and_server",
-        "loaders": ["fabric", "neoforge"],
-        "game_versions": [mc],
-        "dependencies": [],
-    }
-    previous = read_props(STATE).get(state_key) if STATE.exists() else None
-    # Every file named here is uploaded, so a missing one is a naming or version bug. Fail before
-    # the request rather than after: a curl error would otherwise be logged and swallowed below,
-    # and the release would report success having published nothing.
-    missing = [p.name for p in [primary, *extras] if not p.exists()]
-    if missing:
-        die(f"modrinth upload for {state_key}: not in dist/: {missing}")
-    if dry:
-        print(f"  [dry-run] modrinth POST /v2/version project={project} v={version_number} files={[primary.name] + [e.name for e in extras]}")
-        return
-    cmd = ["curl", "-fsS", "-X", "POST", "https://api.modrinth.com/v2/version",
-           "-H", f"Authorization: {token}",
-           "-F", f"data={json.dumps(data)};type=application/json",
-           "-F", f"file=@{primary}"]
-    for extra in extras:
-        cmd += ["-F", f"file=@{extra}"]
-    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-    if proc.returncode != 0:
-        log(f"modrinth: upload failed: {proc.stderr.strip()[:200]}")
-        return
-    new_id = json.loads(proc.stdout).get("id")
-    if not new_id:
-        log(f"modrinth: no id in response: {proc.stdout[:200]}")
-        return
-    set_state(state_key, new_id)
-    log(f"modrinth: created {new_id} ({version_number})")
-    if previous and previous != new_id:
-        req = urllib.request.Request(
-            f"https://api.modrinth.com/v2/version/{previous}",
-            data=b'{"requested_status":"archived"}', method="PATCH")
-        req.add_header("Authorization", token)
-        req.add_header("Content-Type", "application/json")
-        req.add_header("User-Agent", UA)
-        try:
-            urllib.request.urlopen(req)
-            log(f"modrinth: archived {previous}")
-        except urllib.error.HTTPError as exc:
-            log(f"modrinth: could not archive {previous} ({exc.code})")
-
-
-# --- release-state.properties -------------------------------------------------------
-
-
-def set_state(key, value):
-    lines = STATE.read_text(encoding="utf-8").splitlines() if STATE.exists() else []
-    pattern = re.compile(rf"^{re.escape(key)}=.*$")
-    for i, line in enumerate(lines):
-        if pattern.match(line):
-            lines[i] = f"{key}={value}"
-            break
-    else:
-        lines.append(f"{key}={value}")
-    STATE.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-
-
-# --- orchestration ------------------------------------------------------------------
+# --- main ---------------------------------------------------------------------------
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Build and publish a release locally.")
-    ap.add_argument("--mod", required=True,
-                    choices=versioning.module_ids(ARGS_MC_DEFAULT) + ["all"],
-                    help="which module is changing (the tag is always v<library>.<stamp>-<mc>)")
+    ap = argparse.ArgumentParser(description="Prepare versions and create release tags locally.")
     ap.add_argument("--mc", default=None,
-                    help="Minecraft version folder under versions/ (default: mc in gradle.properties)")
-    ap.add_argument("--tag", default=None)
-    ap.add_argument("--curseforge", action="store_true", help="also upload to CurseForge")
-    ap.add_argument("--modrinth", action="store_true", help="also upload to Modrinth")
-    ap.add_argument("--no-ci-publish", action="store_true",
-                    help="do not ask CI to publish the release to CurseForge/Modrinth")
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--unsigned", action="store_true", help="do not GPG-sign the commit and tag")
-    ap.add_argument("--allow-dirty", action="store_true")
-    ap.add_argument("--no-push", action="store_true")
-    ap.add_argument("--skip-build", action="store_true",
-                    help="reuse the existing dist/<mc>/")
-    ap.add_argument("--no-daemon", action="store_true",
-                    help="do not reuse a Gradle daemon (slower; reproduces a CI-like cold build)")
+                    help="Minecraft version under versions/ (default: every version)")
+    ap.add_argument("--mod", default=None,
+                    help="which component is changing: a module id or 'all'")
+    ap.add_argument("--tag", default=None,
+                    help="explicit tag name for --create-tags (requires --mc)")
+    ap.add_argument("--create-tags", action="store_true",
+                    help="create the local per-version tags from the committed versions.properties")
     ap.add_argument("--local-only", action="store_true",
-                    help="build and stage the jars locally only: no commit, tag, push, GitHub release "
-                         "or platform/CI publishing. versions.properties is still bumped so the local "
-                         "jars carry the next version; undo with `git checkout -- versions.properties`.")
+                    help="stamp and build every selected version; never create tags")
     ap.add_argument("--bump", choices=("patch", "minor", "major"), default=None,
-                    help="move the semantic version line and stop: no build, no tag, no push. A feature "
-                         "branch takes the next patch so its jars are distinguishable from the released "
-                         "line by filename. Commits the change; --dry-run shows it without writing.")
-    ap.add_argument("--commit", action="store_true",
-                    help="with --bump, also commit the change (otherwise it is left staged for review)")
+                    help="move the semantic version line and stop; never commits")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--unsigned", action="store_true",
+                    help="create unsigned tags")
+    ap.add_argument("--allow-dirty", action="store_true")
+    ap.add_argument("--skip-build", action="store_true",
+                    help="do not rebuild; verify the existing dist/<mc>/")
+    ap.add_argument("--no-daemon", action="store_true",
+                    help="do not reuse a Gradle daemon")
     args = ap.parse_args()
 
-    dry = args.dry_run
-    args.mc = args.mc or default_mc()
-    ensure_clean(args.allow_dirty)
+    versions = selected_versions(args)
 
-    # --bump is a standalone, version-only operation: it writes versions.properties and stops. It
-    # never builds or publishes, so it is safe to run in a worktree or a plain checkout.
     if args.bump:
-        bump_semantic(args.mc, args.mod, args.bump, dry)
-        if not dry and args.commit:
-            commit([VERSIONS], f"Bump {args.mod} to the {args.bump} line", dry, not args.unsigned)
-        elif not dry:
-            log("left uncommitted; review with `git diff versions.properties`, then "
-                "`git commit -am` or re-run with --commit")
+        if args.create_tags or args.local_only:
+            die("--bump cannot be combined with --create-tags or --local-only")
+        if not args.mod:
+            die("--bump requires --mod")
+        ensure_clean(args.allow_dirty)
+        bump_semantic_all(versions, args.mod, args.bump, args.dry_run)
+        log("no commit or build was performed; review and commit versions.properties")
         return
 
-    stamp = versioning.stamp()
-    changed, versions = bump(args.mc, args.mod, stamp, dry)
-    if dry:
-        log("[dry-run] versions.properties left unchanged")
-
-    # The library is the release line: the tag is keyed on its version, and the dependants resolve
-    # their floor from its versions.properties entry at configuration time, so a library bump needs
-    # no rewriting of any dependant file.
-    (lib,) = library_ids(args.mc)
-    if changed[lib]:
-        for path in versioning.floor_paths(args.mc, lib):
-            log(f"floor dependant of {lib} {versions[lib]}: {path}")
+    if args.create_tags:
+        if args.local_only:
+            die("--create-tags cannot be combined with --local-only")
+        if args.tag and len(versions) != 1:
+            die("--tag requires exactly one version; pass --mc")
+        create_tags(versions, args)
+        return
 
     if args.tag:
-        tag = args.tag
-        if not tag.endswith(f"-{args.mc}"):
-            die(f"tag {tag!r} must end with -{args.mc} (the Minecraft version)")
-    else:
-        tag = versioning.tag(versions[lib], stamp, args.mc)
-    log(f"tag: {tag}")
+        die("--tag is only valid with --create-tags")
+    if not args.mod:
+        die("release preparation requires --mod, or use --create-tags / --bump")
 
-    if not args.skip_build:
-        build(args.mc, dry, args.no_daemon, stamp)
-        collect(args.mc, dry)
-    else:
-        verify(args.mc, dry)
-    changelog(tag, args.mc, dry)
+    ensure_clean(args.allow_dirty)
+    stamp = versioning.stamp()
+    new_versions = bump_all(versions, args.mod, stamp, args.dry_run)
 
+    if args.tag and len(versions) != 1:
+        die("--tag requires exactly one version; pass --mc")
+
+    for target in versions:
+        tag = tag_for(target, new_versions, args.tag)
+        if not args.skip_build:
+            build(target, args.dry_run, args.no_daemon, stamp)
+            collect(target, args.dry_run)
+        else:
+            verify(target, args.dry_run)
+        changelog(tag, target, args.dry_run)
+
+    log(f"prepared {', '.join(versions)} with stamp {stamp}")
+    log(f"files to commit: {VERSIONS}" + (f", {ROOT / 'repo'}" if (ROOT / "repo").exists() else ""))
     if args.local_only:
-        log(f"local-only: built the {tag} jars into build/release/{args.mc}/ and dist/{args.mc}/")
-        log("no commit, tag, push, GitHub release or platform publishing was performed")
-        log("versions.properties was bumped; undo with: git checkout -- versions.properties")
-        return
-
-    sign = not args.unsigned
-
-    # Commit the bump (so the tag points at the bumped versions), then sign+push the tag.
-    bump_paths = [VERSIONS, ROOT / "repo"]
-    if commit(bump_paths, f"Release {tag}: bump {args.mod} version", dry, sign):
-        if not args.no_push:
-            run(["git", "push", "origin", current_branch()], dry=dry)
-    tag_release(tag, f"Release {tag}", sign, dry)
-    if not args.no_push:
-        run(["git", "push", "origin", tag], dry=dry)
-
-    # GitHub release against the tag we just pushed. Created as a draft and published only after the
-    # jars are attached, so the `release: published` event - the single trigger for the CI platform
-    # publish - never sees a half-uploaded release.
-    token = github_token()
-    target = capture(["git", "rev-parse", "HEAD"]).strip()
-    # The marker tells the publish workflow to skip this release. It is set when the platforms are
-    # published from here (--curseforge/--modrinth) or when they must not be published at all
-    # (--no-ci-publish); otherwise the release event publishes them.
-    marker = "<!-- mc-san:published -->" if (args.curseforge or args.modrinth or args.no_ci_publish) else ""
-    release = github_release(token, tag, target, marker, dry)
-    if release:
-        upload_assets(token, release["id"], args.mc, dry)
-        publish_release(token, release["id"], dry)
-
-    bundles = bundle_versions(args.mc, versions)
-
-    if args.curseforge:
-        cf = os.environ.get("CURSEFORGE_API_KEY")
-        if not cf:
-            die("--curseforge needs CURSEFORGE_API_KEY (use tools/secrets.py run)")
-        cf_publish(cf, os.environ.get("CURSEFORGE_PROJECT_ID", "1690770"), args.mc, changed, versions, bundles, dry)
-
-    if args.modrinth:
-        mr = os.environ.get("MODRINTH_TOKEN")
-        if not mr:
-            die("--modrinth needs MODRINTH_TOKEN (use tools/secrets.py run)")
-        modrinth_sync(mr, os.environ.get("MODRINTH_ID", "mc-storage-area-network"),
-                      f"mr.api.version.{args.mc}", f"{versions[lib]}-{args.mc}",
-                      f"SAN API {versions[lib]}-{args.mc}", args.mc,
-                      dist_dir(args.mc) / jar_name(lib, versions[lib], "universal", args.mc),
-                      [dist_dir(args.mc) / bundle_name("all", bundles["all"], args.mc)], dry)
-
-    if (args.curseforge or args.modrinth) and commit([STATE], f"Release {tag}: update release state", dry, sign) and not args.no_push:
-        run(["git", "push", "origin", current_branch()], dry=dry)
-
-    log("done")
+        log("local-only: no tags, commit, push, release or platform upload was performed")
+    else:
+        log("next: commit and push the prepared files, then run:")
+        log("  python tools/release.py --create-tags" + (f" --mc {args.mc}" if args.mc else ""))
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        # An idle Gradle daemon keeps Loom's cached mapping jars open, and the next build needs
-        # exclusive access to re-merge them (FileSystemException: "being used by another process").
-        # Stopping it here releases those handles; the next run pays one cold start instead.
-        try:
-            subprocess.run(gradlew() + ["--stop"], cwd=ROOT,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
-        except Exception:
-            pass
+    main()

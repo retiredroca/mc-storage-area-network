@@ -101,34 +101,22 @@ pick the new artifact up automatically.
 
 ### Releasing
 
-Releases can run **locally** (build + GitHub release, optionally CurseForge/Modrinth) or on
-**GitHub** (build + publish) as a fallback.
-
-**Locally** (recommended)
+Releasing is local preparation plus a tag push. The local script never commits, pushes, creates a
+GitHub release or uploads to CurseForge/Modrinth.
 
 ```bash
-python tools/secrets.py init       # once: store CURSEFORGE_API_KEY / MODRINTH_TOKEN in an encrypted vault
-
-# build + sign + commit the version bump + signed tag + GitHub release (+ platforms)
-python tools/secrets.py run -- python tools/release.py --mod routing --curseforge --modrinth
-python tools/release.py --mod all --dry-run      # preview; no changes
+python tools/release.py --mod all --dry-run   # preview every version; no changes
+python tools/release.py --mod all             # stamp and build every version; no commit
+# commit and push the prepared files yourself
+python tools/release.py --create-tags         # create local tags; push them yourself
 ```
 
-`--mod` is `api` / `storage` / `crafting` / `routing` / `access` / `all`; pass `all` (or run
-**Release All**) whenever several components changed together, so no old version ends up inside a
-bundle. The tag is a single series per Minecraft version `v1.0.<patch>.<stamp>-<mc>` (e.g.
-`v1.0.2.26091512-1.21.1`). The local run
-publishes the API to `repo/` first (hosts require an API version **floor**, so the artifact must be
-resolvable before they compile), builds the four groups in order, commits/tags, creates the release,
-and optionally uploads to the platforms. Creating the release triggers the publish-only workflow —
-unless the local run already published (it marks the release so CI skips it). Add `--unsigned` to
-skip GPG.
-
-**On GitHub (fallback)**
-
-Run **Release All** (or a per-mod workflow) from the Actions tab, or comment `/release-all`. That
-path bumps versions, publishes the API, builds and publishes from source; the tag is computed the
-same way (`v1.0.2.<stamp>`). CI cannot sign with your key, so its tags are unsigned.
+`--mod` is `api` / `storage` / `crafting` / `routing` / `access` / `all`; use `all` when several
+components changed together. Without `--mc` every version under `versions/` is prepared; the current
+tree has 1.21.1. The tag push triggers `.github/workflows/release-tag.yml`, which builds the jars in
+CI and creates the GitHub release with every jar and sources jar. That release event runs the platform
+workflow, which uploads only universal component and bundle jars to CurseForge/Modrinth. The workflow
+does not commit; download the `release-state.properties` artifact and commit it yourself.
 
 ### Repository configuration (maintainers)
 
