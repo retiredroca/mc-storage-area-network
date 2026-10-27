@@ -101,22 +101,21 @@ pick the new artifact up automatically.
 
 ### Releasing
 
-Releasing is local preparation plus a tag push. The local script never commits, pushes, creates a
-GitHub release or uploads to CurseForge/Modrinth.
+Releasing is local build plus a GitHub release. The local script never commits; commit the prepared
+files and the downloaded `release-state.properties` artifact yourself.
 
 ```bash
 python tools/release.py --mod all --dry-run   # preview every version; no changes
 python tools/release.py --mod all             # stamp and build every version; no commit
 # commit and push the prepared files yourself
-python tools/release.py --create-tags         # create local tags; push them yourself
+python tools/release.py --create-tags         # push tags + publish the GitHub releases
 ```
 
 `--mod` is `api` / `storage` / `crafting` / `routing` / `access` / `all`; use `all` when several
-components changed together. Without `--mc` every version under `versions/` is prepared; the current
-tree has 1.21.1. The tag push triggers `.github/workflows/release-tag.yml`, which builds the jars in
-CI and creates the GitHub release with every jar and sources jar. That release event runs the platform
-workflow, which uploads only universal component and bundle jars to CurseForge/Modrinth. The workflow
-does not commit; download the `release-state.properties` artifact and commit it yourself.
+components changed together. Without `--mc` every version under `versions/` is built and released;
+the current tree has 1.21.1. The local jars are attached to the GitHub release; the release event
+runs the separate `.github/workflows/publish-release.yml`, which uploads only universal component and
+bundle jars to CurseForge/Modrinth. Nothing is built in GitHub.
 
 ### Repository configuration (maintainers)
 

@@ -198,6 +198,11 @@ jobs:
         env:
           MC_VERSION: ${{ env.MC_VERSION }}
 
+      - name: Validate bundles
+        run: |
+          set -euo pipefail
+          python3 -c "import sys; sys.path.insert(0, 'tools'); import release; release.validate_bundles()"
+
       # --- CurseForge -------------------------------------------------------------------------
       # mc-publish resolves its default `files` glob (build/libs/*.jar) for every step, even the
       # CurseForge-only ones, so the downloaded release jars are staged there (see "Download release
